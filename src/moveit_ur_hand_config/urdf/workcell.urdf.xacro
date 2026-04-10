@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" name="ur_workcell">
+
+  <xacro:arg name="ur_type" default="ur10e"/>
+  <xacro:arg name="hand_type" default="inspire_strong_hand"/>
+  <xacro:arg name="flange_type" default="ring"/>
+
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
+  <xacro:include filename="$(find moveit_ur_hand_config)/urdf/workcell_environment.urdf.xacro" />
+
+  <link name="world" />
+  <xacro:workcell_environment parent="world" />
+
+  <xacro:ur_robot
+    name="$(arg ur_type)"
+    tf_prefix=""
+    parent="world"
+    joint_limits_parameters_file="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"
+    kinematics_parameters_file="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"
+    physical_parameters_file="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"
+    visual_parameters_file="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </xacro:ur_robot>
+
+  <xacro:if value="${'$(arg flange_type)' == 'robotiq'}">
+    <link name="flange_link">
+      <visual>
+        <geometry>
+          <mesh filename="package://moveit_ur_hand_config/meshes/robotiq_flange.obj" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://moveit_ur_hand_config/meshes/robotiq_flange.obj" scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.1"/>
+        <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      </inertial>
+    </link>  
+    <joint name="tool0_to_flange_link" type="fixed">
+      <parent link="tool0"/>
+      <child link="flange_link"/>
+      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+    </joint> 
+  </xacro:if>
+
+  <xacro:if value="${'$(arg flange_type)' == 'ring'}">
+    <link name="flange_link">
+      <visual>
+        <origin xyz="0 0 -0.0045" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.0375" length="0.0086"/>
+        </geometry>
+        <material name="grey"><color rgba="0.5 0.5 0.5 1.0"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 -0.0045" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.0375" length="0.0086"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <origin xyz="0 0 -0.0045" rpy="0 0 0"/>
+        <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+      </inertial>
+    </link>
+    <joint name="tool0_to_flange_link" type="fixed">
+      <parent link="tool0"/>
+      <child link="flange_link"/>
+      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+    </joint> 
+  </xacro:if>
+
+  <link name="hand_mount_frame" />
+
+  <xacro:if value="${'$(arg flange_type)' == 'robotiq'}">
+    <joint name="flange_to_mount_frame" type="fixed">
+      <parent link="flange_link"/>
+      <child link="hand_mount_frame"/>
+      <origin xyz="0 0 -0.0769" rpy="0 0 0"/> 
+    </joint>
+  </xacro:if>
+
+  <xacro:if value="${'$(arg flange_type)' == 'ring'}">
+    <joint name="flange_to_mount_frame" type="fixed">
+      <parent link="flange_link"/>
+      <child link="hand_mount_frame"/>
+      <origin xyz="0 0 -0.0086" rpy="0 0 0"/> 
+    </joint>
+  </xacro:if>
+
+  <xacro:if value="${'$(arg flange_type)' == 'none'}">
+    <joint name="tool0_to_mount_frame" type="fixed">
+      <parent link="tool0"/>
+      <child link="hand_mount_frame"/>
+      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+    </joint>
+  </xacro:if>
+
+  <xacro:if value="${'$(arg hand_type)' == 'inspire_strong_hand'}">
+    <xacro:include filename="$(find moveit_ur_hand_config)/urdf/hands/inspire_strong_hand.urdf.xacro" />
+    <xacro:inspire_hand prefix="right_" parent="hand_mount_frame">
+      <origin rpy="0 -3.14159 2.3562" xyz="0 0 0"/> 
+    </xacro:inspire_hand>
+  </xacro:if>
+
+  <xacro:if value="${'$(arg hand_type)' == 'tesollo_hand'}">
+    <xacro:include filename="$(find moveit_ur_hand_config)/urdf/hands/tesollo_hand.urdf.xacro" />
+    <xacro:tesollo_hand_macro prefix="" parent="hand_mount_frame">
+      <origin rpy="0 -3.14159 -2.3562" xyz="0 0 0"/> 
+    </xacro:tesollo_hand_macro>
+  </xacro:if>
+  
+  </robot>

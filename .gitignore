@@ -1,0 +1,6 @@
+.vscode
+.idea
+src/imitation_grasping/data/
+src/imitation_grasping/imitation_grasping/venv
+src/cam_calibrate/tcp_poses.txt
+src/cam_calibrate/images

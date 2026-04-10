@@ -1,0 +1,114 @@
+services:
+  vivetracker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ViveTracker  
+    container_name: vivetracker
+    privileged: true
+    network_mode: host
+    devices:
+      - /dev/bus/usb:/dev/bus/usb       
+    entrypoint: /home/ros/ros2_ws/entrypoint.sh
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all    
+    working_dir: /home/ros/ros2_ws
+    command: ros2 launch libsurvive_ros2 libsurvive_ros2.launch.py foxbridge:=true composable:=false  
+
+  realsense:
+    build:
+      dockerfile: Dockerfile.Realsense
+    container_name: realsense
+    network_mode: host
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /dev:/dev
+    tty: true
+    stdin_open: true
+    command: >
+        bash -c "source /ws/install/setup.bash &&
+        ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true motion_module.global_time_enabled:=true depth_module.global_time_enabled:=true rgb_camera.global_time_enabled:=true initial_reset:=true enable_sync:=true depth_module.profile:=640x480x30 rgb_camera.profile:=960x540x30"
+
+  ur_artus:
+    build:
+      dockerfile: Dockerfile.UR_Artus
+    container_name: ur_artus
+    network_mode: host
+    shm_size: '16gb'
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes: 
+      - ../src/il_main:/ros2_ws/src/il_main:rw
+      - ../src/cam_calibrate:/ros2_ws/src/cam_calibrate:rw
+      - ../src/senseglove_ros/senseglove/senseglove_description/urdf:/ros2_ws/src/il_main/third_party/senseglove/senseglove_description/urdf:rw
+
+      - ../src/hands/rh56dfx_descrption:/ros2_ws/src/hands/rh56dfx_descrption:rw
+      - ../src/hands/Sarcomere_Dynamics_Resources:/ros2_ws/src/hands/artus_hand:rw
+      - ../src/hands/inspire_hand_Linkage:/ros2_ws/src/hands/inspire_hand_strong_hand:rw
+      - ../src/hands/wuji-hand-description:/ros2_ws/src/hands/wuji_hand:rw
+      - ../src/hands/delto_m_ros2:/ros2_ws/src/hands/tesollo_hand:rw
+
+      - ../src/moveit_ur_hand_config:/ros2_ws/src/moveit_ur_hand_config:rw
+      - ./ur_entrypoint.sh:/ros2_ws/ur_entrypoint.sh:rwx
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /tmp/.docker.xauth:/tmp/.docker.xauth
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    tty: true
+    stdin_open: true
+    runtime: nvidia
+    command: >
+        bash -c "bash /ros2_ws/ur_entrypoint.sh && exec bash"
+
+
+  senseglove:
+    build:
+      dockerfile: Dockerfile.Senseglove
+      args:
+        ROS_DISTRO: jazzy 
+    privileged: true
+    container_name: senseglove
+    network_mode: host
+    volumes:
+      - ../src/senseglove_ros:/root/workspace/src/senseglove_ros:rw
+      - ./entrypoint.sh:/entrypoint.sh:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev:/dev
+      - /var/run/dbus:/var/run/dbus:rw
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DISTRO=jazzy
+      - ROS_DOMAIN_ID=0
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    group_add:
+      - dialout
+      - bluetooth 
+    tty: true
+    stdin_open: true

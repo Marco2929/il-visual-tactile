@@ -1,0 +1,91 @@
+retargeting:
+  type: vector # Using vector mapping (direction/orientation) instead of pure position
+  
+  # --- TARGET: Artus Lite ---
+  urdf_path: ros2_ws/src/il_main/third_party/Sarcomere_Dynamics_Resources/urdf/right_hand/robot.urdf
+  wrist_link_name: "right_forearm_and_palm_assembly"
+
+  # Active joints to control on the Artus Lite. 
+  target_joint_names:
+    # Thumb
+    - "thumb_01"
+    - "thumb_12"
+    - "thumb_23"
+    - "thumb_34"
+    # Index
+    - "index_01"
+    - "index_12"
+    - "index_23"
+    - "index_34"
+    # Middle
+    - "middle_01"
+    - "middle_12"
+    - "middle_23"
+    - "middle_34"
+    # Ring
+    - "ring_01"
+    - "ring_12"
+    - "ring_23"
+    - "ring_34"
+    # Pinky
+    - "pinky_01"
+    - "pinky_12"
+    - "pinky_23"
+    - "pinky_34"
+
+  # The end-effector links for the Artus Lite (fingertips)
+  target_link_names:
+    - "t1_urdf"    # Thumb Tip
+    - "d1-4_urdf"  # Index Tip
+    - "d1-3_urdf"  # Middle Tip
+    - "d1-2_urdf"  # Ring Tip
+    - "d1-1_urdf"  # Pinky Tip
+
+
+  # --- SOURCE: SenseGlove Nova 2 ---
+  human_urdf_path: ros2_ws/src/il_main/third_party/senseglove/senseglove_description/urdf/nova2/nova2_right.urdf.xacro
+  
+  # Joints in the SenseGlove to observe
+  human_joint_names:
+    # Thumb
+    # - "r_thumb_brake"
+    - "r_thumb_mcp"
+    - "r_thumb_pip"
+    - "r_thumb_dip"
+    # Index
+    # - "r_index_brake"
+    - "r_index_mcp"
+    - "r_index_pip"
+    - "r_index_dip"
+    # Middle
+    # - "r_middle_brake"
+    - "r_middle_mcp"
+    - "r_middle_pip"
+    - "r_middle_dip"
+    # Ring
+    # - "r_ring_brake"
+    - "r_ring_mcp"
+    - "r_ring_pip"
+    - "r_ring_dip"
+    # Pinky
+    # - "r_pinky_brake"
+    - "r_pinky_mcp"
+    - "r_pinky_pip"
+    - "r_pinky_dip"
+    
+  # The end-effector links for the SenseGlove
+  human_link_names:
+    - "r_thumb_flexion_three"
+    - "r_index_flexion_three"
+    - "r_middle_flexion_three"
+    - "r_ring_flexion_three"
+    - "r_pinky_flexion_three"
+
+  # --- CONFIGURATION ---
+  target_link_human_indices: [0, 1, 2, 3, 4]
+
+  # Scaling factor for hand size differences
+  scaling_factor: 1.0 
+  
+  # Smoothing factor
+  low_pass_alpha: 0.2

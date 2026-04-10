@@ -1,0 +1,465 @@
+<joint name="base_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+  <joint
+    name="palm_force_sensor_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00036819 0.012296 0.1196"
+      rpy="1.5708 0 -3.1416" />
+    <parent
+      link="base_link" />
+    <child
+      link="palm_force_sensor" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_thumb_1_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0269 0.02101 0.0689"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_thumb_1" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="0"
+      upper="1.1641"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_thumb_2_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0079252 0.0090599 0.0052"
+      rpy="1.5708 0 2.8798" />
+    <parent
+      link="right_thumb_1" />
+    <child
+      link="right_thumb_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0.5864"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_thumb_3_joint"
+    type="revolute">
+    <origin
+      xyz="0.031403 0.021069 0.00095"
+      rpy="0 0 0" />
+    <parent
+      link="right_thumb_2" />
+    <child
+      link="right_thumb_3" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="0.5"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_thumb_2_joint"
+        multiplier="0.8024"
+        offset="0" />
+  </joint>
+  <joint
+    name="thumb_force_sensor_2_joint"
+    type="fixed">
+    <origin
+      xyz="0.011771 0.01699 -0.0077514"
+      rpy="1.8405 -1.5705 3.1416" />
+    <parent
+      link="right_thumb_3" />
+    <child
+      link="thumb_force_sensor_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_thumb_4_joint"
+    type="revolute">
+    <origin
+      xyz="0.021903 0.012816 -0.0003"
+      rpy="0 0 0" />
+    <parent
+      link="right_thumb_3" />
+    <child
+      link="right_thumb_4" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_thumb_3_joint"
+        multiplier="0.9487"
+        offset="0" />
+  </joint>
+  <joint
+    name="thumb_force_sensor_3_joint"
+    type="fixed">
+    <origin
+      xyz="0.014598 0.01472 -0.0073103"
+      rpy="-0.20892 -1.5708 -0.81953" />
+    <parent
+      link="right_thumb_4" />
+    <child
+      link="thumb_force_sensor_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="thumb_force_sensor_4_joint"
+    type="fixed">
+    <origin
+      xyz="0.028987 0.017301 -0.0073512"
+      rpy="1.6795 1.5708 2.7448" />
+    <parent
+      link="right_thumb_4" />
+    <child
+      link="thumb_force_sensor_4" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="thumb_force_sensor_1_joint"
+    type="fixed">
+    <origin
+      xyz="0.0087121 0.026305 -0.0067115"
+      rpy="-1.5728 -1.5708 0.35156" />
+    <parent
+      link="right_thumb_2" />
+    <child
+      link="thumb_force_sensor_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_index_1_joint"
+    type="revolute">
+    <origin
+      xyz="-0.038679 0.00056467 0.1564"
+      rpy="1.6057 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_index_1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="1.4381"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_index_2_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0034259 0.032596 -0.00055"
+      rpy="0 0 0" />
+    <parent
+      link="right_index_1" />
+    <child
+      link="right_index_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_index_1_joint"
+        multiplier="1.0843"
+        offset="0" />      
+  </joint>
+  <joint
+    name="index_force_sensor_2_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0081655 0.037446 -0.0060795"
+      rpy="-1.5708 -1.5337 1.9196" />
+    <parent
+      link="right_index_2" />
+    <child
+      link="index_force_sensor_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="index_force_sensor_3_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0086237 0.052572 -0.0060954"
+      rpy="-1.5708 -1.5252 0.87237" />
+    <parent
+      link="right_index_2" />
+    <child
+      link="index_force_sensor_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="index_force_sensor_1_joint"
+    type="fixed">
+    <origin
+      xyz="-0.012046 0.019649 -0.006651"
+      rpy="-1.5708 -1.5351 1.3587" />
+    <parent
+      link="right_index_1" />
+    <child
+      link="index_force_sensor_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_middle_1_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0171 0.00056467 0.157"
+      rpy="1.5708 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_middle_1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="1.4381"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_middle_2_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0034259 0.032596 -0.00055"
+      rpy="0 0 0" />
+    <parent
+      link="right_middle_1" />
+    <child
+      link="right_middle_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_middle_1_joint"
+        multiplier="1.0843"
+        offset="0" />
+  </joint>
+  <joint
+    name="middle_force_sensor_2_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0090859 0.040963 -0.0061003"
+      rpy="2.7687 -1.5708 3.885" />
+    <parent
+      link="right_middle_2" />
+    <child
+      link="middle_force_sensor_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="middle_force_sensor_3_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0098294 0.056051 -0.0061006"
+      rpy="2.4672 -1.5708 3.14" />
+    <parent
+      link="right_middle_2" />
+    <child
+      link="middle_force_sensor_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="middle_force_sensor_1_joint"
+    type="fixed">
+    <origin
+      xyz="-0.012046 0.019649 -0.006651"
+      rpy="2.9295 -1.5708 3.14" />
+    <parent
+      link="right_middle_1" />
+    <child
+      link="middle_force_sensor_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_ring_1_joint"
+    type="revolute">
+    <origin
+      xyz="0.0045302 0.00056467 0.15683"
+      rpy="1.5184 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_ring_1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="1.4381"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_ring_2_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0034259 0.032596 -0.00055"
+      rpy="0 0 0" />
+    <parent
+      link="right_ring_1" />
+    <child
+      link="right_ring_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_ring_1_joint"
+        multiplier="1.0843"
+        offset="0" />
+  </joint>
+  <joint
+    name="ring_force_sensor_2_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00816549212353353 0.0374457610846523 -0.00607949056508933"
+      rpy="1.57079632679487 -1.51508890383765 -1.22202982373572" />
+    <parent
+      link="right_ring_2" />
+    <child
+      link="ring_force_sensor_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="ring_force_sensor_3_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00862372785817732 0.0525719273258207 -0.00609538761271226"
+      rpy="1.57079632679487 -1.50247215376038 -2.26922737493233" />
+    <parent
+      link="right_ring_2" />
+    <child
+      link="ring_force_sensor_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="ring_force_sensor_1_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0120461582060112 0.019648547178991 -0.00665098451502209"
+      rpy="1.57079632679491 -1.51723862304532 -1.78288465285967" />
+    <parent
+      link="right_ring_1" />
+    <child
+      link="ring_force_sensor_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="right_little_1_joint"
+    type="revolute">
+    <origin
+      xyz="0.025916 0.00056467 0.15365"
+      rpy="1.4661 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="right_little_1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="1.4381"
+      effort="10"
+      velocity="1" />
+  </joint>
+  <joint
+    name="right_little_2_joint"
+    type="revolute">
+    <origin
+      xyz="-0.0034259 0.032596 -0.00055"
+      rpy="0 0 0" />
+    <parent
+      link="right_little_1" />
+    <child
+      link="right_little_2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="0"
+      upper="3.14"
+      effort="10"
+      velocity="1" />
+    <mimic
+        joint="right_little_1_joint"
+        multiplier="1.0843"
+        offset="0" />  
+  </joint>
+  <joint
+    name="little_force_sensor_2_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00645123763174135 0.0276833479200767 -0.00611719352979621"
+      rpy="1.57079632679488 -1.45969392221055 -1.22888814145719" />
+    <parent
+      link="right_little_2" />
+    <child
+      link="little_force_sensor_2" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="little_force_sensor_3_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00639723214432697 0.042706921918282 -0.00611537168168175"
+      rpy="1.5707963267949 -1.43362674619531 -2.2760856926538" />
+    <parent
+      link="right_little_2" />
+    <child
+      link="little_force_sensor_3" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="little_force_sensor_1_joint"
+    type="fixed">
+    <origin
+      xyz="-0.0120461582060113 0.0196485471789908 -0.00665098451502223"
+      rpy="1.5707963267949 -1.4636944932668 -1.78288465285966" />
+    <parent
+      link="right_little_1" />
+    <child
+      link="little_force_sensor_1" />
+    <axis
+      xyz="0 0 0" />
+  </joint>

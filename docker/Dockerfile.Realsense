@@ -1,0 +1,43 @@
+FROM osrf/ros:humble-desktop-full
+
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# install depends, build tools
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    libusb-1.0-0-dev \
+    ros-humble-rmw-cyclonedds-cpp \
+    libudev-dev \
+    pkg-config \
+    libgtk-3-dev \
+    git wget cmake build-essential \
+    libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev at unzip &&\
+    rm -rf /var/lib/apt/lists/* 
+
+WORKDIR /ws/src
+RUN wget --tries=5 --waitretry=5 --retry-connrefused \ 
+    https://github.com/IntelRealSense/librealsense/archive/refs/tags/v2.54.2.zip &&\
+    wget --tries=5 --waitretry=5 --retry-connrefused \
+    https://github.com/IntelRealSense/realsense-ros/archive/refs/tags/4.54.1.zip &&\
+    unzip 4.54.1.zip && unzip v2.54.2.zip &&\
+    rm 4.54.1.zip && rm v2.54.2.zip
+
+RUN cd librealsense-2.54.2 &&\
+    mkdir build && cd build && cmake ../ &&\
+    make uninstall && make clean && make && make install
+    
+
+# install ros dependencies
+WORKDIR /ws/src/nakalab_realsense
+RUN . /opt/ros/humble/setup.sh &&\
+    apt-get update && apt-get install -y \
+    ros-humble-cv-bridge \
+	ros-humble-image-transport \
+	ros-humble-diagnostic-updater &&\
+    rm -rf /var/lib/apt/lists/* 
+
+WORKDIR /ws
+RUN . /opt/ros/humble/setup.sh &&\
+    colcon build --symlink-install
+
+CMD ["bash"]

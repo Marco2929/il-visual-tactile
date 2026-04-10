@@ -1,0 +1,1 @@
+savedcmd_/home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/Module.symvers -T /home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/modules.order -i Module.symvers -e 

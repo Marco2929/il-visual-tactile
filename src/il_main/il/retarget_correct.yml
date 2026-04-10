@@ -1,0 +1,38 @@
+retargeting:
+  type: position
+  urdf_path: /ros2_ws/src/hands/artus_hand/urdf/right_hand/robot.urdf
+  wrist_link_name: "right_forearm_and_palm_assembly"
+
+  target_joint_names:
+    - "thumb_01"
+    - "thumb_12"
+    - "thumb_23"
+    - "thumb_34"
+    - "index_01"
+    - "index_12"
+    - "index_23"
+    - "index_34"
+    - "middle_01"
+    - "middle_12"
+    - "middle_23"
+    - "middle_34"
+    - "ring_01"
+    - "ring_12"
+    - "ring_23"
+    - "ring_34"
+    - "pinky_01"
+    - "pinky_12"
+    - "pinky_23"
+    - "pinky_34"
+
+  target_link_names:
+    - "t1_urdf"
+    - "d1-4_urdf"
+    - "d1-3_urdf"
+    - "d1-2_urdf"
+    - "d1-1_urdf"
+
+  target_link_human_indices: [0, 1, 2, 3, 4]
+
+  scaling_factor: 1.0 
+  low_pass_alpha: 0.2

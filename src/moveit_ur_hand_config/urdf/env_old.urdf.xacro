@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="workcell_environment" params="parent">
+
+    <link name="ground_plane">
+      <visual>
+        <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+        <geometry>
+          <box size="1.1 2.3 0.02"/>
+        </geometry>
+        <material name="ground_color">
+          <color rgba="0.5 0.5 0.5 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+        <geometry>
+          <box size="1.1 2.3 0.02"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${parent}_to_ground" type="fixed">
+      <parent link="${parent}"/>
+      <child link="ground_plane"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>  
+
+    <link name="mounting_plate">
+      <visual>
+        <geometry>
+          <box size="0.4 0.4 0.015"/>
+        </geometry>
+        <material name="plate_color">
+          <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="0.4 0.4 0.015"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="ground_to_plate" type="fixed">
+      <parent link="ground_plane"/>
+      <child link="mounting_plate"/>
+      <origin xyz="0 0 0.0075" rpy="0 0 0"/>
+    </joint>  
+
+    <link name="wall_x_plus">
+      <visual>
+        <origin xyz="0 0 0.6" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 2.3 1.2"/>
+        </geometry>
+        <material name="wall_color">
+          <color rgba="0.6 0.6 0.6 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.6" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 2.3 1.2"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${parent}_to_wall_x" type="fixed">
+      <parent link="${parent}"/>
+      <child link="wall_x_plus"/>
+      <origin xyz="-0.55 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="wall_y_minus">
+      <visual>
+        <origin xyz="0 0 0.6" rpy="0 0 0"/>
+        <geometry>
+          <box size="1.05 0.02 1.2"/>
+        </geometry>
+        <material name="wall_color"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.6" rpy="0 0 0"/>
+        <geometry>
+          <box size="1.05 0.02 1.2"/>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="${parent}_to_wall_y" type="fixed">
+      <parent link="${parent}"/>
+      <child link="wall_y_minus"/>
+      <origin xyz="0 1.15 0" rpy="0 0 0"/>
+    </joint>
+
+  </xacro:macro>
+</robot>

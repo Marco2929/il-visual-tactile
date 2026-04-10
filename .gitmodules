@@ -1,0 +1,3 @@
+[submodule "src/hands/delto_m_ros2"]
+	path = src/hands/delto_m_ros2
+	url = https://github.com/tesollodelto/delto_m_ros2

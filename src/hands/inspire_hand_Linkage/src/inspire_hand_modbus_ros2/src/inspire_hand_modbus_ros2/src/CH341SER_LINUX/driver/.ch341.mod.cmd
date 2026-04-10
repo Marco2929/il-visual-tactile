@@ -1,0 +1,1 @@
+savedcmd_/home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/ch341.mod := printf '%s\n'   ch341.o | awk '!x[$$0]++ { print("/home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/"$$0) }' > /home/inspire001/try_ws/src/inspire_hand_modbus_ros2/src/CH341SER_LINUX/driver/ch341.mod

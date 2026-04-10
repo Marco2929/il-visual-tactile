@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="workcell">
+
+  <xacro:arg name="hand_type" default="inspire_strong_hand"/>
+
+  <xacro:include filename="$(find moveit_ur_hand_config)/config/srdf/ur_arm.srdf.xacro" />
+  <xacro:ur_arm_srdf />
+
+  <xacro:if value="${'$(arg hand_type)' == 'tesollo_hand'}">
+    <xacro:include filename="$(find moveit_ur_hand_config)/config/srdf/tesollo_hand.srdf.xacro" />
+    <xacro:tesollo_hand_srdf />
+  </xacro:if>
+
+  <xacro:if value="${'$(arg hand_type)' == 'inspire_strong_hand'}">
+    <xacro:include filename="$(find moveit_ur_hand_config)/config/srdf/inspire_hand.srdf.xacro" />
+    <xacro:inspire_hand_srdf />
+  </xacro:if>
+
+</robot>
