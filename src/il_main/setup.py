@@ -23,7 +23,10 @@ install_requires=['setuptools', 'scipy', 'numpy', 'dex-retargeting'],
     license='TODO: License declaration',
     entry_points={
         'console_scripts': [
-            'teleop_hand = il.teleop_hand:main',
+            'teleop_ur = il_main.teleop_ur:main',
+            'teleop_inspire = il_main.teleop_inspire:main',
+            'record = il_main.record:main',
+            'move_robot_pose = il_main.move_robot_pose:main',
         ],
     },
 )

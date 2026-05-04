@@ -16,12 +16,12 @@ MODBUS_PORT = 6000
 # Using the mapping from the WORKING script
 # (Finger ID, Register Address, Name, Max Radians)
 JOINT_MAPPING = [
-    (1, 1546, 'inspire_right_little_1_joint', 1.4381),
-    (2, 1548, 'inspire_right_ring_1_joint',   1.4381),
-    (3, 1550, 'inspire_right_middle_1_joint', 1.4381),
-    (4, 1552, 'inspire_right_index_1_joint',  1.4381),
-    (5, 1554, 'inspire_right_thumb_2_joint',  0.5864),
-    (6, 1556, 'inspire_right_thumb_1_joint',  1.1641),
+    (1, 1546, 'right_inspire_right_little_1_joint', 1.4381),
+    (2, 1548, 'right_inspire_right_ring_1_joint',   1.4381),
+    (3, 1550, 'right_inspire_right_middle_1_joint', 1.4381),
+    (4, 1552, 'right_inspire_right_index_1_joint',  1.4381),
+    (5, 1554, 'right_inspire_right_thumb_2_joint',  0.5864),
+    (6, 1556, 'right_inspire_right_thumb_1_joint',  1.1641),
 ]
 
 ANGLE_SET_RANGES = {1: 1486, 2: 1488, 3: 1490, 4: 1492, 5: 1494, 6: 1496}
@@ -47,7 +47,7 @@ class ModbusNode(Node):
 
         # --- TIMER ---
         # Increased to 40ms (25Hz) for better stability
-        self.timer = self.create_timer(0.04, self.timer_callback)
+        self.timer = self.create_timer(0.0333, self.timer_callback)
 
     def connect_modbus(self):
         if not self.modbus_client.connect():

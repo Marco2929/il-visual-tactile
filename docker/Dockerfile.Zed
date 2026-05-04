@@ -1,0 +1,95 @@
+ARG UBUNTU_MAJOR=22
+ARG UBUNTU_MINOR=04
+ARG CUDA_MAJOR=12
+ARG CUDA_MINOR=6
+ARG CUDA_PATCH=3
+ARG ZED_SDK_MAJOR=4
+ARG ZED_SDK_MINOR=2
+ARG ZED_SDK_PATCH=5
+
+ARG IMAGE_NAME=nvcr.io/nvidia/cuda:${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}-devel-ubuntu${UBUNTU_MAJOR}.${UBUNTU_MINOR}
+
+FROM ${IMAGE_NAME}
+
+# Re-declare ARGs after FROM to make them available in the build environment
+ARG UBUNTU_MAJOR=22
+ARG UBUNTU_MINOR=04
+ARG CUDA_MAJOR=12
+ARG CUDA_MINOR=6
+ARG CUDA_PATCH=3
+ARG ZED_SDK_MAJOR=4
+ARG ZED_SDK_MINOR=2
+ARG ZED_SDK_PATCH=3
+ARG CUSTOM_ZED_SDK_URL=""
+ARG ROS2_DIST=jazzy
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# --- ENVIRONMENT VARIABLES ---
+ENV NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:+$NVIDIA_DRIVER_CAPABILITIES,}compute,video,utility
+ENV TZ=Europe/Paris
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV ZED_SDK_URL=${CUSTOM_ZED_SDK_URL:-"https://download.stereolabs.com/zedsdk/${ZED_SDK_MAJOR}.${ZED_SDK_MINOR}.${ZED_SDK_PATCH}/cu${CUDA_MAJOR}/ubuntu${UBUNTU_MAJOR}"}
+ENV ROS_DISTRO=${ROS2_DIST}
+
+# --- 1. SYSTEM, LOCALE & ROS 2 REPO SETUP ---
+# Consolidated into a single layer to avoid redundant apt-get updates
+RUN sed -i 's/archive.ubuntu.com/de.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true && \
+    sed -i 's/security.ubuntu.com/de.archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    locales tzdata curl software-properties-common gnupg2 && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+    add-apt-repository universe && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- 2. INSTALL ALL SYSTEM, ROS & ZED DEPENDENCIES ---
+# All packages from the original file are merged here to pay the "apt update tax" only once
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    apt-utils dialog lsb-release wget less udev sudo build-essential cmake \
+    python3 python3-dev python3-pip python3-wheel git jq libopencv-dev \
+    libpq-dev zstd usbutils libpng-dev libgomp1 bash-completion \
+    ros-${ROS_DISTRO}-iceoryx-binding-c \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+    ros-${ROS2_DIST}-ros-base python3-flake8-docstrings python3-pytest-cov ros-dev-tools && \
+    rm -rf /var/lib/apt/lists/*
+
+# --- 3. PYTHON PACKAGES & ROSDEP ---
+RUN python3 -m pip install opencv-python-headless --no-deps --break-system-packages && \
+    rosdep init && rosdep update
+
+# --- 4. ZED SDK INSTALLATION ---
+# This massive layer is now isolated. It will stay cached unless the SDK version changes.
+RUN echo "CUDA Version $CUDA_MAJOR.$CUDA_MINOR.$CUDA_PATCH" > /usr/local/cuda/version.txt && \
+    echo "Downloading ZED SDK from: $ZED_SDK_URL" && \
+    wget -q -O ZED_SDK_Linux_Ubuntu.run ${ZED_SDK_URL} && \
+    chmod +x ZED_SDK_Linux_Ubuntu.run && \
+    ./ZED_SDK_Linux_Ubuntu.run -- silent skip_tools skip_cuda && \
+    ln -sf /lib/x86_64-linux-gnu/libusb-1.0.so.0 /usr/lib/x86_64-linux-gnu/libusb-1.0.so && \
+    rm ZED_SDK_Linux_Ubuntu.run
+
+# --- 5. WORKSPACE BUILD ---
+# Placed at the very end. If your code changes, Docker ONLY rebuilds from here.
+WORKDIR /root/ros2_ws
+COPY src/zed-ros2-wrapper/ src/zed-ros2-wrapper/
+
+RUN /bin/bash -c "source /opt/ros/$ROS_DISTRO/setup.bash && \
+    apt-get update -y || true && \
+    rosdep install --from-paths src --ignore-src -r -y && \
+    colcon build --parallel-workers $(nproc) --symlink-install \
+    --event-handlers console_direct+ --base-paths src \
+    --cmake-args ' -DCMAKE_BUILD_TYPE=Release' \
+    ' -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs' \
+    ' -DCMAKE_CXX_FLAGS=\"-Wl,--allow-shlib-undefined\"' && \
+    rm -rf /var/lib/apt/lists/*"
+
+# --- 6. ENTRYPOINT SETUP ---
+COPY docker/ros_entrypoint_zed.sh /sbin/ros_entrypoint.sh
+RUN sudo chmod 755 /sbin/ros_entrypoint.sh
+
+ENTRYPOINT ["/sbin/ros_entrypoint.sh"]
+CMD ["bash"]

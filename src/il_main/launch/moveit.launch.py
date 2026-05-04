@@ -83,7 +83,7 @@ def generate_launch_description():
         ],
     )
 
-    rviz_cfg = os.path.join(pkg_share, "rviz", "moveit.rviz")
+    rviz_cfg = os.path.join(pkg_share, "config", "moveit.rviz")
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",

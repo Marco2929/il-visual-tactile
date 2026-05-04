@@ -26,6 +26,19 @@
     <disable_collisions link1="right_inspire_right_ring_2" link2="right_inspire_ring_force_sensor_2" reason="Adjacent"/>
     <disable_collisions link1="right_inspire_right_ring_2" link2="right_inspire_ring_force_sensor_3" reason="Adjacent"/>
     
+    <disable_collisions link1="right_inspire_right_middle_1" link2="right_inspire_middle_force_sensor_1" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_middle_2" link2="right_inspire_middle_force_sensor_2" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_middle_2" link2="right_inspire_middle_force_sensor_3" reason="Adjacent"/>
+
+    <disable_collisions link1="right_inspire_right_little_1" link2="right_inspire_little_force_sensor_1" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_little_2" link2="right_inspire_little_force_sensor_2" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_little_2" link2="right_inspire_little_force_sensor_3" reason="Adjacent"/>
+
+    <disable_collisions link1="right_inspire_right_thumb_2" link2="right_inspire_thumb_force_sensor_1" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_thumb_3" link2="right_inspire_thumb_force_sensor_2" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_thumb_4" link2="right_inspire_thumb_force_sensor_3" reason="Adjacent"/>
+    <disable_collisions link1="right_inspire_right_thumb_4" link2="right_inspire_thumb_force_sensor_4" reason="Adjacent"/>
+    
     <disable_collisions link1="right_inspire_base_link" link2="wrist_1_link" reason="Never"/>
     <disable_collisions link1="right_inspire_base_link" link2="wrist_2_link" reason="Never"/>
     <disable_collisions link1="right_inspire_base_link" link2="wrist_3_link" reason="Never"/>

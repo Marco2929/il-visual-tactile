@@ -1,0 +1,9 @@
+FROM ros:jazzy-ros-base
+
+RUN apt-get update && apt-get install -y \
+    ros-jazzy-iceoryx-posh \
+    ros-jazzy-iceoryx-binding-c \
+    ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["iox-roudi"]
