@@ -1,6 +1,16 @@
-.vscode
-.idea
-data/*
-src/il_main/il/venv
-src/cam_calibrate/tcp_poses.txt
-src/cam_calibrate/images
+# Python und IDE Caches (global)
+**/__pycache__/
+.idea/
+
+# Virtuelle Umgebungen
+data/venv/
+src/il_main/venv/
+
+# Große Datensätze und Model-Outputs
+data/episodes/
+data/outputs/
+data/lerobot_datasets/
+data/zarr_datasets/
+data/dataset_builder/cache/
+data/calibration/
+third_party/ManiFlow_Policy/third_party/pytorch3d/

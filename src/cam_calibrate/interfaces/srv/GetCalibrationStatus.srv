@@ -1,0 +1,4 @@
+---
+int32 num_logged_points
+bool camera_data_available
+bool robot_pose_available

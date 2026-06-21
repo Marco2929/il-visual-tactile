@@ -8,27 +8,21 @@ services:
     network_mode: host
     devices:
       - /dev/bus/usb:/dev/bus/usb       
+    volumes:
+      - /home/mm/dev/il-visual-tactile/src/libsurvive_ros2/config:/home/ros/.config/libsurvive:rw
+      - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro    
     entrypoint: /home/ros/ros2_ws/entrypoint.sh
     environment:
       - ROS_DOMAIN_ID=0
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
       - XAUTHORITY=/tmp/.docker.xauth
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all    
     working_dir: /home/ros/ros2_ws
-    command: ros2 launch libsurvive_ros2 libsurvive_ros2.launch.py foxbridge:=true composable:=false  
-
-  roudi:
-    build:
-      context: .
-      dockerfile: Dockerfile.RouDi
-    container_name: roudi_daemon
-    network_mode: host
-    ipc: host
-    volumes:
-      - /tmp/roudi:/tmp/roudi:rw
+    command: ros2 launch libsurvive_ros2 libsurvive_ros2.launch.py foxbridge:=true composable:=false extra_args:="--no-global-scene-solver"
 
   ur_artus:
     build:
@@ -56,6 +50,7 @@ services:
       - ../src/hands/Sarcomere_Dynamics_Resources:/ros2_ws/src/hands/artus_hand:rw
       - ../src/hands/inspire_hand_Linkage:/ros2_ws/src/hands/inspire_hand_strong_hand:rw
       - ../src/hands/delto_m_ros2:/ros2_ws/src/hands/tesollo_hand:rw
+      - ../src/rembrandt_ros/r1_msgs:/r1_ws/src/r1_msgs:rw
       
       - ../third_party:/ros2_ws/third_party:rw
       - ../data:/ros2_ws/data:rw
@@ -66,15 +61,15 @@ services:
       - /tmp/.docker.xauth:/tmp/.docker.xauth
 
       - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
-      - /tmp/roudi:/tmp/roudi:rw
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, video, utility]
     tty: true
     stdin_open: true
-    runtime: nvidia
     command: >
         /bin/sh -c "tail -f /dev/null"
 #bash -c "bash /ros2_ws/ur_entrypoint.sh && exec bash"
@@ -94,7 +89,9 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev:/dev
       - /var/run/dbus:/var/run/dbus:rw
+      - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
     environment:
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
@@ -106,6 +103,35 @@ services:
       - bluetooth 
     tty: true
     stdin_open: true
+
+  senseglove_r1:
+    build:
+      dockerfile: Dockerfile.Senseglove_r1
+      args:
+        ROS_DISTRO: jazzy 
+    privileged: true
+    container_name: senseglove_r1
+    network_mode: host
+    volumes:
+      - ../src/rembrandt-api:/r1_ws/src/rembrandt-api:rw
+      - ../src/rembrandt_ros:/r1_ws/src/rembrandt_ros:rw
+      - ./r1_entrypoint.sh:/r1_entrypoint.sh:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev:/dev
+      - /var/run/dbus:/var/run/dbus:rw
+      - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
+    environment:
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DISTRO=jazzy
+      - ROS_DOMAIN_ID=0
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    group_add:
+      - dialout
+    tty: true
+    stdin_open: true  
 
   zed-camera:
     build:
@@ -156,13 +182,11 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
-      - /tmp/roudi:/tmp/roudi:rw
+      - ../data:/root/ros2_ws/data:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
       - /dev:/dev
     command: >
-      ros2 launch zed_wrapper zed_camera.launch.py 
-      camera_model:=zed2i
-
+        /bin/sh -c "tail -f /dev/null"
 
   realsense_435i_multi:
     build:
@@ -177,30 +201,24 @@ services:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
       - XAUTHORITY=/tmp/.docker.xauth
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - XAUTHORITY=/tmp/.docker.xauth
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - /dev:/dev
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
       - /tmp/.docker.xauth:/tmp/.docker.xauth
     tty: true
     stdin_open: true
     command: >
-      bash -c "ros2 launch realsense2_camera rs_launch.py
-      camera_namespace:=cam_left
-      camera_name:=cam_left
-      serial_no:=_239722073452
-      rgb_camera.color_profile:=640,480,30
-      depth_module.depth_profile:=640,480,30
-      enable_rgbd:=true
-      align_depth.enable:=true
-      enable_sync:=true
-      initial_reset:=true &
-      sleep 10;
+      bash -c "
       ros2 launch realsense2_camera rs_launch.py
       camera_namespace:=cam_right
       camera_name:=cam_right
-      serial_no:=_239122070304
+      serial_no:=_313522072162
       rgb_camera.color_profile:=640,480,30
       depth_module.depth_profile:=640,480,30
       enable_rgbd:=true
@@ -208,3 +226,16 @@ services:
       enable_sync:=true
       initial_reset:=true;
       wait"
+
+# 239122070304
+# ros2 launch realsense2_camera rs_launch.py
+#       camera_namespace:=cam_left
+#       camera_name:=cam_left
+#       serial_no:=_239722073452
+#       rgb_camera.color_profile:=640,480,30
+#       depth_module.depth_profile:=640,480,30
+#       enable_rgbd:=true
+#       align_depth.enable:=true
+#       enable_sync:=true
+#       initial_reset:=true &
+#       sleep 10;

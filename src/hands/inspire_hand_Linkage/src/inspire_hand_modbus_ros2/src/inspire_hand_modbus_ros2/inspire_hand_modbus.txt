@@ -69,7 +69,7 @@
 
     (4) Set speed (parameter speed range 0-1000)
     ```bash
-    ros2 service call /Setspeed service_interfaces/srv/Setspeed "{speed0: 50,speed1: 50,speed2: 50,speed3: 50,speed4: 50,speed5: 50,id: 1, status: 'set_speed'}"
+    ros2 service call /Setspeed service_interfaces/srv/Setspeed "{speed0: 1000,speed1: 1000,speed2: 1000,speed3: 1000,speed4: 1000,speed5: 1000,id: 1, status: 'set_speed'}"
     ```
 
     (5) Set dexterous hand angle (parameter angle range 0-1000)

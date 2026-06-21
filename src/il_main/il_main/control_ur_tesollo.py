@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+import os
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
@@ -19,7 +20,7 @@ class InferenceControlNode(Node):
 
         # --- Config ---
         self.robot_base_frame = 'base_link'
-        self.robot_tip_frame = 'flange_link' # TODO: Fix as soon as pipeline is fully available
+        self.robot_tip_frame = os.environ.get("ROBOT_TIP_FRAME", "right_inspire_base_link")     
 
         # --- Setup ---
         self.tf_buffer = Buffer()

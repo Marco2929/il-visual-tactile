@@ -25,8 +25,10 @@ install_requires=['setuptools', 'scipy', 'numpy', 'dex-retargeting'],
         'console_scripts': [
             'teleop_ur = il_main.teleop_ur:main',
             'teleop_inspire = il_main.teleop_inspire:main',
+            'teleop_inspire_r1 = il_main.teleop_inspire_r1:main',
             'record = il_main.record:main',
             'move_robot_pose = il_main.move_robot_pose:main',
+            'control_ur_inspire = il_main.control_ur_inspire:main',
         ],
     },
 )

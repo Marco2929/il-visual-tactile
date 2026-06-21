@@ -1,0 +1,67 @@
+meta:
+  name: "box_opening_exp3"
+  task: "Pick up the box and open it"
+  fps: 30
+
+# ─── Kinematics ───────────────────────────────────
+kinematics:
+  urdf_path: "/ros2_ws/src/moveit_ur_hand_config/urdf/inspire_strong_hand_ur10e_flange_workcell.urdf"
+  end_link: "right_inspire_base_link"
+
+# ─── Cache Sources ─────────────────────────────────
+cache:
+  base_dir: "/data/episodes/box_opening_collection"
+  front_rgb: true
+  wrist_rgb: true
+  front_pc: true
+  wrist_pc: true
+
+# ─── Episode Limits ───────────────────────────────
+episodes:
+  max_episodes: null  # null = alle, z.B. 5 für Tests
+
+# ─── Point Cloud Configuration ────────────────────
+point_cloud:
+  mode: "merged"
+  merge_strategy: "fps"
+  final_num_points: 1024
+
+# ─── Proprioception ───────────────────────────────
+proprioception:
+  state_components:
+    - type: "joint_states"
+      joints: "arm"
+    - type: "hand"
+    - type: "force"
+
+  hand:
+    hardware: "inspire"
+    force:
+      enabled: true
+      mode: "raw"
+
+# ─── Actions ──────────────────────────────────────
+actions:
+  type: "next_state"
+  derived_from: "ee_pose"
+
+auxiliary_actions: []
+
+# ─── Progress Signal ──────────────────────────────
+progress_signal:
+  enabled: true
+  mode: "linear"
+
+# ─── Post-Processing Hooks ────────────────────────
+post_processing:
+  repeat_final_state:
+    enabled: true
+    num_repeats: 10
+
+# ─── Output ───────────────────────────────────────
+output:
+  format: "zarr"
+  zarr_path: "/data/zarr_datasets/box_opening_exp3.zarr"
+  lerobot_repo_id: "user/box_opening_exp3"
+  compression: "zstd"
+  chunk_size: 100

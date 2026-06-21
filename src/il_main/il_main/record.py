@@ -4,6 +4,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, HistoryPolicy
 from message_filters import ApproximateTimeSynchronizer, SimpleFilter
 from sensor_msgs.msg import Image, CameraInfo, JointState
+from rclpy.executors import MultiThreadedExecutor
 import numpy as np
 import cv2
 from cv_bridge import CvBridge
@@ -14,98 +15,112 @@ import queue
 
 FOLDER_NAME = "test_collection"
 
-
-
 class RobotCameraSync:
-    """
-    Synchronizes high-frequency JointStates (550Hz) with ZED 2i images (60Hz)
-    """
     def __init__(self, node, callback_function, joint_names):
         self.node = node
         self.callback = callback_function
         self.joint_names = joint_names
 
-        # Buffer for aggregating fragmented joint state packets
-        self.latest_joint_state = {name: None for name in self.joint_names}
+        self.arm_joints = {'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
+                           'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'}
+        self.hand_joints = {'right_inspire_right_thumb_1_joint', 'right_inspire_right_thumb_2_joint',
+                            'right_inspire_right_index_1_joint', 'right_inspire_right_middle_1_joint',
+                            'right_inspire_right_ring_1_joint', 'right_inspire_right_little_1_joint'}
 
-        # Message filters to interface with the Synchronizer
-        self.joint_filt = SimpleFilter()
-        self.color_filt = SimpleFilter()
-        self.depth_filt = SimpleFilter()
+        self.latest_joint_state = {name: None for name in self.joint_names}
+        self.arm_ready = False
+        self.last_hand_update = None
+        
+        # Cache for BOTH image types to prevent race conditions
+        self.latest_depth_msg = None
+        self.latest_color_msg = None
+
+        self.sync_count = 0
+        self.last_log_time = self.node.get_clock().now()
 
         qos_joints = QoSProfile(
-            depth=300, 
+            depth=100,
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST
+        )
+
+        qos_camera_buffered = QoSProfile(
+            depth=50,
             reliability=ReliabilityPolicy.RELIABLE, 
             history=HistoryPolicy.KEEP_LAST
         )
 
-        # Camera (high bandwidth, use best effort / sensor data)
-        qos_camera = qos_profile_sensor_data
+        self.node.create_subscription(JointState, "/joint_states", self._joint_cb, qos_joints)
+        self.node.create_subscription(Image, "/zed/zed_node/depth/depth_registered", self.depth_cb, qos_camera_buffered)
+        self.node.create_subscription(Image, "/zed/zed_node/rgb/color/rect/image", self.color_cb, qos_camera_buffered)
 
-        # Passthrough Publisher to monitor speed externally
-        self.synced_joint_pub = self.node.create_publisher(JointState, '~/synced_joint_states', 10)
-
-        # Standard ROS Subscribers using ZED 2i topics
-        self.node.create_subscription(JointState, "/joint_states", self.joint_cb, qos_joints)
-        self.node.create_subscription(Image, "/zed/zed_node/rgb/color/rect/image", self.color_cb, qos_camera)
-        self.node.create_subscription(Image, "/zed/zed_node/depth/depth_registered", self.depth_cb, qos_camera)
-
-        # Synchronizer
-        # Reduced slop to 0.01s (10ms) because ZED hardware sync is highly accurate
-        self.sync = ApproximateTimeSynchronizer(
-            [self.joint_filt, self.color_filt, self.depth_filt],
-            queue_size=300,
-            slop=0.025
-        ) 
-        self.sync.registerCallback(self.callback)
-        self.node.get_logger().info("ZED Synchronizer Node active. Hardware timestamps enabled.")
-
-    def joint_cb(self, msg):
+    def _joint_cb(self, msg):
         for name, pos in zip(msg.name, msg.position):
             if name in self.latest_joint_state:
                 self.latest_joint_state[name] = pos
-        
-        if all(val is not None for val in self.latest_joint_state.values()):
-            full_msg = JointState()
-            full_msg.header = msg.header 
-            full_msg.name = list(self.latest_joint_state.keys())
-            full_msg.position = list(self.latest_joint_state.values())
-            self.joint_filt.signalMessage(full_msg)
 
-    def color_cb(self, msg):
-        """Pass RGB image to synchronizer using original hardware timestamp."""
-        self.color_filt.signalMessage(msg)
+        if any(n in self.hand_joints for n in msg.name):
+            self.last_hand_update = self.node.get_clock().now()
+
+        if not self.arm_ready:
+            if all(self.latest_joint_state[n] is not None for n in self.arm_joints):
+                self.arm_ready = True
+                self.node.get_logger().info("Arm joints ready.")
 
     def depth_cb(self, msg):
-        """Pass depth image to synchronizer using original hardware timestamp."""
-        self.depth_filt.signalMessage(msg)
+        self.latest_depth_msg = msg
+        self._try_sync()
 
-    def sync_cb(self, joint_msg, color_msg, depth_msg):
-        """Callback triggered when all three topics are synchronized."""
-        self.sync_count += 1
-        
-        # Performance logging every 2 seconds
-        now = self.node.get_clock().now()
-        duration_ns = (now - self.last_log_time).nanoseconds
-        if duration_ns > 2e9:  # 2 seconds
-            duration_s = duration_ns / 1e9
-            fps = self.sync_count / duration_s
-            
-            # Calculate time difference (jitter) between Joint and Camera timestamps
-            # Converting header stamps to total nanoseconds for comparison
-            j_ts = joint_msg.header.stamp.sec * 1e9 + joint_msg.header.stamp.nanosec
-            c_ts = color_msg.header.stamp.sec * 1e9 + color_msg.header.stamp.nanosec
-            diff_ms = abs(j_ts - c_ts) / 1e6
-            
-            self.node.get_logger().info(
-                f"Sync: {fps:.1f} FPS | Joint-Camera Delta: {diff_ms:.2f}ms"
+    def color_cb(self, msg):
+        self.latest_color_msg = msg
+        self._try_sync()
+
+    def _try_sync(self):
+        # Only proceed if the arm is ready and we have AT LEAST one of each image type buffered
+        if not self.arm_ready or self.latest_color_msg is None or self.latest_depth_msg is None:
+            return
+
+        c_t = self.latest_color_msg.header.stamp.sec + (self.latest_color_msg.header.stamp.nanosec * 1e-9)
+        d_t = self.latest_depth_msg.header.stamp.sec + (self.latest_depth_msg.header.stamp.nanosec * 1e-9)
+
+        time_diff = abs(c_t - d_t)
+
+        if time_diff < 0.025:
+            # Timestamps match! Build state and fire the recording callback
+            current_state = np.array(
+                [self.latest_joint_state[n] if self.latest_joint_state[n] is not None else 0.0 for n in self.joint_names], 
+                dtype=np.float32
             )
-            self.sync_count = 0
-            self.last_log_time = now
 
-        # Execute the main recording/processing callback
-        self.callback(joint_msg, color_msg, depth_msg)
+            # --- FPS Logging ---
+            self.sync_count += 1
+            now = self.node.get_clock().now()
+            duration_ns = (now - self.last_log_time).nanoseconds
+            if duration_ns > 2e9:
+                duration_s = duration_ns / 1e9
+                fps = self.sync_count / duration_s
+                hand_age_ms = 0.0
+                if self.last_hand_update is not None:
+                    hand_age_ms = (now - self.last_hand_update).nanoseconds / 1e6
+                self.node.get_logger().info(f"Sync: {fps:.1f} FPS | Hand Age: {hand_age_ms:.0f}ms")
+                self.sync_count = 0
+                self.last_log_time = now
+            # -------------------
 
+            self.callback(current_state, self.latest_color_msg, self.latest_depth_msg)
+            
+            # Consume the messages so they aren't reused for the next trigger
+            self.latest_color_msg = None
+            self.latest_depth_msg = None
+            
+        else:
+            # Mismatch: Log the drift to see if we are rejecting valid frames
+            self.node.get_logger().warn(f"Dropped pair! Time diff: {time_diff * 1000:.1f}ms")
+            
+            if c_t < d_t:
+                self.latest_color_msg = None
+            else:
+                self.latest_depth_msg = None
 
 class DataCollector(Node):
     def __init__(self):
@@ -117,9 +132,9 @@ class DataCollector(Node):
         self.JOINT_NAMES = [
             'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
             'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint',
-            'inspire_right_thumb_1_joint', 'inspire_right_thumb_2_joint',
-            'inspire_right_index_1_joint', 'inspire_right_middle_1_joint',
-            'inspire_right_ring_1_joint', 'inspire_right_little_1_joint'
+            'right_inspire_right_thumb_1_joint', 'right_inspire_right_thumb_2_joint',
+            'right_inspire_right_index_1_joint', 'right_inspire_right_middle_1_joint',
+            'right_inspire_right_ring_1_joint', 'right_inspire_right_little_1_joint'
         ]
 
         self.syncer = RobotCameraSync(self, self.sync_callback, self.JOINT_NAMES)
@@ -156,24 +171,19 @@ class DataCollector(Node):
         self.input_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
         self.input_thread.start()
 
-    def sync_callback(self, joint_msg, img_msg, depth_msg):
+    def sync_callback(self, current_state, img_msg, depth_msg):
         if not self.is_recording:
             return
 
         msg_time = img_msg.header.stamp.sec + (img_msg.header.stamp.nanosec * 1e-9)
 
         try:
-            pos_dict = dict(zip(joint_msg.name, joint_msg.position))
-            current_state = np.array([pos_dict[name] for name in self.JOINT_NAMES], dtype=np.float32)
-            
-            cv_color = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-            cv_depth = self.bridge.imgmsg_to_cv2(depth_msg, "16UC1")
-
+            # We already built the current_state array in RobotCameraSync.
             # Push everything to RAM instantly. Zero disk I/O.
             self.save_queue.put((
                 self.current_frame, 
-                cv_color, 
-                cv_depth, 
+                img_msg,
+                depth_msg,
                 current_state, 
                 msg_time
             ))
@@ -190,13 +200,20 @@ class DataCollector(Node):
                 frame_idx, color, depth, state, timestamp = self.save_queue.get(timeout=1.0)
                 
                 if self.current_episode_dir is None:
+                    self.save_queue.task_done() 
                     continue # Safety check
 
                 frame_name = f"frame_{frame_idx:04d}"
+
+                cv_color = self.bridge.imgmsg_to_cv2(color, "bgr8")
+                cv_depth_f32 = self.bridge.imgmsg_to_cv2(depth, "32FC1")
+                cv_depth_scaled = cv_depth_f32 * 1000.0
+                cv_depth_scaled = np.nan_to_num(cv_depth_scaled, nan=0.0, posinf=0.0, neginf=0.0)
+                cv_depth = cv_depth_scaled.astype(np.uint16)
                 
                 # Slow disk operations happen safely here
-                cv2.imwrite(os.path.join(self.current_episode_dir, "img", f"{frame_name}.png"), color)
-                np.save(os.path.join(self.current_episode_dir, "depth", f"{frame_name}.npy"), depth)
+                cv2.imwrite(os.path.join(self.current_episode_dir, "img", f"{frame_name}.png"), cv_color)
+                np.save(os.path.join(self.current_episode_dir, "depth", f"{frame_name}.npy"), cv_depth)
                 
                 self.state_arrays.append(state)
                 self.action_arrays.append(state)
@@ -293,13 +310,21 @@ class DataCollector(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = DataCollector()
+    
+    # Use a MultiThreadedExecutor to prevent the GIL from starving ROS callbacks
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+    
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
-        node.stop_recording()
+        pass
     finally:
+        if node.is_recording:
+            node.stop_recording()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

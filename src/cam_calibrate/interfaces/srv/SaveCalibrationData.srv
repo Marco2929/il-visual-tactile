@@ -1,0 +1,11 @@
+# Request
+
+string folder_name    # Name des Unterordners (z.B. "calibration_2024_01_15")
+---
+
+# Response
+
+bool success
+string message
+string saved_path
+uint32 num_saved_points

@@ -1,3 +1,15 @@
 [submodule "src/hands/delto_m_ros2"]
 	path = src/hands/delto_m_ros2
 	url = https://github.com/tesollodelto/delto_m_ros2
+[submodule "data/lerobot-dataset-visualizer"]
+	path = data/lerobot-dataset-visualizer
+	url = https://github.com/han-xudong/lerobot-dataset-visualizer.git
+[submodule "data/score_lerobot_episodes"]
+	path = data/score_lerobot_episodes
+	url = https://github.com/RoboticsData/score_lerobot_episodes.git
+[submodule "src/rembrandt_ros"]
+	path = src/rembrandt_ros
+	url = https://github.com/Adjuvo/senseglove_r1_ros.git
+[submodule "src/rembrandt-api"]
+	path = src/rembrandt-api
+	url = https://github.com/Adjuvo/SenseGlove-R1-API.git

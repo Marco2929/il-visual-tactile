@@ -1,0 +1,11 @@
+# Request - leer, nutzt aktuelle Kamera- und Roboter-Daten
+
+---
+
+# Response
+
+bool success
+string message
+uint32 num_logged_points
+uint32 num_markers
+uint32 num_charuco

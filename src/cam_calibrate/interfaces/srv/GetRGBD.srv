@@ -1,0 +1,6 @@
+# Request (empty)
+
+---
+RGBD rgbd
+bool success
+string message

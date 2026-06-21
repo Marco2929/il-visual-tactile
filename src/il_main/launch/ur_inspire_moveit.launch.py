@@ -55,7 +55,7 @@ def generate_launch_description():
 
     teleop_inspire = Node(
         package="il_main",
-        executable="teleop_inspire",
+        executable="teleop_inspire_r1",
         output="screen",
     )
 

@@ -22,6 +22,31 @@
     <origin xyz="0 0 0" rpy="0 0 0" />
   </xacro:ur_robot>
 
+  <link name="cam_holder_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://moveit_ur_hand_config/meshes/cam_holder.obj"/>
+      </geometry>
+      <material name="dark_grey"><color rgba="0.2 0.2 0.2 1.0"/></material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://moveit_ur_hand_config/meshes/cam_holder.obj"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/> 
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="tool0_to_cam_holder" type="fixed">
+    <parent link="tool0"/>
+    <child link="cam_holder_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/> 
+  </joint>
+
   <xacro:if value="${'$(arg flange_type)' == 'robotiq'}">
     <link name="flange_link">
       <visual>
@@ -39,10 +64,10 @@
         <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
       </inertial>
     </link>  
-    <joint name="tool0_to_flange_link" type="fixed">
-      <parent link="tool0"/>
+    <joint name="cam_holder_to_flange_link" type="fixed">
+      <parent link="cam_holder_link"/>
       <child link="flange_link"/>
-      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+      <origin xyz="0 0 0.01" rpy="0 -3.14159 2.3562"/> 
     </joint> 
   </xacro:if>
 
@@ -65,10 +90,10 @@
         <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
       </inertial>
     </link>
-    <joint name="tool0_to_flange_link" type="fixed">
-      <parent link="tool0"/>
+    <joint name="cam_holder_to_flange_link" type="fixed">
+      <parent link="cam_holder_link"/>
       <child link="flange_link"/>
-      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+      <origin xyz="0 0 0.01" rpy="0 -3.14159 2.3562"/> 
     </joint> 
   </xacro:if>
 
@@ -91,10 +116,10 @@
   </xacro:if>
 
   <xacro:if value="${'$(arg flange_type)' == 'none'}">
-    <joint name="tool0_to_mount_frame" type="fixed">
-      <parent link="tool0"/>
+    <joint name="cam_holder_to_mount_frame" type="fixed">
+      <parent link="cam_holder_link"/>
       <child link="hand_mount_frame"/>
-      <origin xyz="0 0 0" rpy="0 -3.14159 2.3562"/> 
+      <origin xyz="0 0 0.01" rpy="0 -3.14159 2.3562"/> 
     </joint>
   </xacro:if>
 
@@ -112,4 +137,4 @@
     </xacro:tesollo_hand_macro>
   </xacro:if>
   
-  </robot>
+</robot>

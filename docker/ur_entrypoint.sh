@@ -37,7 +37,7 @@ cd "$POLICY_DIR"
 pip install -r requirements.txt
 
 # Install the package in editable mode
-cd 3D-Diffusion-Policy && pip install -v -e . && cd ..
+pip install -v -e . && cd ..
 
 cd third_party/pytorch3d_simplified && pip install --no-build-isolation -e . && cd ../..
 
@@ -56,7 +56,7 @@ pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"  --no
 pip install -r requirements.txt
 
 # Install the package in editable mode
-cd ManiFlow && pip install -v -e . && cd ..
+cd ManiFlow && pip install -e . && cd ..
 
 touch /ros2_ws/venv/COLCON_IGNORE
 export PYTHONPATH=$PYTHONPATH:$VENV_DIR/lib/python3.12/site-packages

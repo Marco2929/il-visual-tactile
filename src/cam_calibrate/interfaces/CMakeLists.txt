@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.8)
+project(interfaces)
+
+find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/RGBD.msg"
+  "srv/LogCalibrationData.srv"
+  "srv/SaveCalibrationData.srv"
+  "srv/ClearCalibrationData.srv"
+  "srv/GetCalibrationStatus.srv"
+  "srv/GetRGBD.srv"
+  "srv/RunCalibration.srv"
+  DEPENDENCIES std_msgs sensor_msgs geometry_msgs
+)
+
+ament_package()

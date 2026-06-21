@@ -37,7 +37,7 @@ def generate_launch_description():
     # Path to the generic top-level xacro file
     xacro_file = os.path.join(
         get_package_share_directory(pkg_name),
-        'config',
+        'urdf',
         'workcell.urdf.xacro'
     )
     

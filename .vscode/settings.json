@@ -1,0 +1,61 @@
+{
+    "restoreTerminals.runOnStartup": true,
+    "restoreTerminals.terminals": [
+        // ==================== INFERENCE GROUP ====================
+        {
+            "splitTerminals": [
+                {
+                    "name": "Inf1",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                },
+                {
+                    "name": "Inf2",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                },
+                {
+                    "name": "Inf3",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; source venv/bin/activate; exec /bin/bash'"]
+                }
+            ]
+        },
+        // ==================== RUNNING GROUP ====================
+        {
+            "splitTerminals": [
+                {
+                    "name": "Run1",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                },
+                {
+                    "name": "Run2",
+                    "commands": ["docker exec -it zed_container /bin/bash -c 'source install/setup.bash; ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i & exec /bin/bash'"]
+                }
+            ]
+        },
+        // ==================== WORKING GROUP ====================
+        {
+            "splitTerminals": [
+                {
+                    "name": "Work1",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                },
+                {
+                    "name": "Work2",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                }
+            ]
+        },
+        // ==================== EXTRA GROUP ====================
+        {
+            "splitTerminals": [
+                {
+                    "name": "Record1",
+                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                },
+                {
+                    "name": "Record2",
+                    "commands": ["docker exec -it zed_container /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                }
+            ]
+        }
+    ]
+}

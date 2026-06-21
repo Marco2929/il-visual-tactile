@@ -1,0 +1,12 @@
+# Request
+
+string data_dir              # Path to calibration data (empty = use last saved)
+bool hand_in_eye             # true = hand-in-eye, false = hand-to-eye
+string method                # Calibration method (empty = run all)
+---
+
+# Response
+
+bool success
+string message
+string results_path          # Where results were saved

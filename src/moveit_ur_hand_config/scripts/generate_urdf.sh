@@ -23,7 +23,7 @@ if [ "${FLANGE_TYPE}" != "none" ]; then
 fi
 
 # Define strict relative paths
-INPUT_FILE="src/moveit_ur_hand_config/config/workcell.urdf.xacro"
+INPUT_FILE="src/moveit_ur_hand_config/urdf/workcell.urdf.xacro"
 OUTPUT_DIR="src/moveit_ur_hand_config/urdf"
 OUTPUT_FILE="${OUTPUT_DIR}/${HAND_TYPE}_${UR_TYPE}${FLANGE_SUFFIX}_workcell.urdf"
 

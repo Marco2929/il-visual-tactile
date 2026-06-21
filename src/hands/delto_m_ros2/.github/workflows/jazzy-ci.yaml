@@ -1,0 +1,42 @@
+name: ROS 2 JAZZY CI
+
+on:
+  push:
+    branches: [jazzy, jazzy-dev]
+    paths-ignore:
+      - "README.md"
+  pull_request:
+    branches: [jazzy, jazzy-dev]
+    paths-ignore:
+      - "README.md"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup ROS 2
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+
+      - name: Install dependencies
+        env:
+          ROS_DISTRO: jazzy
+        run: |
+          sudo apt update
+          sudo rosdep init || true
+          rosdep update
+          rosdep install --from-paths . --ignore-src -r -y
+
+      - name: Build with colcon
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --event-handlers console_direct+ --packages-select delto_tcp_comm
+          source install/setup.bash
+          colcon build --event-handlers console_direct+ --packages-select delto_hardware
+          source install/setup.bash
+          colcon build --event-handlers console_direct+ --packages-skip dg_sdk_ros2_bridge
