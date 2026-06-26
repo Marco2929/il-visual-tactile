@@ -165,10 +165,10 @@ class ReplayBuffer:
                     meta[key] = value[:]
 
             if keys is None:
-                keys = src_root['data'].keys()
+                keys = src_root.keys()
             data = dict()
             for key in keys:
-                arr = src_root['data'][key]
+                arr = src_root[key]
                 data[key] = arr[:]
             root = {
                 'meta': meta,

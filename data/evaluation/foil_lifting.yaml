@@ -1,0 +1,36 @@
+task_name: "Foil lifting"
+
+model_iterations:
+  - model_id: "baseline"
+    vision_encoder: "DP3"
+    camera_system: "front"
+    proprioception: "ee"
+    dataset: "foil_lifting_baseline"
+    inference_quality: 3             # Skala 1-5 (5 = flüssig, 1 = starkes Zittern)
+    failure_notes: "Heavily overfitted no understanding of the scene, thumb rotates even though it was constantly 0 moves to the part that is far away for some reason"   
+
+    scenarios:
+      no_parts_test: false
+      no_foil_test: false
+      three_parts_test: [false, false, false, false, false]
+      three_parts_test_reverse: [false, false, false, false, false]
+      four_parts_test: [false, false, false, false, false]
+      four_parts_test_reverse: [false, false, false, false, false]
+
+
+model_iterations:
+  - model_id: "baseline_cleaned"
+    vision_encoder: "DP3"
+    camera_system: "front"
+    proprioception: "ee"
+    dataset: "foil_lifting_baseline_cleaned"
+    inference_quality: 3             # Skala 1-3 (3 = flüssig, 1 = starkes Zittern)
+    failure_notes: "None"   
+
+    scenarios:
+      no_parts_test: true
+      no_foil_test: true
+      three_parts_test: [true, true, true, true, true]
+      three_parts_test_reverse: [true, true, true, true, true]
+      four_parts_test: [true, true, true, true, true]
+      four_parts_test_reverse: [true, true, true, true, true]

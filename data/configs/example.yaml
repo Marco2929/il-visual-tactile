@@ -55,9 +55,8 @@ auxiliary_actions:
     derived_from: "force"
 
 # ─── Progress Signal ──────────────────────────────
-progress_signal:
+progress:
   enabled: false
-  mode: "linear"
 
 # ─── Post-Processing Hooks ────────────────────────
 post_processing:

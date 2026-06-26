@@ -59,6 +59,8 @@ def parse_args():
                         default='/cam_right/cam_right/color/image_raw')
     parser.add_argument('--wrist_depth_topic', type=str,
                         default='/cam_right/cam_right/aligned_depth_to_color/image_raw')
+    parser.add_argument('--include_failed', type=bool,
+                        default=False)
     return parser.parse_args()
 
 
@@ -267,8 +269,10 @@ def extract_episode(episode_dir, args, source_fps = 60):
     init.camera_resolution = sl.RESOLUTION.HD720
     init.camera_fps = 60
     init.depth_mode = sl.DEPTH_MODE.NEURAL
-    init.depth_minimum_distance = 200
-    init.depth_maximum_distance = 2000
+    init.coordinate_units = sl.UNIT.METER 
+            
+    init.depth_minimum_distance = 0.2
+    init.depth_maximum_distance = 2.0
     init.sdk_verbose = 0
 
     cam = sl.Camera()
@@ -505,12 +509,19 @@ def main():
         cprint("[Warning] Camera intrinsics not found. Point clouds disabled.", "yellow")
         args.skip_point_clouds = True
 
-    episodes = sorted([
-        d for d in os.listdir(args.data_dir)
-        if d.startswith('episode_') 
-        and 'failed' not in d 
-        and os.path.isdir(os.path.join(args.data_dir, d))
-    ])
+    if args.include_failed:
+        episodes = sorted([
+            d for d in os.listdir(args.data_dir)
+            if d.startswith('episode_') 
+            and os.path.isdir(os.path.join(args.data_dir, d))
+        ])
+    else:
+        episodes = sorted([
+            d for d in os.listdir(args.data_dir)
+            if d.startswith('episode_') 
+            and 'failed' not in d 
+            and os.path.isdir(os.path.join(args.data_dir, d))
+        ])
 
     if not episodes:
         cprint(f"No episodes found in {args.data_dir}", "red")

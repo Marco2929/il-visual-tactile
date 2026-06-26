@@ -18,6 +18,9 @@ obs_as_global_cond: True
 policy:
   _target_: maniflow.policy.maniflow_r3d_pointcloud_policy.ManiFlowTransformerPointcloudPolicy
   model_name: "DiTX"
+  lambda_aux_ee: 0.5
+  lambda_aux_force: 0.3
+  lambda_progress: 0.05
   n_layer: 8  # max 28
   n_head: 6  # max 16
   n_emb: 384 # max 1152

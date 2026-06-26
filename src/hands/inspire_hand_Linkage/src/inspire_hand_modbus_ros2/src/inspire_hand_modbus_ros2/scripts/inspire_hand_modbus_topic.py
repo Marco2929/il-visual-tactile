@@ -10,7 +10,7 @@ from service_interfaces.msg import GetAngleAct1, GetForceAct1, SetAngle1, SetSpe
 from sensor_msgs.msg import JointState
 
 # --- CONFIGURATION ---
-MODBUS_IP = "192.168.11.210"
+MODBUS_IP = "192.168.56.210"
 MODBUS_PORT = 6000
 
 JOINT_MAPPING = [

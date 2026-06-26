@@ -31,6 +31,13 @@ def generate_point_cloud_from_depth(
 
     Returns: float32 numpy array
     """
+    # Unit normalization: Ensure depth is in millimeters
+    valid_mask = (depth_image > 0) & np.isfinite(depth_image)
+    if np.any(valid_mask):
+        median_depth = np.median(depth_image[valid_mask])
+        if median_depth < 20.0:  # Data is determined to be in meters
+            depth_image = (depth_image * 1000.0).astype(np.float32)
+
     # Depth cleanup
     depth_image = _remove_flying_pixels(depth_image, gradient_threshold=100.0, dilate_size=5)
     depth_image = _filter_zero_values(depth_image)

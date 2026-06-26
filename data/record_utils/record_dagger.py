@@ -13,6 +13,8 @@ import threading
 import shutil
 import subprocess
 import signal
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image as RosImage
 import time
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
@@ -120,6 +122,12 @@ class SVORecorder(Node):
             qos_rs
         )
 
+        self.zed_image_pub = self.create_publisher(RosImage, '/zed/zed_node/rgb/color/rect/image', 10)
+        self.zed_depth_pub = self.create_publisher(RosImage, '/zed/zed_node/depth/depth_registered', 10)
+        self.bridge = CvBridge()
+        self.zed_image = sl.Mat()
+        self.zed_depth = sl.Mat()
+
         self.get_logger().info(f"Saving data to: {self.root_dir}")
         self.get_logger().info("Ready. DAgger Tracker Button Workflow:")
         self.get_logger().info("  Policy runs continuously (inference always on).")
@@ -136,8 +144,10 @@ class SVORecorder(Node):
         init.camera_resolution = sl.RESOLUTION.HD720
         init.camera_fps = 60
         init.depth_mode = sl.DEPTH_MODE.NEURAL
-        init.depth_minimum_distance = 200
-        init.depth_maximum_distance = 2000
+        init.coordinate_units = sl.UNIT.METER 
+                
+        init.depth_minimum_distance = 0.2
+        init.depth_maximum_distance = 2.0
         init.sdk_verbose = 1
         if self.cam.open(init) != sl.ERROR_CODE.SUCCESS:
             raise RuntimeError("ZED open failed")
@@ -371,27 +381,63 @@ class SVORecorder(Node):
         runtime = sl.RuntimeParameters(
             confidence_threshold=100, remove_saturated_areas=True, texture_confidence_threshold=100
         )
+        zed_image = sl.Mat()
+        zed_depth = sl.Mat()
+
         while rclpy.ok() and self.running:
+            # --- Grab + Retrieve inside lock (minimal) ---
             with self.cam_lock:
                 if self.cam.grab(runtime) != sl.ERROR_CODE.SUCCESS:
                     continue
+                self.cam.retrieve_image(zed_image, sl.VIEW.LEFT)
+                self.cam.retrieve_measure(zed_depth, sl.MEASURE.DEPTH)
+                
+                # Correctly using local variable 'zed_depth' to avoid empty array errors
+                depth_np = zed_depth.get_data().copy()
+                
+                valid = depth_np[np.isfinite(depth_np)]
+                if len(valid) > 0:
+                    pass
+                else:
+                    self.get_logger().warn("ALL depth pixels are NaN/Inf!")
+                ts = self.cam.get_timestamp(sl.TIME_REFERENCE.IMAGE)
 
+                # SVO ingest (also inside lock)
                 if self.state in (State.RECORDING, State.TELEOP_TAKEOVER):
                     with self.pending_lock:
                         queued_states = self.pending_states_queue
                         self.pending_states_queue = []
-
                     if queued_states:
                         data = sl.SVOData()
                         data.key = "joint_states"
                         data.set_string_content(json.dumps(queued_states))
-                        data.timestamp_ns = self.cam.get_timestamp(sl.TIME_REFERENCE.IMAGE)
+                        data.timestamp_ns = ts
                         self.cam.ingest_data_into_svo(data)
+
+            # --- Publishing OUTSIDE the lock ---
+            now = self.get_clock().now().to_msg()
+
+            # RGB Image
+            img_np = zed_image.get_data()[:, :, :3].copy()  # BGRA -> BGR, explicit copy
+            ros_img = self.bridge.cv2_to_imgmsg(img_np, encoding='bgr8')
+            ros_img.header.stamp = now
+            ros_img.header.frame_id = 'zed_left_camera_frame'
+            self.zed_image_pub.publish(ros_img)
+
+            # Depth Image
+            pub_depth_np = zed_depth.get_data().copy()
+            ros_depth = self.bridge.cv2_to_imgmsg(pub_depth_np, encoding='32FC1')
+            ros_depth.header.stamp = now
+            ros_depth.header.frame_id = 'zed_left_camera_frame'
+            self.zed_depth_pub.publish(ros_depth)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = SVORecorder()
+    # TODO: Optimize recording quality
+    # executor = MultiThreadedExecutor()
+    # executor.add_node(node)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

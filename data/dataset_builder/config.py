@@ -68,7 +68,7 @@ class DatasetConfig:
 
     @property
     def progress_config(self) -> Dict:
-        return self.raw.get("progress_signal", {"enabled": False})
+        return self.raw.get("progress", {"enabled": False})
 
     @property
     def post_processing_config(self) -> Dict:

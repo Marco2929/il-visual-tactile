@@ -18,6 +18,11 @@ from processing.actions import compute_actions, compute_auxiliary_actions
 from processing.progress import compute_progress
 from processing.post_processing import apply_post_processing
 
+import sys
+sys.path.insert(0, "/ros2_ws/third_party/ManiFlow_Policy/ManiFlow")
+
+from cond_preprocess import PalmFrameTransform
+
 
 def process_episode(episode_dir: Path, config: DatasetConfig,
                     chain, joint_names: List[str]) -> Dict[str, np.ndarray]:
@@ -35,6 +40,8 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
     """
     episode_data = {}
     flags = config.cache_flags
+
+    palm_transformer = PalmFrameTransform(urdf_path=config.kinematics["urdf_path"])
 
     # --- 1. Load raw data from cache ---
     joint_states = load_joint_states(episode_dir)
@@ -60,13 +67,14 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
     # --- 3. Compute Representations ---
     ee_pose = compute_ee_pose(joint_names, joint_states, chain)
     hand_state = compute_hand_state(joint_states, config.hand_config)
-    force = compute_force(force_raw, config.force_config)
+    force = compute_force(force_raw, joint_states, config.force_config, transformer=palm_transformer)
+    if force is not None and force.size > 0 and all(d > 0 for d in force.shape):
+        episode_data["hand_obs"] = force
 
     # --- 4. State (Policy Observation) ---
     episode_data["state"] = build_state_vector(
         ee_pose=ee_pose,
         hand_state=hand_state,
-        force=force,
         joint_states=joint_states,
         config=config.proprio_config,
     )
@@ -91,10 +99,14 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
 
     # --- 7. Progress ---
     if config.progress_config.get("enabled"):
-        progress_signal = compute_progress(num_frames, config.progress_config)
+        progress_signal = compute_progress(
+            num_frames=num_frames,
+            ee_pose=ee_pose,
+            finger_sensor=hand_state[:, 3]
+        )
         
         if progress_signal is None:
-            raise ValueError("compute_progress returned None. Check your progress_signal configuration or logic.")
+            raise ValueError("compute_progress returned None.")
             
         episode_data["progress"] = progress_signal
 

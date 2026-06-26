@@ -133,7 +133,12 @@ lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 -
 ### Training
 
 # ManiFlow policy
+tmux new -s training
+
 bash scripts/train_policy.sh maniflow_pointcloud_policy foil_lifting_baseline 0112 0 0
+ctrl+b d
+
+tmux attach -t training
 
 # LeRobot SARM policy
 lerobot-train --dataset.repo_id=Marco2929/foil_lifting_baseline --dataset.root=/root/.cache/huggingface/lerobot/Marco2929/foil_lifting_baseline --policy.type=sarm --policy.annotation_mode=single_stage --policy.image_key=observation.images.front --output_dir=outputs/train/sarm_single --batch_size=28 --steps=5000 --wandb.enable=true --wandb.project=sarm --policy.repo_id=your-hf-user/your-model-name --policy.push_to_hub=false
@@ -176,18 +181,16 @@ python data/record_utils/record_dagger.py
 ros2 run plotjuggler plotjuggler
 
 
-### ─── Neuen Datensatz bauen ────────────────────────
-python data/dataset_builder/cli.py build --config box_opening_baseline.yaml
-python cli.py build --config foil_lifting.yaml --force   # ohne Nachfrage überschreiben
+# ─── Datensatz generieren ────────────────────────────
+python data/dataset_builder/cli.py --config box_opening_baseline.yaml
+python data/dataset_builder/cli.py --config foil_lifting.yaml
 
-###─── Neue Episoden anhängen ───────────────────────
-python cli.py append --config foil_lifting.yaml
+# ─── Episoden in Rohdaten umklassifizieren ───────────
+# success → failed umbenennen (LeRobot-Indizes, 0-basiert, nur success gezählt)
+python relabel_episodes.py 1 30 55 59 66
 
-### ─── Episoden löschen ─────────────────────────────
-python cli.py delete --config foil_lifting.yaml --episodes "3,5,10-12"
-python cli.py delete --config foil_lifting.yaml --episodes "0-4" --target zarr
-python cli.py delete --config foil_lifting.yaml --episodes "7" --target lerobot
-python cli.py delete --config foil_lifting.yaml --episodes "0,1,2" --force
+# Episoden komplett löschen
+python relabel_episodes.py 1 30 55 59 66 --action delete
 
-### ─── Datensatz-Info anzeigen ──────────────────────
-python cli.py info --config foil_lifting.yaml
+# Anderes Datenverzeichnis
+python relabel_episodes.py 1 30 55 59 66 --data-dir /path/to/episodes

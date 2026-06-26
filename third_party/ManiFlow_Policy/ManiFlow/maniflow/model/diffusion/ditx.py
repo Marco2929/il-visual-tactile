@@ -61,12 +61,14 @@ class DiTX(nn.Module):
         qk_norm: bool = False,
         pre_norm_modality: bool = False,
         language_conditioned: bool=False,
+        force_conditioned: bool=False,
         language_model: str = "t5-small",
     ):
         super().__init__()
         self.n_obs_steps = n_obs_steps
         self.visual_cond_len = visual_cond_len
         self.language_conditioned = language_conditioned
+        self.force_conditioned = force_conditioned
         self.pre_norm_modality = pre_norm_modality
         
         # constants
@@ -121,6 +123,15 @@ class DiTX(nn.Module):
             # pre-norm language modality
             if self.pre_norm_modality:
                 self.lang_norm = AdaptiveLayerNorm(
+                    dim=n_emb,
+                    dim_cond=n_emb,
+                )
+
+        # Force conditioning
+        if self.force_conditioned:
+            self.force_cond_emb = nn.Linear(cond_dim, n_emb)
+            if self.pre_norm_modality:
+                self.force_norm = AdaptiveLayerNorm(
                     dim=n_emb,
                     dim_cond=n_emb,
                 )
@@ -279,6 +290,14 @@ class DiTX(nn.Module):
             nn.init.constant_(self.lang_adaptor[0].bias, 0) if self.lang_adaptor[0].bias is not None else None
             nn.init.normal_(self.lang_adaptor[-1].weight, std=0.02)
             nn.init.constant_(self.lang_adaptor[-1].bias, 0) if self.lang_adaptor[-1].bias is not None else None
+
+        if self.force_conditioned:
+            nn.init.normal_(self.force_cond_emb.weight, std=0.02)
+            nn.init.constant_(self.force_cond_emb.bias, 0)
+            if self.pre_norm_modality:
+                nn.init.zeros_(self.force_norm.cond_linear.weight)
+                nn.init.constant_(self.force_norm.cond_linear.bias[:self.hidden_dim], 1.)
+                nn.init.zeros_(self.force_norm.cond_linear.bias[self.hidden_dim:])
         
         if self.pre_norm_modality:
             # Initialize the adaptive layer norm for visual condition
@@ -374,6 +393,7 @@ class DiTX(nn.Module):
             target_t: Union[torch.Tensor, float, int], 
             vis_cond: torch.Tensor,
             lang_cond: Union[torch.Tensor, list, str] = None,
+            force_cond: torch.Tensor = None,
             **kwargs):
         """
         Forward pass of the DiTX model.
@@ -383,6 +403,7 @@ class DiTX(nn.Module):
             target_t: (B,) or float, the target absolute or relative time for the consistency flow training process
             vis_cond: (B,T, vis_cond_dim) 
             lang_cond: (B,) or list of strings, language condition input
+            force_cond: (B,)
             **kwargs: additional arguments
         output: 
             action: (B,T,output_dim)
@@ -435,6 +456,12 @@ class DiTX(nn.Module):
                 lang_c = self.lang_norm(lang_c, time_c)
             context_c = torch.cat([context_c, lang_c], dim=1) # (B, L + L_lang, n_emb)
 
+        # 4.5 force condition
+        if self.force_conditioned and force_cond is not None:
+            force_c = self.force_cond_emb(force_cond)  # (B, N_force, n_emb)
+            if self.pre_norm_modality:
+                force_c = self.force_norm(force_c, time_c)
+            context_c = torch.cat([context_c, force_c], dim=1)  # (B, L + L_lang + N_force, n_emb)
 
         # 5. transformer blocks
         for block in self.blocks:

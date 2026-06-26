@@ -1,0 +1,40 @@
+name: foil_lifting_bl
+
+task_name: foil_lifting_bl
+
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    point_cloud:
+      shape: [1024, 3]
+      type: point_cloud
+      horizon: 2
+    agent_pos:
+      shape: [13]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [13]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_baseline_1024pc.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.02
+  max_train_episodes: 100
+  # Augmentation
+  augment: true
+  augment_shift: 0.05
+  use_noise_augmentation: true
+  pc_xyz_noise_std: 0.002
+  pc_rgb_noise_std: 0.01        # nur aktiv wenn 6-channel PC
+  agent_pos_noise_std: 0.0002
+  use_color_jitter: false        # true wenn use_pc_color: true
+  brightness_range: [-0.125, 0.125]
+  contrast_range: [0.5, 1.5]
+  saturation_range: [0.5, 1.5]

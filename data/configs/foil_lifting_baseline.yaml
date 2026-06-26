@@ -1,5 +1,5 @@
 meta:
-  name: "foil_lifting_baseline_1024pc"
+  name: "foil_lifting_baseline_cleaned"
   task: "Pick up the box and open it"
   fps: 30
 
@@ -12,7 +12,7 @@ kinematics:
 cache:
   base_dir: "foil_lifting_collection"
   front_rgb: true
-  wrist_rgb: true
+  wrist_rgb: false
   front_pc: true
   wrist_pc: false
 
@@ -46,9 +46,8 @@ actions:
   derived_from: "ee_pose"
 
 # ─── Progress Signal ──────────────────────────────
-progress_signal:
+progress:
   enabled: false
-  mode: "linear"
 
 # ─── Post-Processing Hooks ────────────────────────
 post_processing:
@@ -59,7 +58,7 @@ post_processing:
 # ─── Output ───────────────────────────────────────
 output:
   format: "both"
-  zarr_path: "foil_lifting_baseline_1024pc.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_baseline_1024pc"
+  zarr_path: "foil_lifting_baseline_cleaned.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_baseline_cleaned"
   compression: "zstd"
   chunk_size: 100

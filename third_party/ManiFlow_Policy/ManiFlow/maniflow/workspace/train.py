@@ -33,7 +33,15 @@ import wandb
 import tqdm
 import numpy as np
 from termcolor import cprint
+import torch.nn as nn
+import torch.nn.functional as F
 import shutil
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from io import BytesIO
+from PIL import Image
 import time
 import threading
 from hydra.core.hydra_config import HydraConfig
@@ -81,6 +89,213 @@ class TrainManiFlowDexWorkspace:
         self.global_step = 0
         self.epoch = 0
 
+    def compute_grad_cam(self, batch, policy, device):
+        """
+        Compute input-gradient saliency for the point cloud.
+        Bypasses compute_loss to avoid batch-splitting issues (flow/consistency ratio).
+        Directly runs a forward pass through encoder + model and backpropagates.
+        """
+        model = self.model
+        model.train()
+
+        # --- Prepare inputs (single sample) ---
+        obs_dict = {k: v[:1].clone().to(device) for k, v in batch['obs'].items()}
+        gt_action = batch['action'][:1].clone().to(device)
+
+        if 'point_cloud' not in obs_dict:
+            return None
+
+        # Enable gradient tracking on point cloud input
+        pc_input = obs_dict['point_cloud'].detach().clone().requires_grad_(True)
+        obs_dict['point_cloud'] = pc_input
+
+        model.zero_grad()
+
+        try:
+            # --- Normalize (same as compute_loss) ---
+            nobs = model.normalizer.normalize(obs_dict)
+            nactions = model.normalizer['action'].normalize(gt_action).to(device)
+
+            if not model.use_pc_color:
+                nobs['point_cloud'] = nobs['point_cloud'][..., :3]
+
+            # --- Encode observations (same as compute_loss) ---
+            To = model.n_obs_steps
+            this_nobs = dict_apply(nobs,
+                lambda x: x[:, :To, ...].reshape(-1, *x.shape[2:]).to(device))
+            nobs_features = model.obs_encoder(this_nobs)
+            vis_cond = nobs_features.reshape(1, -1, model.obs_feature_dim)
+
+            # --- Simple flow forward pass at t=0.5 ---
+            B = 1
+            T = model.horizon
+            Da = model.action_dim
+
+            noise = torch.randn(B, T, Da, device=device)
+            t_val = 0.5
+            t = torch.tensor([t_val], device=device)
+
+            # Interpolate: x_t = (1 - t) * noise + t * actions
+            x_t = (1.0 - t_val) * noise + t_val * nactions
+
+            # Target timestep
+            dt_val = 1.0 / max(model.num_inference_steps, 1)
+            if model.sample_target_t_mode == "absolute":
+                target_t = torch.tensor([t_val + dt_val], device=device)
+            elif model.sample_target_t_mode == "relative":
+                target_t = torch.tensor([dt_val], device=device)
+            else:
+                target_t = torch.tensor([dt_val], device=device)
+
+            # Forward through the DiTX model
+            v_pred = model.model(
+                sample=x_t,
+                timestep=t,
+                target_t=target_t,
+                vis_cond=vis_cond,
+                lang_cond=None,
+            )
+
+            # Proxy loss: MSE between predicted velocity and true velocity
+            v_target = nactions - noise  # true flow velocity for linear interpolation
+            proxy_loss = F.mse_loss(v_pred, v_target)
+
+            # Backward
+            proxy_loss.backward()
+
+        except Exception as e:
+            cprint(f"[Grad-CAM] Forward/backward failed: {e}", "yellow")
+            import traceback
+            traceback.print_exc()
+            model.zero_grad()
+            return None
+
+        # --- Check gradient ---
+        if pc_input.grad is None:
+            cprint("[Grad-CAM] No gradient on point_cloud input (grad is None)!", "yellow")
+            model.zero_grad()
+            return None
+
+        grad = pc_input.grad[0].detach()  # [T, N, D] or [N, D]
+
+        # Handle temporal dimension
+        if grad.ndim == 3:
+            # Shape [T, N, D] -> take first timestep
+            grad = grad[0]  # [N, D]
+
+        # Use only XYZ gradient (first 3 channels) for spatial importance
+        xyz_channels = min(3, grad.shape[-1])
+        importance = grad[:, :xyz_channels].norm(dim=-1)  # [N]
+
+        # --- Get point positions for visualization ---
+        points = pc_input[0].detach().cpu().numpy()
+        if points.ndim == 3:
+            points = points[0]  # Take first timestep
+        points = points[:, :3]
+        num_points = points.shape[0]
+
+        # Match dimensions between importance and points
+        if importance.shape[0] > num_points:
+            importance = importance[:num_points]
+        elif importance.shape[0] < num_points:
+            pad = torch.zeros(num_points - importance.shape[0], device=importance.device)
+            importance = torch.cat([importance, pad])
+
+        # --- Normalize importance to [0, 1] ---
+        cam = importance.cpu().numpy()
+        cam_min, cam_max = cam.min(), cam.max()
+
+        if cam_max - cam_min < 1e-8:
+            cprint(f"[Grad-CAM] Uniform gradients! min={cam_min:.6f}, max={cam_max:.6f}", "yellow")
+            model.zero_grad()
+            return None
+
+        cam = (cam - cam_min) / (cam_max - cam_min)
+
+        # --- Log statistics ---
+        top_k = 50
+        top_indices = np.argsort(cam)[-top_k:]
+        grad_stats = {
+            'grad_cam/max_importance': float(cam_max),
+            'grad_cam/mean_importance': float(cam.mean()),
+            'grad_cam/top50_mean': float(cam[top_indices].mean()),
+            'grad_cam/nonzero_ratio': float((cam > 0.01).sum() / len(cam)),
+        }
+
+        # --- Visualization ---
+        fig = plt.figure(figsize=(16, 5))
+
+        # Plot 1: Top-Down (XY)
+        ax1 = fig.add_subplot(141)
+        scatter1 = ax1.scatter(points[:, 0], points[:, 1], c=cam, cmap='jet',
+                            s=2, alpha=0.8, vmin=0, vmax=1)
+        ax1.set_title('Top-Down (XY)')
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+        ax1.set_aspect('equal')
+        plt.colorbar(scatter1, ax=ax1, shrink=0.6)
+
+        # Plot 2: Front (XZ)
+        ax2 = fig.add_subplot(142)
+        scatter2 = ax2.scatter(points[:, 0], points[:, 2], c=cam, cmap='jet',
+                            s=2, alpha=0.8, vmin=0, vmax=1)
+        ax2.set_title('Front (XZ)')
+        ax2.set_xlabel('X')
+        ax2.set_ylabel('Z')
+        ax2.set_aspect('equal')
+        plt.colorbar(scatter2, ax=ax2, shrink=0.6)
+
+        # Plot 3: Side (YZ)
+        ax3 = fig.add_subplot(143)
+        scatter3 = ax3.scatter(points[:, 1], points[:, 2], c=cam, cmap='jet',
+                            s=2, alpha=0.8, vmin=0, vmax=1)
+        ax3.set_title('Side (YZ)')
+        ax3.set_xlabel('Y')
+        ax3.set_ylabel('Z')
+        ax3.set_aspect('equal')
+        plt.colorbar(scatter3, ax=ax3, shrink=0.6)
+
+        # Plot 4: 3D View
+        ax4 = fig.add_subplot(144, projection='3d')
+        scatter4 = ax4.scatter(points[:, 0], points[:, 1], points[:, 2],
+                            c=cam, cmap='jet', s=2, alpha=0.8, vmin=0, vmax=1)
+        ax4.set_title('3D View')
+        ax4.set_xlabel('X')
+        ax4.set_ylabel('Y')
+        ax4.set_zlabel('Z')
+        plt.colorbar(scatter4, ax=ax4, shrink=0.6, label='Importance')
+
+        fig.suptitle(
+            f'Gradient Saliency (Bypass) | Epoch {self.epoch} | '
+            f'Top-{top_k} mean: {cam[top_indices].mean():.3f} | '
+            f'Overall mean: {cam.mean():.3f} | '
+            f'Max: {cam_max:.4e}',
+            fontsize=10
+        )
+        plt.tight_layout()
+
+        # Convert to wandb image
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        img = Image.open(buf)
+        plt.close(fig)
+
+        # Cleanup
+        model.zero_grad()
+
+        # Return image + stats dict for logging
+        result_img = wandb.Image(img, caption=f"Gradient Saliency Epoch {self.epoch}")
+
+        # Log stats separately
+        try:
+            wandb.log(grad_stats, step=self.global_step)
+        except Exception:
+            pass
+
+        return result_img
+    
+    
     def run(self):
         cfg = copy.deepcopy(self.cfg)
         
@@ -357,6 +572,22 @@ class TrainManiFlowDexWorkspace:
                     del result
                     del pred_action
                     del mse
+            
+            # ========= Grad-CAM Visualization =========
+            grad_cam_every = cfg.training.get('grad_cam_every', 0)
+            if grad_cam_every > 0 and (self.epoch % grad_cam_every) == 0:
+                try:
+                    grad_cam_img = self.compute_grad_cam(
+                        batch=train_sampling_batch,
+                        policy=policy,
+                        device=device
+                    )
+                    if grad_cam_img is not None:
+                        step_log['grad_cam'] = grad_cam_img
+                        cprint(f"[Grad-CAM] Logged at epoch {self.epoch}", "cyan")
+                except Exception as e:
+                    cprint(f"[Grad-CAM] Failed: {e}", "yellow")
+            # ============================================
 
             if env_runner is None:
                 step_log['test_mean_score'] = - train_loss
@@ -390,6 +621,13 @@ class TrainManiFlowDexWorkspace:
             wandb_run.log(step_log, step=self.global_step)
             self.global_step += 1
             self.epoch += 1
+
+            # Progressive Proprioception Masking
+            max_prob = cfg.training.get('proprio_mask_max_prob', 0.2)
+            warmup_epochs = cfg.training.get('proprio_mask_warmup_epochs', 100)
+            dataset.proprio_mask_prob = min(max_prob, (self.epoch / warmup_epochs) * max_prob)
+
+
             del step_log
 
     def eval(self):

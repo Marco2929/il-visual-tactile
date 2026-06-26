@@ -35,7 +35,7 @@ proprioception:
     - type: "force"
 
   hand:
-    hardware: "inspire"
+    hardware: "tesollo"
     force:
       enabled: true
       mode: "raw"
@@ -48,9 +48,8 @@ actions:
 auxiliary_actions: []
 
 # ─── Progress Signal ──────────────────────────────
-progress_signal:
+progress:
   enabled: true
-  mode: "linear"
 
 # ─── Post-Processing Hooks ────────────────────────
 post_processing:

@@ -168,21 +168,12 @@ def main(args=None):
     rclpy.init(args=args)
 
     start_joints = {
-        "shoulder_pan_joint": -0.7128694693194788,
-        "shoulder_lift_joint": -1.4950894129327317,
-        "elbow_joint": -2.328955888748169,
-        "wrist_1_joint": 3.8557068544575195,
-        "wrist_2_joint": -2.311946217213766,
-        "wrist_3_joint": -3.220886770878927,
-    }
-
-    target_joints = {
-    "shoulder_pan_joint": -0.6179111639605921,
-    "shoulder_lift_joint": -1.9606038532652796,
-    "elbow_joint": -1.7474212646484375,
-    "wrist_1_joint": 3.3604728418537597,
-    "wrist_2_joint": -2.212716881428854,
-    "wrist_3_joint": -3.4541145006762903,
+        "shoulder_pan_joint": -0.5362704435931605,
+        "shoulder_lift_joint": -1.418149085049965,
+        "elbow_joint": -2.6668741703033447,
+        "wrist_1_joint": 4.063593550319336,
+        "wrist_2_joint": -2.154945675526754,
+        "wrist_3_joint": 3.0416924953460693,
     }
 
     client = TrajectoryControllerClient()

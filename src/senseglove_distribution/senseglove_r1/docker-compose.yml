@@ -1,0 +1,16 @@
+services:
+  senseglove_r1:
+    image: ${SENSEGLOVE_IMAGE:-senseglove/robotics:latest}
+    container_name: senseglove_r1
+    network_mode: host
+    privileged: true
+    tty: true
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    command:
+      - bash
+      - -c
+      - ros2 launch r1_bringup r1.launch.py

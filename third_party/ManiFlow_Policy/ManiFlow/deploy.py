@@ -277,7 +277,33 @@ class RealDexEnv(Node):
         }
 
 
-def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int = 1211, fps: float = 30.0):
+def sport_mode(action_chunk: np.ndarray, speedup: float = 1.2) -> np.ndarray:
+    """
+    Resample action chunk to be shorter → faster execution at same Hz.
+    
+    Args:
+        action_chunk: (T, action_dim) array
+        speedup: 1.2 = 20% faster, 1.5 = 50% faster
+    
+    Returns:
+        (T_new, action_dim) array where T_new = T / speedup
+    """
+    T, action_dim = action_chunk.shape
+    T_new = int(T / speedup)
+    
+    # Original timesteps and new (compressed) timesteps
+    t_original = np.linspace(0, 1, T)
+    t_new = np.linspace(0, 1, T_new)
+    
+    # Linear interpolation per dimension
+    resampled = np.zeros((T_new, action_dim))
+    for dim in range(action_dim):
+        resampled[:, dim] = np.interp(t_new, t_original, action_chunk[:, dim])
+    
+    return resampled
+
+
+def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int = 1211, fps: float = 30.0, sport_mode_active=False):
     if not rclpy.ok():
         rclpy.init()
 
@@ -319,6 +345,9 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
             # 2. CPU POST-PROCESSING & PUBLISHING
             t_post_start = time.perf_counter()
             action_queue = normalize(action_queue_raw)
+
+            if sport_mode_active:
+                action_queue = sport_mode(action_queue, speedup=1.3)
 
             first_pose = action_queue[0][:3]
             last_pose = action_queue[-1][:3]
@@ -371,8 +400,8 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
 if __name__ == "__main__":
     run_policy(
         alg_name="maniflow_pointcloud_policy",
-        task_name="test_block_grasping",
-        run_dir="/ros2_ws/data/outputs/test_block_grasping-maniflow_pointcloud_policy-0112_seed0",
+        task_name="foil_lifting_baseline_cleaned",
+        run_dir="/ros2_ws/data/outputs/foil_lifting_baseline_cleaned_proprio_mask-maniflow_pointcloud_policy-0112_seed0",
         addition_info=1211,
         fps=30.0
     )

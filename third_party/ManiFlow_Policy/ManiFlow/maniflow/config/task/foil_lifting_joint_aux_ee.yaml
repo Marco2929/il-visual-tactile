@@ -1,0 +1,31 @@
+name: foil_lifting_baseline_cleaned
+
+task_name: foil_lifting_baseline_cleaned
+
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    point_cloud:
+      shape: [1024, 3]
+      type: point_cloud
+      horizon: 2
+    agent_pos:
+      shape: [12]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [19]  # 12 joints + 7 ee_pose (optional +force_dim)
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_baseline_cleaned.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.02
+  max_train_episodes: 100
+  augment: True
+  augment_shift: 0.08

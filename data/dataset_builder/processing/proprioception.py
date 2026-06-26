@@ -6,6 +6,45 @@ import kinpy as kp
 from typing import Dict, List
 from termcolor import cprint
 
+import sys
+sys.path.insert(0, "/ros2_ws/third_party/ManiFlow_Policy/ManiFlow")
+
+from cond_preprocess import PalmFrameTransform
+
+def compute_hand_palm_features(
+    joint_states: np.ndarray, 
+    force_raw: np.ndarray, 
+    transformer: PalmFrameTransform,
+    config: Dict
+) -> np.ndarray:
+    """
+    Transformiert Gelenk- und Kraftdaten der gesamten Episode in das Palm-Frame.
+    
+    Args:
+        joint_states: (N, num_total_joints) - Enthält Arm- und Handgelenke
+        force_raw: (N, 30) - Rohe F/T Sensordaten
+        transformer: Instanz der PalmFrameTransform
+        config: Konfiguration (z.B. um den Index-Offset für die Handgelenke zu definieren)
+        
+    Returns:
+        (N, 65) Array mit den Palm-Features für jeden Frame.
+    """
+    if not config.get("enabled", True):
+        return np.zeros((force_raw.shape[0], 0), dtype=np.float32)
+
+    N = force_raw.shape[0]
+    palm_features = np.zeros((N, 65), dtype=np.float32)
+    
+    # Extrahiere nur die 20 Handgelenke. 
+    # Annahme: Arm hat 6 Gelenke, Hand beginnt ab Index 6.
+    # TODO: Could be wrong 
+    hand_joints = joint_states[:, 6 : 6 + 20]
+
+    for i in range(N):
+        palm_features[i] = transformer(hand_joints[i], force_raw[i]).reshape(-1)
+
+    return palm_features
+
 
 def setup_kinematics(urdf_path: str, end_link: str):
     """Build kinematic chain from URDF."""
@@ -67,25 +106,40 @@ def compute_hand_state(joint_states: np.ndarray, hand_config: Dict) -> np.ndarra
     return hand_joints.astype(np.float32)
 
 
-def compute_force(force_raw: np.ndarray, force_config: Dict) -> np.ndarray:
+def compute_force(
+    force_raw: np.ndarray, 
+    joint_states: np.ndarray, 
+    force_config: Dict,
+    transformer: PalmFrameTransform = None
+) -> np.ndarray:
     """
-    Process force sensor data.
-
-    Returns: (N, 6) if enabled, (N, 0) if disabled
+    Process force sensor data based on the mode defined in the config.
+    Returns: (N, D) array where D depends on the mode.
     """
     if not force_config.get("enabled", False):
         return np.zeros((force_raw.shape[0], 0), dtype=np.float32)
 
     mode = force_config.get("mode", "raw")
+    
     if mode == "raw":
         return force_raw.astype(np.float32)
+        
+    elif mode == "hand_palm_features":
+        if transformer is None:
+            raise ValueError("PalmFrameTransform instance is required for 'hand_palm_features' mode.")
+        return compute_hand_palm_features(
+            joint_states=joint_states, 
+            force_raw=force_raw, 
+            transformer=transformer,
+            config=force_config
+        )
+        
     else:
         raise ValueError(f"Unknown force mode: '{mode}'")
 
 
 def build_state_vector(ee_pose: np.ndarray,
                        hand_state: np.ndarray,
-                       force: np.ndarray,
                        joint_states: np.ndarray,
                        config: Dict) -> np.ndarray:
     """
@@ -112,10 +166,8 @@ def build_state_vector(ee_pose: np.ndarray,
 
         elif comp_type == "hand":
             components.append(hand_state)
-
         elif comp_type == "force":
-            components.append(force)
-
+            pass
         else:
             raise ValueError(f"Unknown state_component: '{comp_type}'")
 

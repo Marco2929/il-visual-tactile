@@ -57,5 +57,12 @@
                 }
             ]
         }
+    ],
+    "python-envs.pythonProjects": [
+        {
+            "path": "third_party/ManiFlow_Policy/ManiFlow/maniflow/model/progress",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
     ]
 }

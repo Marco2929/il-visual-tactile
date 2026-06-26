@@ -93,6 +93,7 @@ class InferenceControlNode(Node):
         """Gate: enable/disable policy execution on the robot."""
         if msg.data and not self.policy_active:
             self.policy_active = True
+            self.last_commanded_positions = None  # ← re-init from actual joints on next use
             self.get_logger().info("✅ Policy ACTIVE — Robot will follow policy commands.")
         elif not msg.data and self.policy_active:
             self.policy_active = False
@@ -100,6 +101,7 @@ class InferenceControlNode(Node):
                 self._action_queue.clear()
             self.current_arm_goal = None
             self.current_hand_goal = None
+            self.last_commanded_positions = None  # ← ADD THIS
             self.get_logger().info("⏸️  Policy INACTIVE — Queue cleared, robot stopped.")
 
     def _joint_state_cb(self, msg):

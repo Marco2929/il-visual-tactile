@@ -8,6 +8,7 @@ from maniflow.model.common.normalizer import LinearNormalizer
 from maniflow.policy.base_policy import BasePolicy
 from maniflow.common.pytorch_util import dict_apply
 from maniflow.model.progress.progress_head import ProgressHead
+from maniflow.model.force.force_extractor import force_mlp, force_cnn
 from maniflow.common.model_util import print_params
 from maniflow.model.vision_3d.pointnet_extractor import DP3Encoder
 from maniflow.model.diffusion.ditx import DiTX
@@ -40,9 +41,15 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             downsample_points=False,
             pre_norm_modality=False,
             language_conditioned=False,
-            progress_prediction=False,
+            use_progress=False,
             force_conditioned=False,
+            # Force
+            aux_action=False,
+            aux_force=False,
             force_cond_len=65,
+            lambda_aux_ee=0.5,
+            lambda_aux_force=0.3,
+            lambda_progress=0.05,
             # consistency flow training parameters
             flow_batch_ratio=0.75,
             consistency_batch_ratio=0.25,
@@ -53,6 +60,13 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             sample_target_t_mode="relative", # relative, absolute
             **kwargs):
         super().__init__()
+
+        self.force_conditioned = force_conditioned
+        self.aux_action = aux_action
+        self.aux_force = aux_force
+        self.lambda_aux_ee = lambda_aux_ee
+        self.lambda_progress = lambda_progress
+        self.lambda_aux_force = lambda_aux_force
 
         # parse shape_meta
         action_shape = shape_meta['action']['shape']
@@ -82,39 +96,30 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             raise ValueError(f"Unsupported encoder type {encoder_type}")
         cprint(f"[Encoder_type] {encoder_type}", "yellow")
 
-        self.force_conditioned = force_conditioned
         self.use_force_cnn = kwargs.get('use_force_cnn', False)
         
         # TODO: Cross check in papers if this makes actual sense
-        if self.force_conditioned:
-            # Wir nutzen Padding='same' (padding=1 bei kernel=3), 
-            # damit die Zeit-Länge (z.B. 16) exakt erhalten bleibt.
-            self.force_encoder = nn.Sequential(
-                nn.Conv1d(in_channels=force_cond_len, out_channels=128, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv1d(in_channels=128, out_channels=encoder_output_dim, kernel_size=3, padding=1),
-            )
+        if self.force_conditioned and self.use_force_cnn:
+            self.force_encoder = force_cnn(force_cond_len=force_cond_len,
+                                           encoder_output_dim=encoder_output_dim)
             cprint(f"[Policy] Force CNN enabled. Outputting tokens matching history length.", "cyan")
-        
-        # TODO: Attention initializes always!!
-        else:
-            # MLP Variante (Flatten)
-            # Erwartet Input: (Batch, Time, Channels)
-            self.force_encoder = nn.Sequential(
-                nn.Flatten(), # Macht aus (Batch, n_obs_steps, 65) -> (Batch, n_obs_steps * 65)
-                nn.Linear(n_obs_steps * force_cond_len, 128),
-                nn.LayerNorm(128),
-                nn.GELU(),
-                nn.Linear(128, encoder_output_dim)
-            )
+
+        elif self.force_conditioned:
+            self.force_encoder = force_mlp(n_obs_steps=n_obs_steps, 
+                                           force_cond_len=force_cond_len,
+                                           encoder_output_dim=encoder_output_dim)
+            
             cprint(f"[Policy] Force enabled (MLP): {n_obs_steps * force_cond_len} flat -> {encoder_output_dim}", "cyan")
+        else:
+            pass
 
-        self.progress_prediction = progress_prediction
+        self.use_progress = use_progress
 
-        if self.progress_prediction:
-            self.progress_head = ProgressHead(visual_feat_dim=encoder_output_dim)
+        if self.use_progress:
+            self.progress_head = ProgressHead(visual_feat_dim=encoder_output_dim,
+                                              use_force=self.force_conditioned)
             cprint(f"[Policy] Progress Head enabled (vision-only).", "cyan")
-       
+
         # create ManiFlow model
         obs_feature_dim = obs_encoder.output_shape()
         input_dim = action_dim + obs_feature_dim
@@ -127,6 +132,11 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         self.pointnet_type = pointnet_type
         cprint(f"[ManiFlowTransformerPointcloudPolicy] use_pc_color: {self.use_pc_color}", "yellow")
         cprint(f"[ManiFlowTransformerPointcloudPolicy] pointnet_type: {self.pointnet_type}", "yellow")
+
+        # Hint: ensure encoder_output_dim matches Uni3D output dimension
+        if pointnet_type in ["uni3d", "uni3d_pretrained"]:
+            cprint(f"[DP3] Uni3D encoder detected, ensure encoder_output_dim matches Uni3D output dim", "cyan")
+
         
         cprint(f"[ManiFlowTransformerPointcloudPolicy] Using DiTX model", "red")
         model = DiTX(
@@ -146,6 +156,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             block_type=block_type,
             pre_norm_modality=pre_norm_modality,
             language_conditioned=language_conditioned,
+            force_conditioned=force_conditioned
         )
         
         self.obs_encoder = obs_encoder
@@ -172,6 +183,19 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         self.sample_target_t_mode = sample_target_t_mode
         assert self.sample_target_t_mode in ["absolute", "relative"], "sample_target_t_mode must be either 'absolute' or 'relative'"
 
+        self.aux_ee_dim = 7 if aux_action else 0
+        self.aux_force_dim = shape_meta.get('aux_force_dim', 0) if aux_force else 0
+        self.primary_action_dim = action_dim - self.aux_ee_dim - self.aux_force_dim
+
+        assert self.primary_action_dim > 0, (
+            f"primary_action_dim={self.primary_action_dim} must be > 0. "
+            f"action_dim={action_dim}, aux_ee={self.aux_ee_dim}, aux_force={self.aux_force_dim}"
+        )
+        
+        cprint(f"  - action splits: primary={self.primary_action_dim} "
+               f"(joints+hand or ee+hand), ee_aux={self.aux_ee_dim}, "
+               f"force_aux={self.aux_force_dim}, total={action_dim}", "cyan")
+
         cprint(f"[ManiFlowTransformerPointcloudPolicy] Initialized with parameters:", "yellow")
         cprint(f"  - horizon: {self.horizon}", "yellow")
         cprint(f"  - n_action_steps: {self.n_action_steps}", "yellow")
@@ -192,6 +216,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             condition_data, 
             vis_cond=None,
             lang_cond=None,
+            force_cond=None,
             **kwargs
             ):
         
@@ -206,6 +231,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             N = self.num_inference_steps,
             vis_cond=vis_cond,
             lang_cond=lang_cond,
+            force_cond=force_cond,
            **kwargs)
         
         return ode_traj[-1] # sample ode returns the whole traj, return the last one
@@ -236,6 +262,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         # handle different ways of passing observation
         vis_cond = None
         lang_cond = None
+        force_cond = None
 
         if self.language_conditioned:
             # assume nobs has 'task_name' key for language condition
@@ -247,6 +274,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         nobs_features = self.obs_encoder(this_nobs)
         vis_cond = nobs_features.reshape(B, -1, Do) # B, self.n_obs_steps*L, Do
         
+        # TODO: Fix this that it works with both versions
         # Add force here
         if self.force_conditioned:
             # nobs['hand_obs'] hat durch die YAML jetzt die Form: (Batch, 16, 65)
@@ -260,15 +288,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             
             # Jetzt ordnen wir es für den Transformer um: (Batch, Time, Channels) -> (Batch, 16, 128)
             # Das bedeutet: Wir haben jetzt 16 echte Force-Tokens!
-            force_tokens = force_features.permute(0, 2, 1)
-            
-            # An die visuellen Tokens anhängen
-            vis_cond = torch.cat([vis_cond, force_tokens], dim=1)
-
-        if self.progress_prediction:
-            with torch.no_grad():
-                progress_score = self.progress_head(vis_cond)
-            result['progress_score'] = progress_score.item()
+            force_cond = force_features.permute(0, 2, 1)
 
         # empty data for action
         cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
@@ -278,6 +298,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             cond_data, 
             vis_cond=vis_cond,
             lang_cond=lang_cond,
+            force_cond=force_cond,
             **self.kwargs)
         
         # unnormalize prediction
@@ -287,14 +308,24 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         # get action
         start = To - 1
         end = start + self.n_action_steps
-        action = action_pred[:,start:end]
+        action_full = action_pred[:,start:end]
         
-        # get prediction
         result = {
-            'action': action,
+            'action': action_full[..., :self.primary_action_dim],
             'action_pred': action_pred,
         }
+
+        if self.aux_action:
+            result['ee_pose_pred'] = action_full[..., self.primary_action_dim:self.primary_action_dim + self.aux_ee_dim]
         
+        if self.aux_force:
+            result['force_pred'] = action_full[..., self.primary_action_dim + self.aux_ee_dim:]
+
+        if self.use_progress:
+            with torch.no_grad():
+                progress_score = self.progress_head(vis_cond, force_cond)
+            result['progress_score'] = progress_score.squeeze(-1)  # (B,) Tensor
+
         return result
 
     # ========= training  ============
@@ -330,9 +361,21 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
                 "params": other_obs_params,
                 "weight_decay": obs_encoder_weight_decay
             })
-        optimizer = torch.optim.AdamW(
-            optim_groups, lr=lr, betas=betas
-        )
+
+        if self.force_conditioned:
+            optim_groups.append({
+                "params": list(self.force_encoder.parameters()),
+                "weight_decay": weight_decay,
+            })
+
+        if self.use_progress:
+            optim_groups.append({
+                "params": list(self.progress_head.parameters()),
+                "weight_decay": weight_decay,
+            })
+
+        optimizer = torch.optim.AdamW(optim_groups, lr=lr, betas=betas)
+
         return optimizer
     
     def sample_t(self, batch_size, mode="uniform"):
@@ -408,6 +451,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         # get visual and language conditions
         vis_cond = model_kwargs.get('vis_cond', None)
         lang_cond = model_kwargs.get('lang_cond', None)
+        force_cond = model_kwargs.get('force_cond', None)
         flow_batchsize = actions.shape[0]
         device = actions.device
         
@@ -439,6 +483,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         target_dict['v_target'] = v_t_flow
         target_dict['vis_cond'] = vis_cond
         target_dict['lang_cond'] = lang_cond
+        target_dict['force_cond'] = force_cond
 
         return target_dict
     
@@ -451,6 +496,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         
         # get visual and language conditions
         vis_cond = model_kwargs.get('vis_cond', None)
+        force_cond = model_kwargs.get('force_cond', None)
         lang_cond = model_kwargs.get('lang_cond', None)
         ema_model = model_kwargs.get('ema_model', None)
         consistency_batchsize = actions.shape[0]
@@ -492,6 +538,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
                 target_t=target_t_next.squeeze(), 
                 vis_cond=vis_cond[-consistency_batchsize:],
                 lang_cond=lang_cond[-consistency_batchsize:] if lang_cond is not None else None,
+                force_cond=force_cond[-consistency_batchsize:] if force_cond is not None else None,
             ) 
         # predict the target data point using the average velocity
         pred_x1_ct = x_t_next + (1 - t_next) * v_avg_to_next_target
@@ -550,6 +597,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         trajectory = nactions
         cond_data = trajectory
         lang_cond = None
+        force_cond = None
         ema_model = ema_model
 
         if self.language_conditioned:
@@ -557,15 +605,13 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             lang_cond = nobs.get('task_name', None)
             assert lang_cond is not None, "Language goal is required"
 
-        loss_progress = 0.0
-        if self.progress_prediction:
-            progress_labels = batch['progress_label'].to(self.device).float()
-            progress_score = self.progress_head(vis_cond)
-            loss_progress = F.mse_loss(progress_score, progress_labels)
-            
-            lambda_progress = 0.05
-            loss += lambda_progress * loss_progress
-            loss_progress = loss_progress.item()
+        if self.force_conditioned:
+            hand_obs = nobs['hand_obs'][:, :self.n_obs_steps, ...].to(self.device)
+            hand_obs = hand_obs.permute(0, 2, 1)
+            force_features = self.force_encoder(hand_obs)
+            force_cond = force_features.permute(0, 2, 1)  # (B, T_force, D)
+
+            assert force_cond is not None, "Force goal is required"
 
         # reshape B, T, ... to B*T
         this_nobs = dict_apply(nobs, 
@@ -578,60 +624,98 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         """Get flow and consistency targets"""
         flow_batchsize = int(batch_size * self.flow_batch_ratio)
         consistency_batchsize = int(batch_size * self.consistency_batch_ratio)
-    
+
+        # Slice all conditions
+        vis_cond_flow = vis_cond[:flow_batchsize]
+        vis_cond_ct = vis_cond[flow_batchsize:flow_batchsize+consistency_batchsize]
+        force_cond_flow = force_cond[:flow_batchsize] if force_cond is not None else None
+        force_cond_ct = force_cond[flow_batchsize:flow_batchsize+consistency_batchsize] if force_cond is not None else None
+        lang_cond_flow = lang_cond[:flow_batchsize] if lang_cond is not None else None
+        lang_cond_ct = lang_cond[flow_batchsize:flow_batchsize+consistency_batchsize] if lang_cond is not None else None
 
         # Get flow velocity targets
-        # TODO: FORCE IS MISSING
-        flow_target_dict = self.get_flow_velocity(nactions[:flow_batchsize], 
-                                                    vis_cond=vis_cond[:flow_batchsize],
-                                                    lang_cond=lang_cond[:flow_batchsize] if lang_cond is not None else None)
+        flow_target_dict = self.get_flow_velocity(
+            nactions[:flow_batchsize],
+            vis_cond=vis_cond_flow,
+            lang_cond=lang_cond_flow,
+            force_cond=force_cond_flow,
+        )
         v_flow_pred = self.model(
-            sample=flow_target_dict['x_t'], 
+            sample=flow_target_dict['x_t'],
             timestep=flow_target_dict['t'].squeeze(),
             target_t=flow_target_dict['target_t'].squeeze(),
-            vis_cond=vis_cond[:flow_batchsize],
-            lang_cond=flow_target_dict['lang_cond'][:flow_batchsize] if lang_cond is not None else None)
+            vis_cond=vis_cond_flow,
+            force_cond=force_cond_flow,
+            lang_cond=lang_cond_flow,
+        )
         v_flow_pred_magnitude = torch.sqrt(torch.mean(v_flow_pred ** 2)).item()
 
         # Get consistency velocity targets
-        consistency_target_dict = self.get_consistency_velocity(nactions[flow_batchsize:flow_batchsize+consistency_batchsize],
-                                                                        vis_cond=vis_cond[flow_batchsize:flow_batchsize+consistency_batchsize],
-                                                                        lang_cond=lang_cond[flow_batchsize:flow_batchsize+consistency_batchsize] if lang_cond is not None else None,
-                                                                        ema_model=ema_model
-                                                                        )
+        consistency_target_dict = self.get_consistency_velocity(
+            nactions[flow_batchsize:flow_batchsize+consistency_batchsize],
+            vis_cond=vis_cond_ct,
+            lang_cond=lang_cond_ct,
+            force_cond=force_cond_ct,
+            ema_model=ema_model,
+        )
         v_ct_pred = self.model(
-            sample=consistency_target_dict['x_t'], 
+            sample=consistency_target_dict['x_t'],
             timestep=consistency_target_dict['t'].squeeze(),
             target_t=consistency_target_dict['target_t'].squeeze(),
-            vis_cond=vis_cond[flow_batchsize:flow_batchsize+consistency_batchsize],
-            lang_cond=lang_cond[flow_batchsize:flow_batchsize+consistency_batchsize] if lang_cond is not None else None,
-            )
+            vis_cond=vis_cond_ct,
+            force_cond=force_cond_ct,
+            lang_cond=lang_cond_ct,
+        )
         v_ct_pred_magnitude = torch.sqrt(torch.mean(v_ct_pred ** 2)).item()
 
         """Compute losses"""
         loss = 0.
+        p = self.primary_action_dim
+        e = self.aux_ee_dim
 
         # compute flow loss 
         v_flow_target = flow_target_dict['v_target']
-        loss_flow = F.mse_loss(v_flow_pred, v_flow_target, reduction='none')
-        loss_flow = reduce(loss_flow, 'b ... -> b (...)', 'mean')
-        loss += loss_flow.mean()
-        loss_flow = loss_flow.mean().item()
+        loss_flow_raw = F.mse_loss(v_flow_pred, v_flow_target, reduction='none')
+
+        loss_flow_primary = reduce(loss_flow_raw[..., :p], 'b ... -> b (...)', 'mean').mean()
+        loss_flow_aux_ee = reduce(loss_flow_raw[..., p:p+e], 'b ... -> b (...)', 'mean').mean() if self.aux_action else torch.tensor(0.0, device=self.device)
+        loss_flow_aux_force = reduce(loss_flow_raw[..., p+e:], 'b ... -> b (...)', 'mean').mean() if self.aux_force else torch.tensor(0.0, device=self.device)
+        
+        loss += loss_flow_primary + self.lambda_aux_ee * loss_flow_aux_ee + self.lambda_aux_force * loss_flow_aux_force
 
         # compute consistency training loss
         v_ct_target = consistency_target_dict['v_target']
-        loss_ct = F.mse_loss(v_ct_pred, v_ct_target, reduction='none')
-        loss_ct = reduce(loss_ct, 'b ... -> b (...)', 'mean')
-        loss += loss_ct.mean()
-        loss_ct = loss_ct.mean().item()  
+        loss_ct_raw = F.mse_loss(v_ct_pred, v_ct_target, reduction='none')
+        
+        loss_ct_primary = reduce(loss_ct_raw[..., :p], 'b ... -> b (...)', 'mean').mean()
+        loss_ct_aux_ee = reduce(loss_ct_raw[..., p:p+e], 'b ... -> b (...)', 'mean').mean() if self.aux_action else torch.tensor(0.0, device=self.device)
+        loss_ct_aux_force = reduce(loss_ct_raw[..., p+e:], 'b ... -> b (...)', 'mean').mean() if self.aux_force else torch.tensor(0.0, device=self.device)
+
+        loss += loss_ct_primary + self.lambda_aux_ee * loss_ct_aux_ee + self.lambda_aux_force * loss_ct_aux_force
+
+        loss_progress = 0.0
+        if self.use_progress:
+            progress_labels = batch['progress'][:, self.n_obs_steps - 1, :].to(self.device).float()  # (B, 1)
+            progress_score = self.progress_head(vis_cond, force_cond)  # (B, 1)
+            loss_progress = F.mse_loss(progress_score, progress_labels)
+
+            loss = loss + self.lambda_progress * loss_progress
+            loss_progress = loss_progress.item()
+
 
         loss = loss.mean()
+
         loss_dict = {
-                'loss_flow': loss_flow,
-                'loss_ct': loss_ct,
-                'v_flow_pred_magnitude': v_flow_pred_magnitude,
-                'v_ct_pred_magnitude': v_ct_pred_magnitude,
-                'bc_loss': loss.item(),
+            'total_loss': loss.item(),
+            'loss_flow_primary': loss_flow_primary.item(),
+            'loss_flow_ee': loss_flow_aux_ee.item(),
+            'loss_flow_force': loss_flow_aux_force.item(),
+            'loss_ct_primary': loss_ct_primary.item(),
+            'loss_ct_ee': loss_ct_aux_ee.item(),
+            'loss_ct_force': loss_ct_aux_force.item(),
+            'loss_progress': loss_progress,
+            'v_flow_pred_magnitude': v_flow_pred_magnitude,
+            'v_ct_pred_magnitude': v_ct_pred_magnitude,
         }
         
 
