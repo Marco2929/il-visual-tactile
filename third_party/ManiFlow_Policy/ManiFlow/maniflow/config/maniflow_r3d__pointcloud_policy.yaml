@@ -1,0 +1,172 @@
+defaults:
+  - task: foil_lifting_baseline
+  
+name: train_maniflow_pointcloud_policy
+
+task_name: ${task.name}
+shape_meta: ${task.shape_meta}
+exp_name: "maniflow"
+
+horizon: 64
+n_obs_steps: 2
+n_action_steps: 32
+n_latency_steps: 0
+dataset_obs_steps: ${n_obs_steps}
+keypoint_visible_rate: 1.0
+obs_as_global_cond: True
+
+policy:
+  _target_: maniflow.policy.maniflow_force_pointcloud_policy.ManiFlowTransformerPointcloudPolicy
+  model_name: "DiTX"
+  n_layer: 8              # Vorher 12
+  n_head: 6               # Vorher 8
+  n_emb: 384 
+  visual_cond_len: 1024
+  use_progress: true
+  force_cond_len: 0
+  max_lang_cond_len: 1
+  qkv_bias: false
+  qk_norm: false
+
+  force_conditioned: false
+  use_force_cnn: false
+  language_conditioned: false
+  pre_norm_modality: false
+
+  flow_batch_ratio: 0.75
+  consistency_batch_ratio: 0.25
+
+  sample_t_mode_flow: "beta" # choose between beta or lognorm, both are performing well
+  sample_t_mode_consistency: "discrete" 
+  sample_dt_mode_consistency: "uniform"
+  sample_target_t_mode: "relative" # "absolute", "relative"
+  denoise_timesteps: 10
+
+  diffusion_timestep_embed_dim: 128
+  diffusion_target_t_embed_dim: 128
+
+  use_point_crop: true
+  crop_shape:
+  - 80
+  - 80
+  horizon: ${horizon}
+  n_action_steps: ${n_action_steps}
+  n_obs_steps: ${n_obs_steps}
+
+
+
+  num_inference_steps: 10
+  obs_as_global_cond: true
+  shape_meta: ${shape_meta}
+
+
+  use_pc_color: true
+  pointnet_type: "uni3d"
+  downsample_points: true
+
+  pointcloud_encoder_cfg:
+    pc_model: "eva02_tiny_patch14_224"
+    pc_feat_dim: 192
+    embed_dim: 256
+    group_size: 32
+    num_group: 512
+    patch_dropout: 0 # pointSAM without patch_dropout
+    drop_path_rate: 0.2
+    pretrained_pc: null # Point transformer in Uni3D is initialized empty
+    pc_encoder_dim: 512
+    use_pretrained_weights: true
+    pretrained_weights_path: /ros2_ws/third_party/ManiFlow_Policy/pretrained_weights/r3d  # Pretrained weights path
+    normalization_type: "layer_norm"  # Options: "batch_norm", "layer_norm", "none"
+    feature_mode: "pointsam" # Options: "pointsam", "cls", "max_pooling"
+
+  # FPS randomness config
+  fps_random_config:
+    use_random: true          # Enable randomness
+    random_start: true        # Use random starting point
+    random_noise_scale: 0     # Noise scale (0 = no noise)
+    shuffle_output: true      # Shuffle output order    
+
+ema:
+  _target_: maniflow.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 64
+  num_workers: 10
+  shuffle: True
+  pin_memory: True
+  persistent_workers: True # default False
+
+
+val_dataloader:
+  batch_size: 64 # 128
+  num_workers: 10
+  shuffle: False
+  pin_memory: True
+  persistent_workers: False
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  weight_decay: 1.0e-3
+
+training:
+  device: "cuda:0"
+  env_device: "cuda:0"
+  seed: 42
+  debug: False
+  resume: True
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+  num_epochs: 500 # 2010 for single task, 3000 for multitask
+  gradient_accumulate_every: 1
+  use_ema: True
+  rollout_every: 50 # 200
+  checkpoint_every: 50 # 200
+  val_every: 10
+  grad_cam_every: 10
+  sample_every: 10
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+  proprio_mask_max_prob: 0.3
+  proprio_mask_warmup_epochs: 0
+
+logging:
+  group: ${exp_name}
+  id: null
+  mode: online
+  name: ${training.seed}
+  project: ManiFlow
+  resume: true
+  tags:
+  - ${logging.project}
+
+checkpoint:
+  save_ckpt: True
+  topk:
+    monitor_key: train_action_mse_error   # ← FIX: existiert tatsächlich
+    mode: min
+    k: 5
+    format_str: 'epoch={epoch:04d}-mse={train_action_mse_error:.6f}.ckpt'
+  save_last_ckpt: True
+  save_last_snapshot: False
+
+multi_run:
+  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  sweep:
+    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}

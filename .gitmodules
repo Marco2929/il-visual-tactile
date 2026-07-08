@@ -13,3 +13,18 @@
 [submodule "src/rembrandt-api"]
 	path = src/rembrandt-api
 	url = https://github.com/Adjuvo/SenseGlove-R1-API.git
+[submodule "third_party/3D-Diffusion-Policy"]
+	path = third_party/3D-Diffusion-Policy
+	url = https://github.com/YanjieZe/3D-Diffusion-Policy.git
+[submodule "third_party/FlowPolicy"]
+	path = third_party/FlowPolicy
+	url = https://github.com/zql-kk/FlowPolicy.git
+[submodule "third_party/R3D-Policy"]
+	path = third_party/R3D-Policy
+	url = https://github.com/Wushr-Lance/R3D-Policy.git
+[submodule "third_party/lerobot"]
+	path = third_party/lerobot
+	url = https://github.com/huggingface/lerobot.git
+[submodule "third_party/manip-as-in-sim-suite"]
+	path = third_party/manip-as-in-sim-suite
+	url = https://github.com/ByteDance-Seed/manip-as-in-sim-suite.git

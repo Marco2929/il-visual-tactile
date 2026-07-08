@@ -1,0 +1,7 @@
+- task=foil_lifting
+- training.debug=False
+- training.seed=0
+- training.device=cuda:0
+- exp_name=foil_lifting-simple_dp3-0112
+- logging.mode=online
+- checkpoint.save_ckpt=True
