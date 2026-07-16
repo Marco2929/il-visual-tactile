@@ -88,6 +88,16 @@ def build_launch_command(product_key: str, product: dict, args: argparse.Namespa
             extra.append(f"hand:={args.hand}")
         if hasattr(args, "glove_id") and args.glove_id is not None:
             extra.append(f"glove_id:={args.glove_id}")
+        if hasattr(args, "delto_ip") and args.delto_ip is not None:
+            extra.append(f"delto_ip:={args.delto_ip}")
+            # Also set the hand-specific IP arg used by the mapper launch
+            hand_val = getattr(args, "hand", None)
+            if hand_val == "right":
+                extra.append(f"delto_ip_rh:={args.delto_ip}")
+            elif hand_val == "left":
+                extra.append(f"delto_ip_lh:={args.delto_ip}")
+        if hasattr(args, "delto_port") and args.delto_port is not None:
+            extra.append(f"delto_port:={args.delto_port}")
 
     return cmd + (" " + " ".join(extra) if extra else "")
 
@@ -209,6 +219,20 @@ if __name__ == "__main__":
         default=None,
         metavar="ID",
         help="Glove device ID.",
+    )
+    tesollo_group.add_argument(
+        "--delto-ip",
+        dest="delto_ip",
+        default=None,
+        metavar="IP",
+        help="IP address of the Tesollo hand (default inside image: 169.254.186.72).",
+    )
+    tesollo_group.add_argument(
+        "--delto-port",
+        dest="delto_port",
+        default=None,
+        metavar="PORT",
+        help="Modbus TCP port of the Tesollo hand (default: 502).",
     )
 
     args = parser.parse_args()

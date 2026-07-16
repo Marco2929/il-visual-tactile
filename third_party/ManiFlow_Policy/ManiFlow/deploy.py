@@ -29,9 +29,11 @@ from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 import message_filters
 
+from visualization_msgs.msg import Marker
+
 from model_serve import init_model, normalize
 from cond_preprocess import PointCloudProcessor, setup_kinematics, compute_fk
-from rtc_utils import LatencyTracker
+from rtc_utils import LatencyTracker, RTCProcessor
 
 
 class RobotCameraSync:
@@ -131,7 +133,7 @@ class RobotCameraSync:
 
 class RealDexEnv(Node):
     """Environment management — policy runs continuously."""
-    def __init__(self, cfg: Node, fps: float):
+    def __init__(self, cfg: Node, fps: float, progress_threshold: float = None):
         super().__init__('flow_policy')
 
         self.cfg = cfg
@@ -139,6 +141,7 @@ class RealDexEnv(Node):
         self.n_obs_steps = cfg.n_obs_steps
         self.n_action_steps = cfg.n_action_steps
         self.fps = fps
+        self.progress_threshold = progress_threshold
 
         self.JOINT_NAMES = [
             'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
@@ -158,6 +161,14 @@ class RealDexEnv(Node):
 
         self.action_pub = self.create_publisher(
             Float64MultiArray, '/predicted_action_chunk', 10)
+
+        # Progress publishers
+        self.progress_pub = self.create_publisher(
+            Float64MultiArray, '/policy_progress', 10)
+        self.progress_marker_pub = self.create_publisher(
+            Marker, '/policy_progress_marker', 10)
+        self.done_pub = self.create_publisher(
+            Bool, '/policy_done', 10)
 
         self.static_pc_tensor = None
         self.static_state_tensor = None
@@ -205,6 +216,46 @@ class RealDexEnv(Node):
         msg = String()
         msg.data = status_text
         self.status_pub.publish(msg)
+
+    def publish_progress(self, progress_score: float):
+        """Publish progress score as Float64MultiArray and as RViz Marker."""
+        msg = Float64MultiArray()
+        msg.data = [progress_score]
+        self.progress_pub.publish(msg)
+
+        marker = Marker()
+        marker.header.frame_id = "base_link"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "policy_progress"
+        marker.id = 0
+        marker.type = Marker.TEXT_VIEW_FACING
+        marker.action = Marker.ADD
+        marker.pose.position.x = 0.0
+        marker.pose.position.y = 0.0
+        marker.pose.position.z = 1.0
+        marker.pose.orientation.w = 1.0
+        marker.scale.z = 0.08
+        progress_clamped = max(0.0, min(1.0, progress_score))
+        marker.color.a = 1.0
+        marker.color.r = 1.0 - progress_clamped
+        marker.color.g = progress_clamped
+        marker.color.b = 0.0
+        marker.text = f"Progress: {progress_score:.3f}"
+        if self.progress_threshold is not None:
+            marker.text += f" / {self.progress_threshold:.2f}"
+        marker.lifetime.sec = 1
+        self.progress_marker_pub.publish(marker)
+
+    def check_progress_done(self, progress_score: float) -> bool:
+        """Check if progress threshold is reached. Returns True if done."""
+        if self.progress_threshold is not None and progress_score >= self.progress_threshold:
+            self.get_logger().info(
+                f"[DONE] Progress {progress_score:.3f} >= threshold {self.progress_threshold:.2f}. Stopping.")
+            done_msg = Bool()
+            done_msg.data = True
+            self.done_pub.publish(done_msg)
+            return True
+        return False
 
     def observation_callback(self, joint_msg, color_msg, depth_msg):
         try:
@@ -303,7 +354,7 @@ def sport_mode(action_chunk: np.ndarray, speedup: float = 1.2) -> np.ndarray:
     return resampled
 
 
-def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int = 1211, fps: float = 30.0, sport_mode_active=False):
+def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int = 1211, fps: float = 30.0, sport_mode_active=False, progress_threshold: float = None, warmup_steps: int = 3, num_inference_steps: int = None, use_rtc: bool = True, rtc_execution_horizon: int = 16, rtc_max_guidance: float = 5.0):
     if not rclpy.ok():
         rclpy.init()
 
@@ -314,7 +365,15 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
         run_dir=run_dir
     )
 
-    env = RealDexEnv(cfg=cfg, fps=fps)
+    # Override inference steps (ManiFlow paper: 1-2 steps BETTER than 10 with consistency training)
+    if num_inference_steps is not None:
+        old_steps = getattr(policy, 'num_inference_steps', None)
+        policy.num_inference_steps = num_inference_steps
+        print(f"[INFO] num_inference_steps: {old_steps} → {num_inference_steps}")
+    else:
+        print(f"[INFO] num_inference_steps: {getattr(policy, 'num_inference_steps', '?')}")
+
+    env = RealDexEnv(cfg=cfg, fps=fps, progress_threshold=progress_threshold)
 
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(env)
@@ -324,6 +383,17 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
     latency_tracker = LatencyTracker(maxlen=100)
     time_per_chunk = 1.0 / fps
 
+    # Real-Time Chunking: guides new chunk to continue previous chunk's tail
+    rtc = RTCProcessor(
+        execution_horizon=rtc_execution_horizon,
+        max_guidance_weight=rtc_max_guidance,
+        prefix_attention_schedule="exp") if use_rtc else None
+    prev_action_pred = None  # (B, T, Da) unnormalized full-horizon prediction from last step
+    if use_rtc:
+        print(f"[INFO] RTC ENABLED (exec_horizon={rtc_execution_horizon}, max_guidance={rtc_max_guidance})")
+    else:
+        print("[INFO] RTC DISABLED")
+
     try:
         env.publish_status("RUNNING")
         print("[INFO] Policy running continuously. Waiting for observations...")
@@ -331,16 +401,48 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
         # Wait for initial observation buffer to fill
         obs = env.get_latest_obs()
 
+        # Warmup: run inference a few times to stabilize CUDA kernels
+        print(f"[INFO] Warming up model ({warmup_steps} steps)...")
+        for i in range(warmup_steps):
+            with torch.no_grad():
+                _ = policy.predict_action(obs)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+            print(f"  Warmup {i+1}/{warmup_steps} done.")
+        print("[INFO] Warmup complete. Starting real-time control.")
+
         while rclpy.ok():
             start_time = time.perf_counter()
+
+            # 0. RTC PREP: compute inference delay from recent latency, slice leftover
+            prev_leftover = None
+            prev_leftover_np = None
+            rtc_delay = 0
+            if rtc is not None and prev_action_pred is not None:
+                est_latency = latency_tracker.mean() if len(latency_tracker) > 0 else 0.0
+                rtc_delay = math.ceil(est_latency / time_per_chunk)
+                # Cap delay at execution_horizon: beyond that RTC has nothing
+                # meaningful to bind to, and hard-binding the whole prefix hurts.
+                rtc_delay = max(0, min(rtc_delay, rtc_execution_horizon,
+                                       prev_action_pred.shape[1] - 1))
+                # Leftover: unexecuted tail, aligned so leftover[0] == new_chunk[0]
+                prev_leftover = prev_action_pred[:, rtc_delay:, :]
+                prev_leftover_np = prev_leftover[0].cpu().numpy()  # (Tp, Da) for metric
 
             # 1. GPU INFERENCE
             t_model_start = time.perf_counter()
             with torch.no_grad():
-                action_queue_raw = policy.predict_action(obs)
+                action_queue_raw = policy.predict_action(
+                    obs,
+                    rtc_processor=rtc,
+                    prev_chunk_left_over=prev_leftover,
+                    inference_delay=rtc_delay)
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
             time_model = time.perf_counter() - t_model_start
+
+            # Save full-horizon prediction (unnormalized) for next step's RTC leftover
+            prev_action_pred = action_queue_raw['action_pred'].detach()
 
             # 2. CPU POST-PROCESSING & PUBLISHING
             t_post_start = time.perf_counter()
@@ -357,12 +459,38 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
             print(f"Start (X,Y,Z): {np.round(first_pose, 4).tolist()}")
             print(f"End   (X,Y,Z): {np.round(last_pose, 4).tolist()}")
 
+            # TRUE RTC CONTINUITY METRIC: compare new chunk to aligned leftover
+            # at the SAME timesteps. RTC should make these match at the start.
+            if prev_leftover_np is not None:
+                k = min(rtc_execution_horizon, len(action_queue), len(prev_leftover_np))
+                if k > 0:
+                    new_xyz = action_queue[:k, :3]
+                    old_xyz = prev_leftover_np[:k, :3]
+                    per_step = np.linalg.norm(new_xyz - old_xyz, axis=1)
+                    print(f"[RTC CONTINUITY over {k} steps] "
+                          f"step0={per_step[0]*1000:.1f}mm "
+                          f"mean={per_step.mean()*1000:.1f}mm "
+                          f"max={per_step.max()*1000:.1f}mm")
+
             if hasattr(env, 'last_published_end'):
                 gap = np.linalg.norm(first_pose - env.last_published_end)
                 print(f"GAP TO OLD CHUNK: {gap:.4f} m")
 
             env.last_published_end = last_pose
             print("=" * 50 + "\n")
+
+            # Publish progress + check done
+            if 'progress_score' in action_queue_raw:
+                progress_val = float(action_queue_raw['progress_score'][0].item())
+                env.publish_progress(progress_val)
+                thr_str = f" / {env.progress_threshold:.2f}" if env.progress_threshold is not None else ""
+                bar_len = 20
+                filled = int(max(0.0, min(1.0, progress_val)) * bar_len)
+                bar = "█" * filled + "░" * (bar_len - filled)
+                print(f"[PROGRESS] {bar} {progress_val:.3f}{thr_str}")
+                if env.check_progress_done(progress_val):
+                    env.publish_status("DONE")
+                    break
 
             inference_time = time.perf_counter() - start_time
             latency_tracker.add(inference_time)
@@ -376,7 +504,8 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
                 print(f"[WARN] Latency extremely high! ({max_latency:.3f}s).")
                 future_actions = action_queue[-1:]
 
-            print(f"[SYNC] Inference: {inference_time:.3f}s | Shift: {delay_steps} | Sending: {len(future_actions)}")
+            rtc_tag = f"RTC(d={rtc_delay}) " if rtc is not None else ""
+            print(f"[SYNC] {rtc_tag}Inference: {inference_time:.3f}s | Shift: {delay_steps} | Sending: {len(future_actions)}")
 
             env.publish_action_chunk(future_actions)
             time_post = time.perf_counter() - t_post_start
@@ -399,9 +528,16 @@ def run_policy(alg_name: str, task_name: str, run_dir: str, addition_info: int =
 
 if __name__ == "__main__":
     run_policy(
-        alg_name="maniflow_pointcloud_policy",
-        task_name="foil_lifting_baseline_cleaned",
-        run_dir="/ros2_ws/data/outputs/foil_lifting_baseline_cleaned_proprio_mask-maniflow_pointcloud_policy-0112_seed0",
+        alg_name="maniflow_force_pointcloud_policy_v2",
+        task_name="foil_lifting_augmented_v2",
+        run_dir="/ros2_ws/data/outputs/foil_lifting_augmented_v2-maniflow_force_pointcloud_policy_v2-0112_seed0",
         addition_info=1211,
-        fps=30.0
+        fps=20.0,
+        progress_threshold=0.9,
+        warmup_steps=3,
+        num_inference_steps=10,
+        use_rtc=True,
+        rtc_execution_horizon=16,
+        rtc_max_guidance=5.0,
     )
+

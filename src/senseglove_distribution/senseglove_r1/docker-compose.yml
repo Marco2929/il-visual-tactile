@@ -10,6 +10,7 @@ services:
     volumes:
       - /dev:/dev
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./finger_joint_range_limits.csv:/usr/local/lib/python3.12/dist-packages/SG_API/finger_joint_range_limits.csv:ro
     command:
       - bash
       - -c

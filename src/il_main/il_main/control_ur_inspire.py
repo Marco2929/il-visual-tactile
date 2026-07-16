@@ -60,6 +60,11 @@ class InferenceControlNode(Node):
         self.current_hand_goal = None
         self.CHUNK_SIZE = 32
 
+        # --- Motor tuning (RTC handles continuity; controller just follows) ---
+        self.alpha = 0.18          # low-pass toward goal (was effectively 0.02)
+        self.max_joint_vel = 1.0   # rad/s safety clamp on per-tick joint motion
+        self.motor_dt = 1.0 / 500.0
+
         # --- Policy gate (INACTIVE by default) ---
         self.policy_active = False
 
@@ -74,9 +79,11 @@ class InferenceControlNode(Node):
         self.chunk_sub = self.create_subscription(
             Float64MultiArray, '/predicted_action_chunk', self._chunk_callback, 10)
 
-        # --- Policy gate subscription ---
+        # --- Policy gate + done subscriptions ---
         self.policy_gate_sub = self.create_subscription(
             Bool, '/policy_gate', self._policy_gate_cb, 10)
+        self.policy_done_sub = self.create_subscription(
+            Bool, '/policy_done', self._policy_done_cb, 10)
 
         # --- 4. Control Loops ---
         self.queue_timer = self.create_timer(1.0 / 30.0, self._queue_pop_loop)
@@ -103,6 +110,17 @@ class InferenceControlNode(Node):
             self.current_hand_goal = None
             self.last_commanded_positions = None  # ← ADD THIS
             self.get_logger().info("⏸️  Policy INACTIVE — Queue cleared, robot stopped.")
+
+    def _policy_done_cb(self, msg: Bool):
+        """Auto-stop: progress head signals task completion."""
+        if msg.data and self.policy_active:
+            self.policy_active = False
+            with self._queue_lock:
+                self._action_queue.clear()
+            self.current_arm_goal = None
+            self.current_hand_goal = None
+            self.last_commanded_positions = None
+            self.get_logger().info("🏁 Policy DONE — Progress threshold reached. Robot stopped.")
 
     def _joint_state_cb(self, msg):
         for name, pos in zip(msg.name, msg.position):
@@ -162,29 +180,13 @@ class InferenceControlNode(Node):
         if not processed_actions:
             return
 
+        # RTC (deploy.py) handles continuity in Cartesian space. Joint-space
+        # blending here would fight RTC, add lag, and can create NEW
+        # discontinuities. Just replace the queue directly.
         with self._queue_lock:
-            old_queue = list(self._action_queue)
             self._action_queue.clear()
-
-            if not old_queue:
-                curr_arm = (self.last_commanded_positions.copy()
-                            if self.last_commanded_positions is not None
-                            else self.current_joint_positions.copy())
-                curr_hand = (self.current_hand_goal
-                             if self.current_hand_goal is not None
-                             else np.zeros(6))
-
-                stationary_point = np.concatenate([curr_arm, curr_hand])
-                old_queue = [stationary_point] * len(processed_actions)
-
-            for i, new_act in enumerate(processed_actions):
-                if i < len(old_queue):
-                    blend_horizon = 15.0
-                    w = max(0.0, 1.0 - (i / blend_horizon))
-                    blended_act = (w * old_queue[i]) + ((1.0 - w) * new_act)
-                    self._action_queue.append(blended_act)
-                else:
-                    self._action_queue.append(new_act)
+            for act in processed_actions:
+                self._action_queue.append(act)
 
     # -------------------------------------------------------------------------
     # Control Loops
@@ -209,9 +211,18 @@ class InferenceControlNode(Node):
         if self.last_commanded_positions is None:
             self.last_commanded_positions = self.current_joint_positions.copy()
 
-        alpha = 0.02
-        safe_target = (alpha * self.current_arm_goal) + \
-                      ((1.0 - alpha) * self.last_commanded_positions)
+        # Low-pass toward goal. alpha=0.18 → ~95% convergence in 33ms (one
+        # queue-pop window), vs. 28% at the old 0.02 (chronic lag). RTC already
+        # provides smooth targets, so aggressive tracking is safe here.
+        safe_target = (self.alpha * self.current_arm_goal) + \
+                      ((1.0 - self.alpha) * self.last_commanded_positions)
+
+        # Velocity clamp: hard safety limit. max_joint_vel [rad/s] * motor_dt
+        # bounds per-tick motion, protecting against IK-flip spikes.
+        max_delta = self.max_joint_vel * self.motor_dt
+        delta = np.clip(safe_target - self.last_commanded_positions,
+                        -max_delta, max_delta)
+        safe_target = self.last_commanded_positions + delta
 
         self.last_commanded_positions = safe_target
 
@@ -279,7 +290,8 @@ class InferenceControlNode(Node):
         msg = SetAngle1()
         msg.finger_ids = [1, 2, 3, 4, 5, 6]
         reversed_joints = hand_joints[::-1]
-        msg.angles = [int((1 - x) * 1000) for x in reversed_joints]
+        # Trailing 0 matches the servo controller convention
+        msg.angles = [int((1 - x) * 1000) for x in reversed_joints] + [0]
         self.hand_pub.publish(msg)
 
 

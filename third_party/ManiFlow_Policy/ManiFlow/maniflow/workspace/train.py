@@ -123,8 +123,17 @@ class TrainManiFlowDexWorkspace:
             To = model.n_obs_steps
             this_nobs = dict_apply(nobs,
                 lambda x: x[:, :To, ...].reshape(-1, *x.shape[2:]).to(device))
-            nobs_features = model.obs_encoder(this_nobs)
-            vis_cond = nobs_features.reshape(1, -1, model.obs_feature_dim)
+            encoder_out = model.obs_encoder(this_nobs)
+            # Handle tuple return from separate_state=True encoders
+            if isinstance(encoder_out, tuple):
+                pc_feat = encoder_out[0]
+                state_feat = encoder_out[1]
+                vis_cond = pc_feat.reshape(1, -1, model.obs_feature_dim)
+                state_cond = state_feat.reshape(1, model.n_obs_steps, -1)
+                state_cond = state_cond[:, -1:, :].expand(-1, model.horizon, -1)
+            else:
+                vis_cond = encoder_out.reshape(1, -1, model.obs_feature_dim)
+                state_cond = None
 
             # --- Simple flow forward pass at t=0.5 ---
             B = 1
@@ -153,6 +162,7 @@ class TrainManiFlowDexWorkspace:
                 timestep=t,
                 target_t=target_t,
                 vis_cond=vis_cond,
+                state_cond=state_cond,
                 lang_cond=None,
             )
 
@@ -426,8 +436,9 @@ class TrainManiFlowDexWorkspace:
                 
                     # compute loss
                     t1_1 = time.time()
-                    # Forward pass
-                    raw_loss, loss_dict = self.model.compute_loss(batch, self.ema_model)
+                    # Forward pass (bfloat16 — same exponent range as fp32, no overflow)
+                    with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                        raw_loss, loss_dict = self.model.compute_loss(batch, self.ema_model)
 
                     loss = raw_loss / cfg.training.gradient_accumulate_every
                     loss.backward()

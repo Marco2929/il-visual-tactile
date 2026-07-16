@@ -108,8 +108,18 @@ class PointCloudProcessor:
         # Farthest point sampling
         if len(filtered_points) > 0:
             filtered_points = torch.from_numpy(filtered_points).cuda()
+
+            # Cap FPS input to a fixed size → deterministic FPS runtime.
+            # Random pre-subsample keeps spatial coverage while removing the
+            # data-dependent latency spikes (100ms↔1000ms) from variable N.
+            MAX_FPS_INPUT = 8192
+            n = filtered_points.shape[0]
+            if n > MAX_FPS_INPUT:
+                idx = torch.randperm(n, device=filtered_points.device)[:MAX_FPS_INPUT]
+                filtered_points = filtered_points[idx]
+
             sampled_points, _ = torch3d_ops.sample_farthest_points(
-                points=filtered_points.unsqueeze(0), 
+                points=filtered_points.unsqueeze(0),
                 K=[num_points]
             )
             sampled_points = sampled_points.squeeze(0).cpu().numpy()

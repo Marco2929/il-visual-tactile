@@ -135,7 +135,7 @@ lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 -
 # ManiFlow policy
 tmux new -s training
 
-bash scripts/train_policy.sh maniflow_pointcloud_policy foil_lifting_baseline 0112 0 0
+bash scripts/train_policy.sh maniflow_r3d_pointcloud_policy foil_lifting_augmented_r3d 0112 0 0
 ctrl+b d
 
 tmux attach -t training

@@ -48,6 +48,7 @@ class DiTX(nn.Module):
         horizon: int,
         n_obs_steps: int = None,
         cond_dim: int = 256,
+        state_cond_dim: int = 0,  # ← state via input concatenation
         visual_cond_len: int = 1024,
         diffusion_timestep_embed_dim: int = 256,
         diffusion_target_t_embed_dim: int = 256,
@@ -70,20 +71,33 @@ class DiTX(nn.Module):
         self.language_conditioned = language_conditioned
         self.force_conditioned = force_conditioned
         self.pre_norm_modality = pre_norm_modality
+        self.state_cond_dim = state_cond_dim
         
         # constants
         T = horizon
         self.T = T
         self.horizon = horizon
 
-        # input embedding stem
+        # input embedding stem — wider input if state is concatenated
         self.hidden_dim = n_emb
-        self.input_emb = nn.Linear(input_dim, n_emb)
+        actual_input_dim = input_dim + state_cond_dim
+        self.input_emb = nn.Linear(actual_input_dim, n_emb)
         self.pos_emb = nn.Parameter(torch.zeros(1, T, n_emb))
         self.vis_cond_obs_emb = nn.Linear(cond_dim, n_emb) # visual condition observation embedding
         self.vis_cond_pos_embed = nn.Parameter(
-            torch.zeros(1, visual_cond_len * n_obs_steps, n_emb)
-            )  # learnable visual condition positional embedding
+            torch.zeros(1, (visual_cond_len + 1) * n_obs_steps, n_emb)
+            )  # learnable visual condition positional embedding (checkpoint: 2050 = (1024+1)*2)
+
+        # Optional SPATIAL positional encoding for PC tokens (PointSAM / Uni3D).
+        # When pc_pe is passed at forward time, it replaces the index-based
+        # vis_cond_pos_embed above. This is required when FPS token order is
+        # shuffled (index PE becomes meaningless), but pointnet leaves pc_pe
+        # None → falls back to index PE (fully backward compatible).
+        self.pc_pe_proj = nn.Linear(cond_dim, n_emb)
+
+        if state_cond_dim > 0:
+            cprint(f"[DiTX] State conditioning via INPUT concatenation: "
+                   f"action_dim={input_dim} + state_dim={state_cond_dim} = {actual_input_dim}", "green")
         
         # pre-norm visual modality
         if self.pre_norm_modality:
@@ -280,6 +294,11 @@ class DiTX(nn.Module):
         nn.init.normal_(self.vis_cond_obs_emb.weight, std=0.02)
         nn.init.constant_(self.vis_cond_obs_emb.bias, 0) if self.vis_cond_obs_emb.bias is not None else None
 
+        # Initialize spatial PC positional-encoding projection:
+        nn.init.normal_(self.pc_pe_proj.weight, std=0.02)
+        if self.pc_pe_proj.bias is not None:
+            nn.init.constant_(self.pc_pe_proj.bias, 0)
+
         # Initialize the adapter for timestep and target_t
         nn.init.normal_(self.timestep_target_t_adaptor.weight, std=0.02)
         nn.init.constant_(self.timestep_target_t_adaptor.bias, 0)
@@ -392,8 +411,10 @@ class DiTX(nn.Module):
             timestep: Union[torch.Tensor, float, int], 
             target_t: Union[torch.Tensor, float, int], 
             vis_cond: torch.Tensor,
+            state_cond: torch.Tensor = None,  # ← state via input concat
             lang_cond: Union[torch.Tensor, list, str] = None,
             force_cond: torch.Tensor = None,
+            pc_pe: torch.Tensor = None,  # ← spatial PE for PC tokens
             **kwargs):
         """
         Forward pass of the DiTX model.
@@ -409,8 +430,15 @@ class DiTX(nn.Module):
             action: (B,T,output_dim)
         """
 
+        # ====== Concatenate state with sample ======
+        if state_cond is not None and self.state_cond_dim > 0:
+            model_input = torch.cat([sample, state_cond], dim=-1)  # (B, T, action_dim + state_dim)
+        else:
+            model_input = sample
+        # ============================================
+
         # process input
-        input_emb = self.input_emb(sample) # (B, T, n_emb)
+        input_emb = self.input_emb(model_input) # (B, T, n_emb)
         x = input_emb + self.pos_emb # (B, T, n_emb)
  
 
@@ -441,8 +469,13 @@ class DiTX(nn.Module):
 
         # 3. visual condition
         vis_con_obs_emb = self.vis_cond_obs_emb(vis_cond) # (B, L, n_emb)
-        vis_cond_pos_embed = self.vis_cond_pos_embed[:, :vis_cond.shape[1]]
-        context_c = vis_con_obs_emb + vis_cond_pos_embed # (B, L, n_emb)
+        if pc_pe is not None:
+            # SPATIAL PE: bind each token to its true 3D position (order-invariant)
+            context_c = vis_con_obs_emb + self.pc_pe_proj(pc_pe)
+        else:
+            # INDEX PE: fallback for pointnet / global features (backward compat)
+            vis_cond_pos_embed = self.vis_cond_pos_embed[:, :vis_cond.shape[1]]
+            context_c = vis_con_obs_emb + vis_cond_pos_embed # (B, L, n_emb)
         if self.pre_norm_modality:
             context_c = self.vis_norm(context_c, time_c)
 

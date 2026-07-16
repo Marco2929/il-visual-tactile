@@ -58,5 +58,5 @@ wrist_camera_extrinsics = np.array([
 workspace = {
     'x': (-1.0, 0),    # R
     'y': (0.0, 0.8),   # G
-    'z': (0.0, 4.0)   # B
+    'z': (0.03, 1.0)   # B
 }

@@ -611,13 +611,15 @@ class DP3Encoder(nn.Module):
                  pointnet_type='pointnet',
                  downsample_points=False,
                  fps_random_config=None,
-                 cat_on_token=False,
+                 cat_on_token=True,
+                 separate_state=False,
                  ):
         super().__init__()
         self.imagination_key = 'imagin_robot'
         self.state_key = 'agent_pos'
         self.point_cloud_key = 'point_cloud'
         self.n_output_channels = out_channel
+        self.separate_state = separate_state
 
         # Allow config override for state_mlp_size
         if pointcloud_encoder_cfg is not None and hasattr(pointcloud_encoder_cfg, 'get'):
@@ -697,12 +699,20 @@ class DP3Encoder(nn.Module):
             net_arch = list(state_mlp_size[:-1])
         output_dim = state_mlp_size[-1]
 
+        self.state_feat_dim = output_dim
+
         self.state_mlp = nn.Sequential(
-            *create_mlp(self.state_shape[0], output_dim, net_arch, state_mlp_activation_fn))
+            *create_mlp(self.state_shape[0], output_dim, net_arch, state_mlp_activation_fn),
+            nn.Dropout(p=0.3),
+        )
 
         # --- Compute final output dim ---
-        if self.cat_on_token:
-            pass  # output channels already set by encoder
+        if self.separate_state:
+            # PC output dim stays as-is; state is returned separately and fed
+            # into the DiTX input via state_cond (not concatenated to context).
+            cprint(f"[DP3Encoder] SEPARATE STATE MODE: pc_dim={self.n_output_channels}, state_dim={self.state_feat_dim}", "green")
+        elif self.cat_on_token:
+            self.state_proj = nn.Linear(output_dim, self.n_output_channels)
         else:
             self.n_output_channels += output_dim
 
@@ -746,19 +756,25 @@ class DP3Encoder(nn.Module):
         state = observations[self.state_key]
         state_feat = self.state_mlp(state)
 
-        # Combine features
-        if not self.pc_encoder_extract_global_feature:
-            if self.cat_on_token:
-                state_feat = state_feat.unsqueeze(1)
-            else:
-                state_feat = state_feat.unsqueeze(1).expand(-1, pn_feat.shape[1], -1)
-        elif len(pn_feat.shape) == 3:
-            # Pointwise mode: expand state to match point dimension
-            state_feat = state_feat.unsqueeze(1).expand(-1, pn_feat.shape[1], -1)
+        # ====== SEPARATE STATE MODE ======
+        # Return PC features and state features separately. The policy feeds
+        # state into the DiTX input (concatenation), while PC goes to context.
+        if self.separate_state:
+            if not self.pc_encoder_extract_global_feature:
+                return pn_feat, state_feat, pc_pe
+            return pn_feat, state_feat
+        # ==================================
 
+        # Combine features (legacy cat modes)
         if self.cat_on_token:
+            state_feat = self.state_proj(state_feat)
+            state_feat = state_feat.unsqueeze(1)
             final_feat = torch.cat([pn_feat, state_feat], dim=-2)
         else:
+            if not self.pc_encoder_extract_global_feature:
+                state_feat = state_feat.unsqueeze(1).expand(-1, pn_feat.shape[1], -1)
+            elif len(pn_feat.shape) == 3:
+                state_feat = state_feat.unsqueeze(1).expand(-1, pn_feat.shape[1], -1)
             final_feat = torch.cat([pn_feat, state_feat], dim=-1)
 
         if not self.pc_encoder_extract_global_feature:

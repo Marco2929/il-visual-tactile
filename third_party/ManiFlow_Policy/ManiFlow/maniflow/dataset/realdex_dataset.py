@@ -217,7 +217,7 @@ class RealDexDataset(BaseDataset):
 
         # 6. Progressive Proprioception Masking
         if self.augment and np.random.random() < self.proprio_mask_prob:
-            agent_pos = np.zeros_like(agent_pos)
+                agent_pos = np.random.uniform(-1.0, 1.0, size=agent_pos.shape).astype(np.float32)
 
         # 7. Dynamically build the observation dictionary
         obs_dict = {

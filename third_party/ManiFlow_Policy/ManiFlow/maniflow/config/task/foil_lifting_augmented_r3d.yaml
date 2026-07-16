@@ -6,7 +6,7 @@ shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
   obs:
     point_cloud:
-      shape: [1025, 3]
+      shape: [1024, 6]
       type: point_cloud
       horizon: 2
     agent_pos:
@@ -22,11 +22,21 @@ dataset:
   _target_: maniflow.dataset.realdex_dataset.RealDexDataset
   zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_baseline_20.zarr
   horizon: ${horizon}
-  use_progress: true
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42
   val_ratio: 0.02
-  max_train_episodes: 168
-  use_noise_augmentation: true      # Enable data augmentation
+  max_train_episodes: 165
+  augment: True
+  augment_shift: 0.08
+  # Noise augmentation (critical for preventing proprio overfitting)
+  use_noise_augmentation: True
   pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.005  # 5mm — must be comparable to PC noise!
+  pc_rgb_noise_std: 0
+  # Color jitter parameters
+  use_color_jitter: true      # Enable color jitter augmentation
+  brightness_range: [-0.125, 0.125]   # Brightness range
+  contrast_range: [0.5, 1.5]          # Contrast range
+  saturation_range: [0.5, 1.5]        # Saturation range
+      

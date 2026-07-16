@@ -18,12 +18,13 @@ Pipeline (from the paper, NOT point_cloud_utils.py):
   5. FPS-downsample the cropped cloud to 8192 points.
 
 Usage:
+  # Front (ZED) cloud only (default):
   python3 data/record_extractor/visualize_merged_pc.py \
-      --episode /root/ros2_ws/data/episodes/foil_lifting_collection/episode_002_success \
-      --frame_index 0 --distinguish
+      --episode <dir> --frame_index 0
 
-  # Color front points blue and wrist points red so you can tell them apart:
-  python3 visualize_merged_pc.py --episode <dir> --frame_index 0 --distinguish
+  # Also merge the wrist (RealSense) cloud, tinted to distinguish sources:
+  python3 visualize_merged_pc.py --episode <dir> --frame_index 0 \
+      --merge_pointclouds --distinguish
 """
 
 import os
@@ -35,7 +36,14 @@ import numpy as np
 import open3d as o3d
 import kinpy as kp
 
-sys.path.insert(0, "/root/ros2_ws/data/record_utils")
+# record_utils holds camera_info.py. Resolve it relative to THIS file so the
+# script works regardless of the container mount point (/root/ros2_ws vs
+# /ros2_ws). Allow an explicit override via RECORD_UTILS_DIR.
+_RECORD_UTILS_DIR = os.environ.get(
+    "RECORD_UTILS_DIR",
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "record_utils")),
+)
+sys.path.insert(0, _RECORD_UTILS_DIR)
 
 from camera_info import (
     camera_intrinsics as FRONT_INTRINSICS,
@@ -54,7 +62,11 @@ except ImportError:
 # Kinematics defaults (match cond_preprocess / dataset_builder). The wrist
 # camera is mounted on the moving flange, so its world transform needs FK on
 # the arm joints, NOT a static extrinsic. Read from env like the other scripts.
-DEFAULT_URDF = "/root/ros2_ws/data/record_extractor/inspire_strong_hand_ur10e_flange_workcell.urdf"
+DEFAULT_URDF = os.environ.get(
+    "URDF_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "inspire_strong_hand_ur10e_flange_workcell.urdf"),
+)
 # Match the dataset builder config (foil_lifting_wrist.yaml -> end_link).
 # transform_wrist_pc_to_base() runs FK to this link and applies the extrinsic
 # on top of it, so we reproduce EXACTLY that to see what the dataset looks like.
@@ -157,99 +169,14 @@ def fk_matrix(chain, arm_joints):
     return fk.matrix()
 
 
-def transform_wrist_to_base(pcd, T_base_flange, extrinsic, invert_extrinsic=False):
+def transform_wrist_to_base(pcd, T_base_flange, extrinsic):
     """Reproduce transform_wrist_pc_to_base():
         T_base_cam = FK(arm_joints -> end_link) @ WRIST_EXTRINSICS
     (no z-180 fix, matching merge_point_clouds()).
-
-    The hand-in-eye calibration saved T_camera2gripper; the composition above is
-    only correct if that means T_gripper<-camera. If the wrist is rigidly offset
-    (moves with the arm but sits in the wrong place), the extrinsic direction is
-    likely reversed -> try invert_extrinsic=True.
     """
-    ext = np.linalg.inv(extrinsic) if invert_extrinsic else extrinsic
-    T_base_cam = T_base_flange @ ext  # base <- end_link <- camera
-    print(f"      [debug] invert_extrinsic={invert_extrinsic}")
-    print(f"      [debug] FK (end_link) translation: {np.round(T_base_flange[:3, 3], 4)}")
-    print(f"      [debug] T_base_cam   translation: {np.round(T_base_cam[:3, 3], 4)}")
+    T_base_cam = T_base_flange @ extrinsic  # base <- end_link <- camera
     pcd.transform(T_base_cam)
     return pcd
-
-
-def make_frame(T, size=0.15):
-    """Coordinate-frame triad placed at pose T (4x4)."""
-    f = o3d.geometry.TriangleMesh.create_coordinate_frame(size=size)
-    f.transform(T)
-    return f
-
-
-def run_diagnose(args, front, arm_state, f_ts):
-    """Build raw wrist camera cloud once, apply all 4 transform hypotheses,
-    and report each one's table-plane gap vs the (fixed) front table.
-
-    The CORRECT hypothesis has a gap near 0 that stays constant across frames.
-    """
-    w_color, w_depth = read_wrist_frame(args.episode, f_ts)
-    if w_color is None or w_depth is None:
-        print("  [diagnose] no wrist frame.")
-        return
-
-    ft = segment_plane_z(front)
-    front_z = ft[0] if ft else None
-    print(f"\n===== DIAGNOSE (frame {args.frame_index}) =====")
-    print(f"  front table Z = {front_z:+.4f} m" if front_z is not None
-          else "  front table: no plane")
-
-    chains = {
-        'tool0': setup_kinematics(args.urdf_path, 'tool0'),
-        'right_inspire_base_link':
-            setup_kinematics(args.urdf_path, 'right_inspire_base_link'),
-    }
-
-    for link, chain in chains.items():
-        T = fk_matrix(chain, arm_state[:6])
-        for invert in (False, True):
-            ext = np.linalg.inv(WRIST_EXTRINSICS) if invert else WRIST_EXTRINSICS
-            w = build_camera_cloud(w_color, w_depth, WRIST_INTRINSICS)
-            w.transform(T @ ext)
-            wt = segment_plane_z(w)
-            if wt and front_z is not None:
-                gap = (wt[0] - front_z) * 100
-                tag = 'ext' if not invert else 'inv(ext)'
-                print(f"  [{link:24s} | {tag:8s}] "
-                      f"wrist table Z={wt[0]:+.4f}  gap={gap:+.2f}cm")
-    print("  (correct = gap ~0 AND identical across frames 50/200/400)")
-    print("====================================\n")
-
-
-def measure_offset_icp(wrist, front, threshold=0.05):
-    """Register wrist -> front with ICP; the translation is the residual offset.
-
-    Returns (T_icp, rmse, fitness). We copy the clouds so the caller's geometry
-    is untouched (the visualizer still shows the UN-registered clouds).
-    """
-    src = o3d.geometry.PointCloud(wrist)
-    tgt = o3d.geometry.PointCloud(front)
-    # Point-to-plane needs normals on the target.
-    tgt.estimate_normals(
-        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.05, max_nn=30))
-    reg = o3d.pipelines.registration.registration_icp(
-        src, tgt, threshold, np.eye(4),
-        o3d.pipelines.registration.TransformationEstimationPointToPlane(),
-        o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=100),
-    )
-    return reg.transformation, reg.inlier_rmse, reg.fitness
-
-
-def segment_plane_z(pcd, dist=0.01):
-    """RANSAC-fit the dominant plane (table); return its mean height along the
-    plane normal's world Z as a coarse 'table height' estimate."""
-    if len(pcd.points) < 100:
-        return None
-    plane, inliers = pcd.segment_plane(distance_threshold=dist,
-                                       ransac_n=3, num_iterations=200)
-    pts = np.asarray(pcd.points)[inliers]
-    return float(np.median(pts[:, 2])), plane, len(inliers)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -416,40 +343,16 @@ def main():
     ap.add_argument('--urdf_path', type=str, default=DEFAULT_URDF)
     ap.add_argument('--end_link', type=str, default=DEFAULT_END_LINK,
                     help='FK tip for the wrist transform (matches dataset config).')
+    ap.add_argument('--merge_pointclouds', action='store_true', default=False,
+                    help='Also load + transform + merge the wrist (RealSense) '
+                         'cloud. Default False = front (ZED) cloud only.')
     ap.add_argument('--distinguish', action='store_true',
                     help='Tint front (blue) vs wrist (red) instead of true RGB.')
     ap.add_argument('--no_crop', action='store_true',
                     help='Skip workspace crop (debug: see full merged cloud).')
-    ap.add_argument('--show_ee', action='store_true',
-                    help='Draw a coordinate frame at the FK end-effector pose '
-                         '(kinematic ground truth). The CORRECT cloud must have '
-                         'the gripper/hand sitting at this frame.')
-    ap.add_argument('--wrist_invert_extrinsic', action='store_true',
-                    help='Use inv(WRIST_EXTRINSICS) — test if the calibration '
-                         'extrinsic direction (camera<->gripper) is reversed.')
-    ap.add_argument('--wrist_offset', type=float, nargs=3, default=None,
-                    metavar=('DX', 'DY', 'DZ'),
-                    help='Manual XYZ nudge (meters) applied to the wrist cloud '
-                         'in base frame — use to measure/compensate the residual.')
-    ap.add_argument('--save_split_ply', type=str, default=None,
-                    metavar='PREFIX',
-                    help='Save front/wrist clouds as separate PLYs '
-                         '(PREFIX_front.ply, PREFIX_wrist.ply) for measuring.')
-    ap.add_argument('--diagnose', action='store_true',
-                    help='Test all 4 transform hypotheses (tool0/inspire x '
-                         'ext/inv-ext) in one run; report wrist-vs-front table '
-                         'gap for each. Correct one = gap near 0 AND constant '
-                         'across frames.')
-    ap.add_argument('--measure', action='store_true',
-                    help='Auto-measure the wrist<->front residual offset via ICP '
-                         'and table-plane height (objective, no clicking).')
     ap.add_argument('--save_ply', type=str, default=None)
     ap.add_argument('--no_show', action='store_true')
     args = ap.parse_args()
-
-    print("[0/5] Setting up kinematics (FK for wrist camera) ...")
-    chain = setup_kinematics(args.urdf_path, args.end_link)
-    print(f"      wrist FK tip: {args.end_link}")
 
     print("[1/5] Reading front (ZED) frame ...")
     f_color, f_depth, f_ts, arm_state = read_front_frame(args.episode, args.frame_index)
@@ -458,48 +361,21 @@ def main():
     print(f"      front cloud: {len(front.points):,} pts")
     print(f"      arm joints:  {np.round(arm_state[:6], 4)}")
 
-    if args.diagnose:
-        run_diagnose(args, front, arm_state, f_ts)
-        return
-
-    T_base_flange = fk_matrix(chain, arm_state[:6])
-
-    print("[2/5] Reading wrist (RealSense) frame + FK transform ...")
-    w_color, w_depth = read_wrist_frame(args.episode, f_ts)
     wrist = None
-    if w_color is not None and w_depth is not None:
-        wrist = build_camera_cloud(w_color, w_depth, WRIST_INTRINSICS)
-        wrist = transform_wrist_to_base(wrist, T_base_flange, WRIST_EXTRINSICS,
-                                        invert_extrinsic=args.wrist_invert_extrinsic)
-        if args.wrist_offset is not None:
-            wrist.translate(np.array(args.wrist_offset, dtype=float))
-            print(f"      [nudge] wrist translated by {args.wrist_offset}")
-        print(f"      wrist cloud: {len(wrist.points):,} pts")
+    if args.merge_pointclouds:
+        print("[0/5] Setting up kinematics (FK for wrist camera) ...")
+        chain = setup_kinematics(args.urdf_path, args.end_link)
+        print(f"      wrist FK tip: {args.end_link}")
+        T_base_flange = fk_matrix(chain, arm_state[:6])
 
-    if args.save_split_ply:
-        o3d.io.write_point_cloud(f"{args.save_split_ply}_front.ply", front)
-        if wrist is not None:
-            o3d.io.write_point_cloud(f"{args.save_split_ply}_wrist.ply", wrist)
-        print(f"      saved split PLYs: {args.save_split_ply}_front.ply / _wrist.ply")
-
-    if args.measure and wrist is not None:
-        print("\n===== OFFSET MEASUREMENT =====")
-        # 1) ICP: translation that best snaps wrist onto front = the residual.
-        T_icp, rmse, fitness = measure_offset_icp(wrist, front)
-        dxyz = T_icp[:3, 3]
-        print(f"  ICP residual translation (m): dx={dxyz[0]:+.4f} "
-              f"dy={dxyz[1]:+.4f} dz={dxyz[2]:+.4f}")
-        print(f"  ICP |offset| = {np.linalg.norm(dxyz)*100:.2f} cm | "
-              f"rmse={rmse*1000:.1f}mm | fitness={fitness:.2f}")
-        print(f"  -> to compensate, try: --wrist_offset "
-              f"{dxyz[0]:.4f} {dxyz[1]:.4f} {dxyz[2]:.4f}")
-        # 2) Table-plane height gap (pure vertical measure).
-        wt = segment_plane_z(wrist)
-        ft = segment_plane_z(front)
-        if wt and ft:
-            print(f"  table height  front={ft[0]:+.4f}m  wrist={wt[0]:+.4f}m  "
-                  f"gap={(wt[0]-ft[0])*100:+.2f}cm")
-        print("==============================\n")
+        print("[2/5] Reading wrist (RealSense) frame + FK transform ...")
+        w_color, w_depth = read_wrist_frame(args.episode, f_ts)
+        if w_color is not None and w_depth is not None:
+            wrist = build_camera_cloud(w_color, w_depth, WRIST_INTRINSICS)
+            wrist = transform_wrist_to_base(wrist, T_base_flange, WRIST_EXTRINSICS)
+            print(f"      wrist cloud: {len(wrist.points):,} pts")
+    else:
+        print("[2/5] Wrist merge disabled (use --merge_pointclouds to enable).")
 
     if args.distinguish:
         paint_source(front, FRONT_COLOR)
@@ -539,12 +415,6 @@ def main():
         geoms = [final]
         # base_link origin
         geoms.append(o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3))
-        if args.show_ee:
-            # FK end-effector pose = kinematic ground truth for the gripper.
-            geoms.append(make_frame(T_base_flange, size=0.15))
-            print(f"      [ground truth] EE ({args.end_link}) at "
-                  f"{np.round(T_base_flange[:3, 3], 4)} — the correct cloud's "
-                  f"gripper should sit here.")
         o3d.visualization.draw_geometries(
             geoms,
             window_name=f"Merged PC (frame {args.frame_index}) - {len(final.points)} pts",

@@ -50,14 +50,21 @@ class InferenceControlNode(Node):
         super().__init__('inference_control_node')
 
         # --- Parameters ---
-        self.declare_parameter('execution_fps', 30.0)
+        self.declare_parameter('execution_fps', 20.0)
         self.declare_parameter('max_joint_delta', 0.3)  # rad, IK flip protection
-        self.declare_parameter('trajectory_speed_scale', 1.0)  # <1 = slower, >1 = faster
+        self.declare_parameter('trajectory_speed_scale', 0.3)  # <1 = slower, >1 = faster
+        self.declare_parameter('lead_time', 0.1)
+        # Safety thresholds (from joints controller)
+        self.declare_parameter('max_entry_jump', 0.3)    # rad, first-point vs current
+        self.declare_parameter('max_step_vel', 1.0)       # rad/s between waypoints
 
         self.execution_fps = self.get_parameter('execution_fps').value
         self.max_joint_delta = self.get_parameter('max_joint_delta').value
         self.speed_scale = self.get_parameter('trajectory_speed_scale').value
         self.dt_per_step = (1.0 / self.execution_fps) / self.speed_scale
+        self.lead_time = self.get_parameter('lead_time').value
+        self.max_entry_jump = self.get_parameter('max_entry_jump').value
+        self.max_step_vel = self.get_parameter('max_step_vel').value
 
         # --- Kinematics Setup (Pinocchio & Pink) ---
         self.model = pin.buildModelFromUrdf(URDF_PATH)
@@ -96,6 +103,8 @@ class InferenceControlNode(Node):
             Float64MultiArray, '/predicted_action_chunk', self._chunk_callback, 10)
         self.policy_gate_sub = self.create_subscription(
             Bool, '/policy_gate', self._policy_gate_cb, 10)
+        self.policy_done_sub = self.create_subscription(
+            Bool, '/policy_done', self._policy_done_cb, 10)
 
         # Hand timer (sends hand commands at 30Hz from latest goal)
         self.current_hand_goal = None
@@ -121,6 +130,15 @@ class InferenceControlNode(Node):
             # Send empty trajectory to stop
             self._send_stop()
             self.get_logger().info("⏸️  Policy INACTIVE — Robot stopped.")
+
+    def _policy_done_cb(self, msg: Bool):
+        """Auto-stop: progress head signals task completion."""
+        if msg.data and self.policy_active:
+            self.policy_active = False
+            self.last_ik_solution = None
+            self.current_hand_goal = None
+            self._send_stop()
+            self.get_logger().info("🏁 Policy DONE — Progress threshold reached. Robot stopped.")
 
     def _joint_state_cb(self, msg):
         for name, pos in zip(msg.name, msg.position):
@@ -173,7 +191,8 @@ class InferenceControlNode(Node):
 
             joints = self._cartesian_to_joints(pose_7d, ik_ref)
             if joints is None:
-                # Skip this point but continue
+                self.get_logger().warn(
+                    f"IK failed: target={pose_7d[:3].round(3)}, quat_norm={np.linalg.norm(pose_7d[3:7]):.4f}")
                 continue
 
             ik_ref = joints
@@ -183,6 +202,27 @@ class InferenceControlNode(Node):
         if not joint_waypoints:
             self.get_logger().warn("No valid IK solutions in chunk.")
             return
+
+        arm = np.array(joint_waypoints)  # (N, 6)
+
+        # --- SAFETY: entry jump (first waypoint vs current/last pose) ---
+        ref = (self.last_ik_solution
+               if self.last_ik_solution is not None
+               else self.current_joint_positions)
+        entry_jump = np.max(np.abs(arm[0] - ref))
+        if entry_jump > self.max_entry_jump:
+            self.get_logger().warn(
+                f"Chunk REJECTED: entry jump {entry_jump:.3f} rad > {self.max_entry_jump} rad.")
+            return
+
+        # --- SAFETY: per-step velocity across the chunk ---
+        if len(arm) > 1:
+            step_deltas = np.abs(np.diff(arm, axis=0))
+            max_vel = step_deltas.max() / self.dt_per_step
+            if max_vel > self.max_step_vel:
+                self.get_logger().warn(
+                    f"Chunk REJECTED: peak joint vel {max_vel:.2f} rad/s > {self.max_step_vel} rad/s.")
+                return
 
         # Update last IK solution for next chunk
         self.last_ik_solution = joint_waypoints[-1].copy()
@@ -196,14 +236,17 @@ class InferenceControlNode(Node):
     def _publish_trajectory(self, joint_waypoints):
         """Build JointTrajectory message and publish."""
         traj = JointTrajectory()
-        traj.header.stamp = self.get_clock().now().to_msg()
+        # stamp=0 → controller starts executing immediately from 'now', rather
+        # than trying to align to an absolute wall-clock time (avoids drift/jerk).
+        traj.header.stamp = rclpy.time.Time().to_msg()
         traj.joint_names = UR_JOINT_NAMES
 
         for i, joints in enumerate(joint_waypoints):
             point = JointTrajectoryPoint()
             point.positions = joints.tolist()
-            # Time from start: each waypoint spaced at dt_per_step
-            t = (i + 1) * self.dt_per_step
+            # Time from start: lead_time offset + spacing. lead_time gives the
+            # controller room to reach the first point smoothly.
+            t = self.lead_time + (i + 1) * self.dt_per_step
             point.time_from_start = Duration(seconds=t).to_msg()
             traj.points.append(point)
 
@@ -272,7 +315,7 @@ class InferenceControlNode(Node):
         configuration = pink.Configuration(self.model, self.data, q)
 
         try:
-            for _ in range(3):
+            for _ in range(10):  # More iterations for convergence
                 velocity = pink.solve_ik(
                     configuration,
                     [self.ee_task, self.posture_task],
@@ -286,8 +329,9 @@ class InferenceControlNode(Node):
             joints = q[:6]
 
             # IK flip protection
-            if np.max(np.abs(joints - ref_joints)) > self.max_joint_delta:
-                self.get_logger().debug("IK flip avoided.")
+            delta = np.max(np.abs(joints - ref_joints))
+            if delta > self.max_joint_delta:
+                self.get_logger().debug(f"IK flip avoided: delta={delta:.3f} > {self.max_joint_delta}")
                 return None
 
             return joints

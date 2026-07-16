@@ -22,9 +22,14 @@ class DeployManiWorkspace:
         payload = torch.load(path, pickle_module=dill, map_location='cpu')
         if 'state_dicts' in payload:
             if 'model' in payload['state_dicts']:
-                self.model.load_state_dict(payload['state_dicts']['model'])
+
+                missing, unexpected = self.model.load_state_dict(
+                    payload['state_dicts']['model'], strict=False)
+                print(f"[LOAD] model — missing: {list(missing)}, unexpected: {list(unexpected)}")
             if self.ema_model is not None and 'ema_model' in payload['state_dicts']:
-                self.ema_model.load_state_dict(payload['state_dicts']['ema_model'])
+                m2, u2 = self.ema_model.load_state_dict(
+                    payload['state_dicts']['ema_model'], strict=False)
+                print(f"[LOAD] ema_model — missing: {list(m2)}, unexpected: {list(u2)}")
             print("====== CHECKPOINT DEBUG ======")
             print("Keys in state_dicts:", payload['state_dicts'].keys())
             if 'normalizer' in payload['state_dicts']:
@@ -63,40 +68,38 @@ def init_model(task_name, alg_name, addition_info, run_dir):
         )
 
     workspace = DeployManiWorkspace(cfg)
-    ckpt_path = os.path.join(cfg.run_dir, 'checkpoints/latest.ckpt')
+
+    ckpt_path = os.path.join(cfg.run_dir, 'checkpoints/epoch=0200-mse=0.000175.ckpt')
     workspace.load_checkpoint(ckpt_path)
 
     policy = workspace.ema_model or workspace.model
     policy.eval().to(cfg.training.device) 
         
-    # --- OPTIMIERUNG 2: PyTorch 2.0 Kompilierung (CUDA Graphen) ---
     if torch.cuda.is_available() and hasattr(torch, 'compile'):
-        print("[INFO] Kompiliere PyTorch Modell für extrem schnelle Inferenz...")
-        print("[INFO] Hinweis: Der erste Durchlauf (Chunk) wird dadurch 1-2 Minuten dauern!")
-        
-        # 'reduce-overhead' ist ideal, um den Python-Dispatch-Overhead bei vielen
-        # kleinen Iterationen (wie den 10 Denoising-Schritten) zu minimieren.
+        print("[INFO] torch.compile mode='default' (RTC-compatible, no CUDA graphs)...")
+        print("[INFO] First inference will be slower due to JIT compilation.")
         try:
-            policy = torch.compile(policy, mode="reduce-overhead")
+            policy = torch.compile(policy, mode="default")
         except Exception as e:
-            print(f"[WARN] torch.compile fehlgeschlagen. Falle auf Standard-Inferenz zurück. Fehler: {e}")
-    # -------------------------------------------------------------
+            print(f"[WARN] torch.compile failed: {e}. Running uncompiled.")
 
     print("=== Flash Attention Diagnose ===")
     print(f"PyTorch Version: {torch.__version__}")
 
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
-        print(f"Native PyTorch Flash Attention (SDPA) bereit: {torch.backends.cuda.flash_sdp_enabled()}")
-        print(f"Native PyTorch Math Attention (Langsam) bereit: {torch.backends.cuda.math_sdp_enabled()}")
+        print(f"Native PyTorch Flash Attention (SDPA) available: {torch.backends.cuda.flash_sdp_enabled()}")
+        print(f"Native PyTorch Math Attention (Slow) available: {torch.backends.cuda.math_sdp_enabled()}")
         
         try:
             import flash_attn
-            print(f"Externes 'flash-attn' Paket installiert: JA (Version {flash_attn.__version__})")
+            print(f"External 'flash-attn' package installed: YES (Version {flash_attn.__version__})")
         except ImportError:
-            print("Externes 'flash-attn' Paket installiert: NEIN")
+            print("External 'flash-attn' package installed: NO")
+        except Exception as e:
+            print(f"External 'flash-attn' import error: {type(e).__name__}: {e}")
     else:
-        print("CUDA ist nicht verfügbar!")
+        print("CUDA is not available!")
 
     return cfg, policy
 

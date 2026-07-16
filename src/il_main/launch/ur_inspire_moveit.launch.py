@@ -25,7 +25,7 @@ def generate_launch_description():
             'use_fake_hardware': 'false',
             'launch_rviz': 'false',
             'kinematics_params_file': '/ros2_ws/src/il_main/my_robot_calibration.yaml',
-            'initial_joint_controller': 'forward_position_controller'
+            'initial_joint_controller': 'joint_trajectory_controller'
         }.items()
     )
 

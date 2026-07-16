@@ -52,7 +52,13 @@ class InferenceControlNode(Node):
         self.policy_active = False
 
         # --- Execution rate: how fast we stream poses to Servo ---
-        self.execution_fps = 30.0
+        self.execution_fps = 20.0
+
+        # --- EMA smoothing factor for streamed poses ---
+        # Damps residual ~16mm chunk-boundary jitter from flow-matching sampling.
+        # Lower = smoother but more lag; higher = more responsive but jerkier.
+        #   0.4 = good starting point, 0.25 = very smooth, 0.6 = responsive
+        self.ema_alpha = float(os.environ.get("SERVO_EMA_ALPHA", "0.4"))
 
         # --- ROS Interfaces ---
         # Servo pose target stream (Servo does IK internally)
@@ -178,7 +184,29 @@ class InferenceControlNode(Node):
         with self._queue_lock:
             if self._action_queue:
                 action = self._action_queue.popleft()
-                self.current_pose_goal = action[:7]
+
+                new_pose = action[:7].copy()
+
+                if self.current_pose_goal is not None:
+                    a = self.ema_alpha
+                    prev = self.current_pose_goal
+
+                    # --- Quaternion hemisphere alignment (fixes wrist wobble) ---
+                    # Network may output -q instead of +q (same rotation, but
+                    # Servo reads the sign flip as a ~180° jump). Align first.
+                    if np.dot(new_pose[3:7], prev[3:7]) < 0.0:
+                        new_pose[3:7] = -new_pose[3:7]
+
+                    # --- EMA smoothing on position ---
+                    new_pose[:3] = a * new_pose[:3] + (1.0 - a) * prev[:3]
+
+                    # --- EMA smoothing on quaternion, then renormalize ---
+                    q = a * new_pose[3:7] + (1.0 - a) * prev[3:7]
+                    q_norm = np.linalg.norm(q)
+                    if q_norm > 1e-8:
+                        new_pose[3:7] = q / q_norm
+
+                self.current_pose_goal = new_pose
                 self.current_hand_goal = action[7:13]
 
         # Servo needs a continuous stream — re-publish current goal every tick

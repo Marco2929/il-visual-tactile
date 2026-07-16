@@ -1,5 +1,5 @@
 meta:
-  name: "foil_lifting_baseline_cleaned"
+  name: "foil_lifting_baseline_20"
   task: "Pick up the box and open it"
   fps: 30
 
@@ -58,7 +58,7 @@ post_processing:
 # ─── Output ───────────────────────────────────────
 output:
   format: "both"
-  zarr_path: "foil_lifting_baseline_cleaned.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_baseline_cleaned"
+  zarr_path: "foil_lifting_baseline_20.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_baseline_20"
   compression: "zstd"
   chunk_size: 100

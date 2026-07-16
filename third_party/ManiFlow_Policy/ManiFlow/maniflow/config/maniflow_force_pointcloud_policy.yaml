@@ -40,6 +40,7 @@ policy:
 
   force_conditioned: false
   use_force_cnn: false
+  use_progress: false
   language_conditioned: false
   pre_norm_modality: false
 
@@ -65,8 +66,6 @@ policy:
   n_action_steps: ${n_action_steps}
   n_obs_steps: ${n_obs_steps}
 
-  progress_prediction: true
-
   num_inference_steps: 10
   obs_as_global_cond: true
   shape_meta: ${shape_meta}
@@ -82,6 +81,9 @@ policy:
     normal_channel: false
     num_points: ${policy.visual_cond_len} 
     pointwise: true
+    state_mlp_size:
+    - 64
+    - 32
     
 
 ema:
@@ -133,8 +135,8 @@ training:
   max_train_steps: null
   max_val_steps: null
   tqdm_interval_sec: 1.0
-  proprio_mask_max_prob: 0.6
-  proprio_mask_warmup_epochs: 20
+  proprio_mask_max_prob: 0.85
+  proprio_mask_warmup_epochs: 1
 
 logging:
   group: ${exp_name}
@@ -149,9 +151,9 @@ logging:
 checkpoint:
   save_ckpt: True
   topk:
-    monitor_key: train_action_mse_error   # ← FIX: existiert tatsächlich
+    monitor_key: train_action_mse_error
     mode: min
-    k: 5
+    k: 50
     format_str: 'epoch={epoch:04d}-mse={train_action_mse_error:.6f}.ckpt'
   save_last_ckpt: True
   save_last_snapshot: False
