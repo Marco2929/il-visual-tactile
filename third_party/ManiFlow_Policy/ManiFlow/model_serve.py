@@ -42,7 +42,7 @@ if torch.cuda.is_available():
     torch.set_float32_matmul_precision('high')
 # -----------------------------------------------------------
 
-def init_model(task_name, alg_name, addition_info, run_dir):
+def init_model(task_name, alg_name, addition_info, run_dir, ckpt_file):
     config_dir_path = pathlib.Path(__file__).parent / 'maniflow' / 'config'
     config_dir_str = str(config_dir_path.absolute())
 
@@ -69,7 +69,7 @@ def init_model(task_name, alg_name, addition_info, run_dir):
 
     workspace = DeployManiWorkspace(cfg)
 
-    ckpt_path = os.path.join(cfg.run_dir, 'checkpoints/epoch=0200-mse=0.000175.ckpt')
+    ckpt_path = os.path.join(cfg.run_dir, 'checkpoints/', ckpt_file + '.ckpt')
     workspace.load_checkpoint(ckpt_path)
 
     policy = workspace.ema_model or workspace.model

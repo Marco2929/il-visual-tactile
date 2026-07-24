@@ -54,7 +54,18 @@ CDM_COLOR = np.array([1.0, 0.2, 0.1])   # red  = CDM cleaned cloud
 # ────────────────────────────────────────────────────
 # STAGE 1: export  (zed_container)  — reads SVO/rosbag, writes files
 # ────────────────────────────────────────────────────
+def _normalize_depth_m(depth):
+    """Force depth to float32 meters (auto-detect mm)."""
+    depth = depth.astype(np.float32).copy()
+    depth[~np.isfinite(depth)] = 0.0
+    valid = depth > 0
+    if np.any(valid) and np.median(depth[valid]) > 20.0:
+        depth = depth / 1000.0  # mm -> m
+    return depth
+
+
 def stage_export(args):
+    """Export ONE frame (legacy single-frame dump)."""
     import cv2
     # pyzed / rosbags are pulled in lazily by these readers.
     from visualize_merged_pc import (
@@ -76,12 +87,8 @@ def stage_export(args):
         if color_bgr is None or depth is None:
             raise SystemExit("No wrist frame available for this episode.")
 
-    # Normalize depth to float32 meters so the compare stage needs no guessing.
-    depth = depth.astype(np.float32).copy()
-    depth[~np.isfinite(depth)] = 0.0
+    depth = _normalize_depth_m(depth)
     valid = depth > 0
-    if np.any(valid) and np.median(depth[valid]) > 20.0:
-        depth = depth / 1000.0  # mm -> m
 
     # Save RGB as BGR PNG (cv2 round-trips BGR), depth as float32 meters npy.
     cv2.imwrite(os.path.join(args.export_dir, "rgb.png"), color_bgr)
@@ -101,6 +108,120 @@ def stage_export(args):
     print(f"[export] wrote rgb.png / depth.npy / meta.json to {args.export_dir}")
     print(f"[export] depth: min={depth[valid].min():.3f} "
           f"max={depth[valid].max():.3f} m (valid px: {int(valid.sum()):,})")
+
+
+def stage_export_episode(args):
+    """Export MANY front-camera frames from one SVO into a browsable dump.
+
+    Layout under export_dir:
+        meta.json                 (episode-level: camera, frame list, urdf...)
+        frames/frame_0000_rgb.png
+        frames/frame_0000_depth.npy
+        ...
+    Only the FRONT (ZED) camera is supported here - it needs a single SVO
+    pass. Wrist frames would require rosbag time-matching per frame; use the
+    single-frame 'export' for that.
+    """
+    import cv2
+    import pyzed.sl as sl
+    from visualize_merged_pc import DEFAULT_URDF, DEFAULT_END_LINK, ARM_JOINT_NAMES
+
+    frames_dir = os.path.join(args.export_dir, "frames")
+    os.makedirs(frames_dir, exist_ok=True)
+
+    svo = os.path.join(args.episode, "recording.svo2")
+    if not os.path.exists(svo):
+        raise SystemExit(f"No recording.svo2 in {args.episode}")
+
+    init = sl.InitParameters()
+    init.set_from_svo_file(svo)
+    init.svo_real_time_mode = False
+    init.camera_resolution = sl.RESOLUTION.HD720
+    init.camera_fps = 60
+    init.depth_mode = sl.DEPTH_MODE.NEURAL
+    init.coordinate_units = sl.UNIT.METER
+    init.depth_minimum_distance = 0.2
+    init.depth_maximum_distance = 2.0
+    init.sdk_verbose = 0
+
+    cam = sl.Camera()
+    if cam.open(init) != sl.ERROR_CODE.SUCCESS:
+        raise SystemExit("Failed to open SVO")
+
+    total = cam.get_svo_number_of_frames()
+    rt = sl.RuntimeParameters()
+    rt.confidence_threshold = 100
+    rt.texture_confidence_threshold = 100
+    img_mat, depth_mat = sl.Mat(), sl.Mat()
+
+    end = total if args.count <= 0 else min(args.start + args.count * args.stride, total)
+    wanted = list(range(args.start, end, args.stride))
+    wanted_set = set(wanted)
+    print(f"[export-ep] SVO has {total} frames; exporting {len(wanted)} "
+          f"(start={args.start}, stride={args.stride}) ...")
+
+    last_positions = np.zeros(12, dtype=np.float32)
+    last_ts = sl.Timestamp()
+    last_ts.set_nanoseconds(0)
+
+    saved = []
+    idx = 0
+    max_idx = max(wanted) if wanted else -1
+    while idx <= max_idx:
+        if cam.grab(rt) != sl.ERROR_CODE.SUCCESS:
+            break
+
+        # Track latest joint states (same source extract_episodes uses).
+        current_ts = cam.get_timestamp(sl.TIME_REFERENCE.IMAGE)
+        custom_data = {}
+        res = cam.retrieve_svo_data("joint_states", custom_data, last_ts, current_ts)
+        if res == sl.ERROR_CODE.SUCCESS and len(custom_data) > 0:
+            latest_key = sorted(custom_data.keys(),
+                                key=lambda t: t.get_nanoseconds())[-1]
+            sc = custom_data[latest_key]
+            js = (sc.get_content_as_string() if hasattr(sc, 'get_content_as_string')
+                  else sc.get_string_content())
+            try:
+                batch = json.loads(js)
+                if len(batch) > 0:
+                    last_positions = np.array(batch[-1]['positions'], dtype=np.float32)
+            except json.JSONDecodeError:
+                pass
+        last_ts = current_ts
+
+        if idx in wanted_set:
+            cam.retrieve_image(img_mat, sl.VIEW.LEFT)
+            cam.retrieve_measure(depth_mat, sl.MEASURE.DEPTH)
+            color_bgr = cv2.cvtColor(img_mat.get_data(), cv2.COLOR_BGRA2BGR)
+            depth = _normalize_depth_m(depth_mat.get_data().copy())
+
+            base = f"frame_{idx:04d}"
+            cv2.imwrite(os.path.join(frames_dir, base + "_rgb.png"), color_bgr)
+            np.save(os.path.join(frames_dir, base + "_depth.npy"), depth)
+            saved.append({
+                "frame_index": idx,
+                "rgb": f"frames/{base}_rgb.png",
+                "depth": f"frames/{base}_depth.npy",
+                "arm_joints": last_positions[:6].tolist(),
+            })
+            print(f"  saved frame {idx} ({len(saved)}/{len(wanted)})")
+        idx += 1
+
+    cam.close()
+
+    meta = {
+        "episode": args.episode,
+        "camera": "front",
+        "multi_frame": True,
+        "urdf_path": args.urdf_path or DEFAULT_URDF,
+        "end_link": args.end_link or DEFAULT_END_LINK,
+        "depth_units": "meters",
+        "frames": saved,
+    }
+    with open(os.path.join(args.export_dir, "meta.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+
+    print(f"[export-ep] wrote {len(saved)} frames + meta.json to {args.export_dir}")
 
 
 # ────────────────────────────────────────────────────
@@ -151,15 +272,11 @@ def run_cdm_depth(model, color_bgr, depth_m, input_size=518, max_depth=25.0):
     return pred
 
 
-def save_depth_comparison(color_bgr, raw_depth, cdm_depth, out_path,
-                          vmin=0.1, vmax=5.0):
-    """Write a 4-panel image-space comparison:
+def _build_depth_panel(color_bgr, raw_depth, cdm_depth, vmin=0.1, vmax=5.0):
+    """Build the 4-panel BGR image [RGB | raw | cdm | diff] + mean-diff (cm).
 
-        [ RGB | raw depth | CDM depth | |CDM - raw| diff ]
-
-    This surfaces exactly what CDM changes (filled holes, sharpened edges,
-    removed flying pixels) that the sparse 8192-pt cloud averages away.
-    Runs fully headless (no Open3D window) - ideal for the ur_artus container.
+    Returns (panel_bgr, mean_diff_cm). Shared by the headless PNG writer and
+    the interactive depth browser.
     """
     import cv2
     sys.path.insert(0, CDM_DIR)
@@ -181,11 +298,6 @@ def save_depth_comparison(color_bgr, raw_depth, cdm_depth, out_path,
     diff[m] = np.abs(cdm_depth[m] - raw_depth[m])
     diff_colored = color(diff, 0.0, 0.20)  # 0-20 cm scale
 
-    # Label every tile so the panel is self-explanatory.
-    #   RGB          : the input color image
-    #   raw depth    : the sensor's depth
-    #   cdm depth    : CDM-predicted (cleaned) depth
-    #   |cdm-raw|    : how much CDM changed the depth per pixel (0-20cm)
     for img, txt in ((rgb_display, "RGB"),
                      (raw_colored, "raw depth"),
                      (cdm_colored, "cdm depth"),
@@ -195,11 +307,98 @@ def save_depth_comparison(color_bgr, raw_depth, cdm_depth, out_path,
 
     grid = image_grid([rgb_display, raw_colored, cdm_colored, diff_colored],
                       rows=1, cols=4)
-    cv2.imwrite(out_path, cv2.cvtColor(grid, cv2.COLOR_RGB2BGR))
+    panel_bgr = cv2.cvtColor(grid, cv2.COLOR_RGB2BGR)
+    mean_diff_cm = float(diff[m].mean()) * 100 if np.any(m) else 0.0
+    return panel_bgr, mean_diff_cm
 
-    valid_mean = float(diff[m].mean()) if np.any(m) else 0.0
+
+def save_depth_comparison(color_bgr, raw_depth, cdm_depth, out_path,
+                          vmin=0.1, vmax=5.0):
+    """Write a 4-panel image-space comparison [RGB | raw | cdm | diff]."""
+    import cv2
+    panel, mean_cm = _build_depth_panel(color_bgr, raw_depth, cdm_depth,
+                                        vmin=vmin, vmax=vmax)
+    cv2.imwrite(out_path, panel)
     print(f"[compare] depth panel saved: {out_path}")
-    print(f"[compare] mean |cdm-raw| over valid px = {valid_mean*100:.2f} cm")
+    print(f"[compare] mean |cdm-raw| over valid px = {mean_cm:.2f} cm")
+
+
+def _browse_depth_panels(args, frame_list, model):
+    """Interactive matplotlib browser through the 4-panel depth comparison.
+
+    Uses matplotlib (not cv2) because the container often ships headless
+    OpenCV without GUI support. matplotlib uses the X display directly.
+
+    Controls (figure window):
+        n / Right / Space -> next    p / Left -> prev
+        s -> save current panel PNG   q -> quit
+    """
+    import cv2
+    import matplotlib
+    import matplotlib.pyplot as plt
+
+    print(f"[browse-depth] {len(frame_list)} frames | "
+          f"n/-> next | p/<- prev | s save | q quit")
+
+    cache = {}
+
+    def get_panel(pos):
+        if pos not in cache:
+            entry = frame_list[pos]
+            color_bgr = cv2.imread(
+                os.path.join(args.export_dir, entry["rgb"]), cv2.IMREAD_COLOR)
+            depth = np.load(os.path.join(args.export_dir, entry["depth"]))
+            cdm_depth = run_cdm_depth(model, color_bgr, depth,
+                                      input_size=args.input_size)
+            panel, mean_cm = _build_depth_panel(
+                color_bgr, depth, cdm_depth,
+                vmin=args.depth_vmin, vmax=args.depth_vmax)
+            cache[pos] = (panel, mean_cm)
+        return cache[pos]
+
+    state = {"cur": 0}
+
+    fig, ax = plt.subplots(figsize=(18, 5))
+    ax.axis("off")
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.95, bottom=0.01)
+    img_handle = None
+
+    def show():
+        nonlocal img_handle
+        panel, mean_cm = get_panel(state["cur"])
+        frame_idx = frame_list[state["cur"]]["frame_index"]
+        # panel is BGR -> RGB for matplotlib
+        rgb = panel[:, :, ::-1]
+        if img_handle is None:
+            img_handle = ax.imshow(rgb)
+        else:
+            img_handle.set_data(rgb)
+        ax.set_title(
+            f"frame {frame_idx} ({state['cur']+1}/{len(frame_list)}) | "
+            f"mean|cdm-raw|={mean_cm:.2f}cm   "
+            f"[RGB | raw | cdm | diff]", fontsize=11)
+        fig.canvas.draw_idle()
+
+    def on_key(event):
+        if event.key in ('n', 'right', ' '):
+            state["cur"] = min(state["cur"] + 1, len(frame_list) - 1)
+            show()
+        elif event.key in ('p', 'left'):
+            state["cur"] = max(state["cur"] - 1, 0)
+            show()
+        elif event.key == 's':
+            panel, _ = get_panel(state["cur"])
+            frame_idx = frame_list[state["cur"]]["frame_index"]
+            out = os.path.join(args.export_dir,
+                               f"depth_compare_{frame_idx:04d}.png")
+            cv2.imwrite(out, panel)
+            print(f"[browse-depth] saved {out}")
+        elif event.key == 'q':
+            plt.close(fig)
+
+    fig.canvas.mpl_connect('key_press_event', on_key)
+    show()
+    plt.show()
 
 
 # ────────────────────────────────────────────────────
@@ -218,6 +417,126 @@ def build_cloud_in_base(color_bgr, depth, camera, T_base_flange):
         return transform_wrist_to_base(pcd, T_base_flange, WRIST_EXTRINSICS)
 
 
+def stage_browse(args, meta):
+    """Interactive frame-by-frame RAW vs CDM browser for a multi-frame dump.
+
+    Loads the CDM once, then lets you step through the exported front-camera
+    frames with the keyboard, building RAW + CDM clouds on demand (cached).
+
+    Controls:
+        N / Right -> next    P / Left -> prev
+        O -> overlay/side toggle    T -> tint/RGB toggle    Q -> quit
+    """
+    import cv2
+    import open3d as o3d
+    from visualize_merged_pc import (
+        FRONT_INTRINSICS, FRONT_EXTRINSICS,
+        build_camera_cloud, transform_front_to_base,
+        crop_workspace, fps_downsample, paint_source, WORKSPACE,
+    )
+
+    frame_list = meta["frames"]
+    if not frame_list:
+        raise SystemExit("multi_frame dump has no frames.")
+    print(f"[browse] {len(frame_list)} frames in {args.export_dir}")
+
+    # Load CDM once.
+    print(f"[browse] Running CDM ({args.cdm_model}) ...")
+    ckpt = resolve_cdm_checkpoint(args.cdm_model)
+    model = load_cdm(ckpt, args.encoder)
+
+    # --- 2D depth-panel browser (cv2) instead of 3D point clouds ---
+    if getattr(args, "depth_mode", False):
+        return _browse_depth_panels(args, frame_list, model)
+
+    def build_clouds(color_bgr, depth):
+        raw = build_camera_cloud(color_bgr, depth, FRONT_INTRINSICS)
+        raw = transform_front_to_base(raw, FRONT_EXTRINSICS)
+        cdm_depth = run_cdm_depth(model, color_bgr, depth,
+                                  input_size=args.input_size)
+        cdm = build_camera_cloud(color_bgr, cdm_depth, FRONT_INTRINSICS)
+        cdm = transform_front_to_base(cdm, FRONT_EXTRINSICS)
+        if not args.no_crop:
+            raw = crop_workspace(raw, WORKSPACE)
+            cdm = crop_workspace(cdm, WORKSPACE)
+        raw = fps_downsample(raw, args.num_points)
+        cdm = fps_downsample(cdm, args.num_points)
+        return raw, cdm
+
+    state = {"cur": 0, "overlay": args.overlay, "tint": args.tint, "cache": {}}
+
+    def get_clouds(pos):
+        if pos not in state["cache"]:
+            entry = frame_list[pos]
+            color_bgr = cv2.imread(
+                os.path.join(args.export_dir, entry["rgb"]), cv2.IMREAD_COLOR)
+            depth = np.load(os.path.join(args.export_dir, entry["depth"]))
+            state["cache"][pos] = build_clouds(color_bgr, depth)
+        return state["cache"][pos]
+
+    def refresh(vis):
+        raw, cdm = get_clouds(state["cur"])
+        frame_idx = frame_list[state["cur"]]["frame_index"]
+        raw_c = o3d.geometry.PointCloud(raw)
+        cdm_c = o3d.geometry.PointCloud(cdm)
+        if state["tint"]:
+            paint_source(raw_c, RAW_COLOR)
+            paint_source(cdm_c, CDM_COLOR)
+        if not state["overlay"]:
+            cdm_c.translate((0.0, args.gap, 0.0))
+        vis.clear_geometries()
+        vis.add_geometry(
+            o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3),
+            reset_bounding_box=False)
+        vis.add_geometry(raw_c, reset_bounding_box=False)
+        vis.add_geometry(cdm_c, reset_bounding_box=False)
+        mode = "OVERLAY" if state["overlay"] else f"SIDE-BY-SIDE(+{args.gap}m Y)"
+        rgb = "tint" if state["tint"] else "true RGB"
+        print(f"[browse] frame {frame_idx} ({state['cur']+1}/{len(frame_list)}) "
+              f"| {mode} | {rgb} | raw={len(raw_c.points):,} "
+              f"cdm={len(cdm_c.points):,}")
+
+    def nxt(vis):
+        if state["cur"] < len(frame_list) - 1:
+            state["cur"] += 1
+            refresh(vis)
+        return False
+
+    def prv(vis):
+        if state["cur"] > 0:
+            state["cur"] -= 1
+            refresh(vis)
+        return False
+
+    def tog_overlay(vis):
+        state["overlay"] = not state["overlay"]
+        refresh(vis)
+        return False
+
+    def tog_tint(vis):
+        state["tint"] = not state["tint"]
+        refresh(vis)
+        return False
+
+    vis = o3d.visualization.VisualizerWithKeyCallback()
+    vis.create_window(window_name="RAW(blue) vs CDM(red) episode browser")
+    vis.register_key_callback(ord("N"), nxt)
+    vis.register_key_callback(ord("P"), prv)
+    vis.register_key_callback(262, nxt)   # Right arrow
+    vis.register_key_callback(263, prv)   # Left arrow
+    vis.register_key_callback(ord("O"), tog_overlay)
+    vis.register_key_callback(ord("T"), tog_tint)
+
+    raw, cdm = get_clouds(0)
+    vis.add_geometry(o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3))
+    vis.add_geometry(o3d.geometry.PointCloud(raw))
+    vis.add_geometry(o3d.geometry.PointCloud(cdm))
+    refresh(vis)
+    print("\n[browse] N/-> next | P/<- prev | O overlay | T tint | Q quit\n")
+    vis.run()
+    vis.destroy_window()
+
+
 def stage_compare(args):
     import cv2
     import open3d as o3d
@@ -233,6 +552,11 @@ def stage_compare(args):
         raise SystemExit(f"No meta.json in {args.export_dir}; run 'export' first.")
     with open(meta_path) as f:
         meta = json.load(f)
+
+    # Multi-frame dump -> interactive browser.
+    if meta.get("multi_frame"):
+        return stage_browse(args, meta)
+
     camera = meta["camera"]
     arm_state = np.array(meta["arm_joints"], dtype=np.float32)
     color_bgr = cv2.imread(os.path.join(args.export_dir, "rgb.png"),
@@ -340,14 +664,28 @@ def build_parser():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="stage", required=True)
 
-    # export
-    e = sub.add_parser("export", help="Read SVO/rosbag frame -> dump files.")
+    # export (single frame)
+    e = sub.add_parser("export", help="Read ONE SVO/rosbag frame -> dump files.")
     e.add_argument('--episode', required=True)
     e.add_argument('--frame_index', type=int, default=0)
     e.add_argument('--camera', choices=['front', 'wrist'], default='front')
     e.add_argument('--export_dir', required=True)
     e.add_argument('--urdf_path', default=None)
     e.add_argument('--end_link', default=None)
+
+    # export-episode (many front frames for browsing)
+    ee = sub.add_parser("export-episode",
+                        help="Dump MANY front-camera frames for browsing.")
+    ee.add_argument('--episode', required=True)
+    ee.add_argument('--export_dir', required=True)
+    ee.add_argument('--start', type=int, default=0,
+                    help='First SVO frame index.')
+    ee.add_argument('--count', type=int, default=40,
+                    help='How many frames (<=0 = all until end of SVO).')
+    ee.add_argument('--stride', type=int, default=5,
+                    help='Grab every Nth SVO frame (60fps source).')
+    ee.add_argument('--urdf_path', default=None)
+    ee.add_argument('--end_link', default=None)
 
     # compare
     c = sub.add_parser("compare", help="Load dump -> run CDM -> compare.")
@@ -379,6 +717,9 @@ def build_parser():
     c.add_argument('--depth_vmax', type=float, default=5.0,
                    help='Max depth (m) for the depth-png color scale.')
     c.add_argument('--no_show', action='store_true')
+    c.add_argument('--depth_mode', action='store_true',
+                   help='(multi_frame) browse 2D depth panels '
+                        '[RGB|raw|cdm|diff] with cv2 instead of 3D clouds.')
     return p
 
 
@@ -386,6 +727,8 @@ def main():
     args = build_parser().parse_args()
     if args.stage == "export":
         stage_export(args)
+    elif args.stage == "export-episode":
+        stage_export_episode(args)
     elif args.stage == "compare":
         stage_compare(args)
 

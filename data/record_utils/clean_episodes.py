@@ -20,7 +20,7 @@ import shutil
 import argparse
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "foil_lifting_collection_60")
-WORKDIR = os.environ.get("WORKDIR", "/ros2_ws/data/")
+WORKDIR = os.environ.get("WORKDIR", "/ros2_ws/data")
 
 KEEP = {"realsense_bag", "recording.svo2"}
 
@@ -57,7 +57,7 @@ def main():
     )
     args = parser.parse_args()
 
-    root_dir = os.path.join(WORKDIR, f"episodes/{FOLDER_NAME}")
+    root_dir = os.path.join(WORKDIR, f"episodes/external/{FOLDER_NAME}")
     print(f"Dataset root : {root_dir}")
     print(f"Keeping      : {KEEP}")
     print(f"Mode         : {'🔴 EXECUTE' if args.execute else '🟡 DRY RUN'}")

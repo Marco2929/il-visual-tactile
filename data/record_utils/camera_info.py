@@ -1,7 +1,12 @@
-import open3d as o3d 
+
 import numpy as np  
 import json
 import os
+
+try:
+    import open3d as o3d
+except ImportError:
+    o3d = None
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 
@@ -17,27 +22,28 @@ DATA_PATH = os.path.join(ros2_ws_root, "data", "episodes", FOLDER_NAME)
 
 with open(os.path.join(DATA_PATH, "camera_intrinsics.json")) as f:
     intr = json.load(f)
-
-camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(
-    width=intr["width"],
-    height=intr["height"],
-    fx=intr["fx"],
-    fy=intr["fy"],
-    cx=intr["cx"],
-    cy=intr["cy"]
-)
+if o3d:
+    camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(
+        width=intr["width"],
+        height=intr["height"],
+        fx=intr["fx"],
+        fy=intr["fy"],
+        cx=intr["cx"],
+        cy=intr["cy"]
+    )
 
 with open(os.path.join(DATA_PATH, "wrist_camera_intrinsics.json")) as f:
     intr = json.load(f)
 
-wrist_camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(
-    width=intr["width"],
-    height=intr["height"],
-    fx=intr["fx"],
-    fy=intr["fy"],
-    cx=intr["cx"],
-    cy=intr["cy"]
-)
+if o3d:
+    wrist_camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(
+        width=intr["width"],
+        height=intr["height"],
+        fx=intr["fx"],
+        fy=intr["fy"],
+        cx=intr["cx"],
+        cy=intr["cy"]
+    )
 
 # Set extrinsic matrix
 camera_extrinsics = np.array([

@@ -17,7 +17,7 @@ from natsort import natsorted
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 
-DATA_DIR = os.path.join("data/episodes", FOLDER_NAME)
+DATA_DIR = os.path.join("data/episodes/external", FOLDER_NAME)
 
 
 def find_success_episodes(data_dir: Path) -> list[Path]:

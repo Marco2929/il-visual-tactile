@@ -47,8 +47,8 @@ FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract episodes from SVO + ROS bags")
     parser.add_argument('--data_dir', type=str,
-                        default=f'/root/ros2_ws/data/episodes/{FOLDER_NAME}')
-    parser.add_argument('--target_fps', type=int, default=30)
+                        default=f'/root/ros2_ws/data/episodes/external/{FOLDER_NAME}')
+    parser.add_argument('--target_fps', type=int, default=20)
     parser.add_argument('--max_frames', type=int, default=1500,
                         help='Max SVO frames (60fps). Episodes above are deleted.')
     parser.add_argument('--num_points', type=int, default=4096,
@@ -61,6 +61,28 @@ def parse_args():
                         default='/cam_right/cam_right/aligned_depth_to_color/image_raw')
     parser.add_argument('--include_failed', type=bool,
                         default=False)
+    # --- CDM depth refinement ---
+    # Front (ZED): OFF by default (opt-in).
+    parser.add_argument('--use_cdm', action='store_true',
+                        help='Refine FRONT depth with a CDM before PC generation')
+    parser.add_argument('--cdm_model', type=str,
+                        default='depth-anything/camera-depth-model-zed2i-neural',
+                        help='Front CDM HF repo id or local checkpoint path')
+    # Wrist (RealSense D435): ON by default (opt-out with --no_wrist_cdm).
+    parser.add_argument('--no_wrist_cdm', action='store_true',
+                        help='Disable CDM refinement on the WRIST depth')
+    parser.add_argument('--wrist_cdm_model', type=str,
+                        default='depth-anything/camera-depth-model-d435',
+                        help='Wrist CDM HF repo id or local checkpoint path')
+    parser.add_argument('--cdm_encoder', type=str, default='vitl',
+                        help='CDM ViT encoder size (shared)')
+    parser.add_argument('--cdm_input_size', type=int, default=518,
+                        help='CDM inference resolution (shared)')
+    # --- Wrist depth range cap (camera frame, meters) ---
+    parser.add_argument('--wrist_max_depth', type=float, default=0.5,
+                        help='Cap wrist depth (m) before CDM + PC gen. '
+                             'Points farther than this are dropped. '
+                             '<=0 disables the cap.')
     return parser.parse_args()
 
 
@@ -147,7 +169,7 @@ def get_header_stamp_ns(msg, fallback_ts):
     return fallback_ts
 
 
-def extract_wrist_camera(episode_dir, output_timestamps_ns, args):
+def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=None):
     """Extract wrist RGB + point cloud from rosbag, synced to ZED timestamps."""
     if not ROSBAGS_AVAILABLE:
         cprint("  [Error] 'rosbags' not installed.", "red")
@@ -230,7 +252,27 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args):
             closest_d_idx = np.argmin(np.abs(depth_timestamps_ns - target_ts))
             _, rawdata_d, conn_d = depth_entries[closest_d_idx]
             msg_d = typestore.deserialize_cdr(rawdata_d, conn_d.msgtype)
-            depth_img = decode_image_msg(msg_d, conn_d)
+            depth_img = decode_image_msg(msg_d, conn_d).astype(np.float32)
+
+            # Detect units once (RealSense is typically mm).
+            _valid = np.isfinite(depth_img) & (depth_img > 0)
+            _is_mm = np.any(_valid) and np.median(depth_img[_valid]) > 20.0
+
+            # Cap depth range (camera frame) BEFORE CDM + PC gen so both the
+            # refiner and the point cloud focus on the near grasp region.
+            if args.wrist_max_depth > 0:
+                cap = args.wrist_max_depth * 1000.0 if _is_mm else args.wrist_max_depth
+                depth_img[depth_img > cap] = 0.0
+
+            # Optional CDM refinement on the wrist depth.
+            # CDM expects meters; convert, refine, convert back.
+            if cdm_refiner is not None:
+                depth_m = depth_img / 1000.0 if _is_mm else depth_img.copy()
+                depth_m = cdm_refiner.refine(color_img, depth_m)
+                # CDM may hallucinate depth on capped (zeroed) regions; re-cap.
+                if args.wrist_max_depth > 0:
+                    depth_m[depth_m > args.wrist_max_depth] = 0.0
+                depth_img = depth_m * 1000.0  # back to mm for the PC builder
 
             pc = generate_point_cloud_from_depth(
                 color_img, depth_img.astype(np.float32),
@@ -248,7 +290,8 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args):
 # ZED SVO Extraction (Front Camera)
 # ═══════════════════════════════════════════════════════════════
 
-def extract_episode(episode_dir, args, source_fps = 60):
+def extract_episode(episode_dir, args, source_fps = 60, cdm_refiner=None,
+                    wrist_cdm_refiner=None):
     """
     Extract single episode from SVO.
     Saves: front_rgb/, front_pc/, state.npy, force.npy.
@@ -373,6 +416,10 @@ def extract_episode(episode_dir, args, source_fps = 60):
                     cam.retrieve_measure(depth_mat, sl.MEASURE.DEPTH)
                     depth_data = depth_mat.get_data().copy()
 
+                    # Optional CDM depth refinement (depth_data is in METERS here)
+                    if cdm_refiner is not None:
+                        depth_data = cdm_refiner.refine(color_bgr, depth_data)
+
                     pc = generate_point_cloud_from_depth(
                         color_bgr, depth_data,
                         intrinsics=FRONT_INTRINSICS, 
@@ -434,7 +481,8 @@ def extract_episode(episode_dir, args, source_fps = 60):
         cprint(f"  [QA] Missed states: {dropped_state_count}/{output_idx} frames.", "yellow")
 
     # Wrist camera
-    extract_wrist_camera(episode_dir, output_timestamps_ns, args)
+    extract_wrist_camera(episode_dir, output_timestamps_ns, args,
+                         cdm_refiner=wrist_cdm_refiner)
 
     cprint(f"  [Done] {output_idx} frames.", "green")
     return True
@@ -509,6 +557,32 @@ def main():
         cprint("[Warning] Camera intrinsics not found. Point clouds disabled.", "yellow")
         args.skip_point_clouds = True
 
+    # Optional: load CDM depth refiners (front + wrist use different models)
+    cdm_refiner = None
+    wrist_cdm_refiner = None
+    if not args.skip_point_clouds:
+        from cdm_refiner import CDMRefiner
+
+        # Front CDM: opt-in.
+        if args.use_cdm:
+            cprint(f"[CDM] Front depth refiner: {args.cdm_model}",
+                   "cyan", attrs=["bold"])
+            cdm_refiner = CDMRefiner(
+                model_spec=args.cdm_model,
+                encoder=args.cdm_encoder,
+                input_size=args.cdm_input_size,
+            )
+
+        # Wrist CDM: on by default (opt-out).
+        if not args.no_wrist_cdm and ROSBAGS_AVAILABLE:
+            cprint(f"[CDM] Wrist depth refiner: {args.wrist_cdm_model}",
+                   "cyan", attrs=["bold"])
+            wrist_cdm_refiner = CDMRefiner(
+                model_spec=args.wrist_cdm_model,
+                encoder=args.cdm_encoder,
+                input_size=args.cdm_input_size,
+            )
+
     if args.include_failed:
         episodes = sorted([
             d for d in os.listdir(args.data_dir)
@@ -544,7 +618,8 @@ def main():
             deleted_count += 1
             continue
 
-        if extract_episode(episode_dir, args):
+        if extract_episode(episode_dir, args, cdm_refiner=cdm_refiner,
+                           wrist_cdm_refiner=wrist_cdm_refiner):
             success_count += 1
         elif not os.path.exists(episode_dir):
             deleted_count += 1

@@ -1,0 +1,194 @@
+controller_manager:
+  ros__parameters:
+    force_torque_sensor_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+    scaled_joint_trajectory_controller:
+      type: ur_controllers/ScaledJointTrajectoryController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    cartesian_compliance_controller:
+      type: cartesian_compliance_controller/CartesianComplianceController
+
+    cartesian_force_controller:
+      type: cartesian_force_controller/CartesianForceController
+
+    cartesian_motion_controller:
+      type: cartesian_motion_controller/CartesianMotionController
+
+    motion_control_handle:
+      type: cartesian_controller_handles/MotionControlHandle
+
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+
+force_torque_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: tcp_fts_sensor
+    state_interface_names:
+      - force.x
+      - force.y
+      - force.z
+      - torque.x
+      - torque.y
+      - torque.z
+    frame_id: tool0
+    topic_name: wrench
+
+scaled_joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    constraints:
+      stopped_velocity_tolerance: 0.2
+      goal_time: 0.0
+      shoulder_pan_joint: { trajectory: 0.2, goal: 0.1 }
+      shoulder_lift_joint: { trajectory: 0.2, goal: 0.1 }
+      elbow_joint: { trajectory: 0.2, goal: 0.1 }
+      wrist_1_joint: { trajectory: 0.2, goal: 0.1 }
+      wrist_2_joint: { trajectory: 0.2, goal: 0.1 }
+      wrist_3_joint: { trajectory: 0.2, goal: 0.1 }
+
+cartesian_compliance_controller:
+  ros__parameters:
+    end_effector_link: "tool0"
+    robot_base_link: "base_link"
+    ft_sensor_ref_link: "tool0"
+    compliance_ref_link: "tool0"
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+    command_interfaces:
+      - position
+
+    stiffness:
+        trans_x: 500.0
+        trans_y: 500.0
+        trans_z: 500.0
+        rot_x: 20.0
+        rot_y: 20.0
+        rot_z: 20.0
+
+    solver:
+        error_scale: 0.5
+        iterations: 1
+        publish_state_feedback: True
+
+    pd_gains:
+        trans_x: {p: 0.05, d: 0.005}
+        trans_y: {p: 0.05, d: 0.005}
+        trans_z: {p: 0.05, d: 0.005}
+        rot_x: {p: 1.5}
+        rot_y: {p: 1.5}
+        rot_z: {p: 1.5}
+
+cartesian_force_controller:
+  ros__parameters:
+    end_effector_link: "tool0"
+    robot_base_link: "base_link"
+    ft_sensor_ref_link: "tool0"
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+    command_interfaces:
+      - position
+
+    solver:
+        error_scale: 0.5
+        publish_state_feedback: True
+
+    pd_gains:
+        trans_x: {p: 0.05}
+        trans_y: {p: 0.05}
+        trans_z: {p: 0.05}
+        rot_x: {p: 1.5}
+        rot_y: {p: 1.5}
+        rot_z: {p: 1.5}
+
+cartesian_motion_controller:
+  ros__parameters:
+    # Hier steuern wir jetzt gezielt die Handbasis anstelle der nackten Flansche an!
+    end_effector_link: "right_inspire_base_link"
+    robot_base_link: "base_link"
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+
+    command_interfaces:
+      - position
+
+    # Konservative Sicherheitsgrenzen für deinen ersten Test
+    max_trans_vel: 0.05    # 5 cm/s
+    max_trans_acc: 0.2     # Sehr weiche Beschleunigung
+    max_rot_vel: 0.1       # Langsame Orientierungsänderung
+    max_rot_acc: 0.2
+
+    solver:
+        error_scale: 1.0
+        iterations: 10
+        publish_state_feedback: True
+
+    # "Weiche" Federrate, um die 20 Hz Sollwertsprünge wegzudämpfen
+    pd_gains:
+        trans_x: {p: 1.0}
+        trans_y: {p: 1.0}
+        trans_z: {p: 1.0}
+        rot_x: {p: 0.5}
+        rot_y: {p: 0.5}
+        rot_z: {p: 0.5}
+
+motion_control_handle:
+  ros__parameters:
+    end_effector_link: "tool0"
+    robot_base_link: "base_link"
+    ft_sensor_ref_link: "tool0"
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - shoulder_pan_joint
+      - shoulder_lift_joint
+      - elbow_joint
+      - wrist_1_joint
+      - wrist_2_joint
+      - wrist_3_joint
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity

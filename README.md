@@ -35,7 +35,7 @@ ros2 topic echo /senseglove/glove0/rh/joint_states --field position
 ros2 launch moveit_ur_hand_config view_robot.launch.py ur_type:=ur10e hand_type:=inspire_strong_hand flange_type:=ring
 
 # Generate URDF
-./src/moveit_ur_hand_config/scripts/generate_urdf.sh ur10e tesollo_hand ring
+./src/moveit_ur_hand_config/scripts/generate_urdf.sh ur10e inspire_strong_hand ring
 
 # Switch controllers
 ros2 control switch_controllers --deactivate forward_position_controller --activate scaled_joint_trajectory_controller
@@ -102,7 +102,7 @@ ros2 run il_main teleop_ur
 ## Record & Train Pipeline
 
 ### Environment Variables
-
+export FOLDER_NAME="foil_lifting_collection"
 export FOLDER_NAME="box_opening_collection"
 export FOLDER_NAME="foil_lifting_collection"
 export FOLDER_NAME="dataset_collection"
@@ -135,7 +135,7 @@ lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 -
 # ManiFlow policy
 tmux new -s training
 
-bash scripts/train_policy.sh maniflow_r3d_pointcloud_policy foil_lifting_augmented_r3d 0112 0 0
+bash scripts/train_policy.sh maniflow_force_pointcloud_policy_v5 foil_lifting_augmented_v2 0112 0 0
 ctrl+b d
 
 tmux attach -t training
@@ -150,13 +150,13 @@ lerobot-train --dataset.repo_id=Marco2929/foil_lifting_baseline --dataset.root=/
 ### Launch Stack
 
 # Terminal 1: Robot hardware
-ros2 launch il_main ur_inspire.launch.py
+ros2 launch il_main ur_inspire_cartesian.launch.py
 
 # Terminal 2: ZED camera
 ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i
 
 # Terminal 3: Control node (inactive by default)
-ros2 run il_main control_ur_inspire
+ros2 run il_main cartesian_inference_control
 
 # Terminal 4: Policy (runs inference continuously)
 python third_party/ManiFlow_Policy/ManiFlow/deploy.py

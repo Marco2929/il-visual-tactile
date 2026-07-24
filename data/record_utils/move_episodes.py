@@ -3,9 +3,9 @@ import os
 import re
 import shutil
 
-BASE_PATH = "/home/mm/dev/il-visual-tactile/data/episodes"
+BASE_PATH = "/root/ros2_ws/data/episodes/external"
 
-SOURCE = os.path.join(BASE_PATH, "dataset_collection")
+SOURCE = os.path.join(BASE_PATH, "test_collection")
 DESTINATION = os.path.join(BASE_PATH, "foil_lifting_collection")
 
 
@@ -127,4 +127,4 @@ if __name__ == "__main__":
     move_episodes(SOURCE, DESTINATION, dry_run=True)
 
     # Uncomment to execute:
-    move_episodes(SOURCE, DESTINATION, dry_run=False)
+    # move_episodes(SOURCE, DESTINATION, dry_run=False)

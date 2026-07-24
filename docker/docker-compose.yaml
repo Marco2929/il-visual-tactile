@@ -54,8 +54,11 @@ services:
       
       - ../third_party:/ros2_ws/third_party:rw
       - ../data:/ros2_ws/data:rw
+      - /mnt/data/data:/ros2_ws/data/episodes/external:rw
 
       - ../src/moveit_ur_hand_config:/ros2_ws/src/moveit_ur_hand_config:rw
+      - ../src/cartesian_controllers:/ros2_ws/src/cartesian_controllers:rw
+      - ../src/cartesian_controllers_universal_robots:/ros2_ws/src/cartesian_controllers_universal_robots:rw
       - ./ur_entrypoint.sh:/ros2_ws/ur_entrypoint.sh:rwx
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth
@@ -183,6 +186,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
       - ../data:/root/ros2_ws/data:rw
+      - /mnt/data/data:/root/ros2_ws/data/episodes/external:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
       - /dev:/dev
     command: >

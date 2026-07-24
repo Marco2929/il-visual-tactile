@@ -1,18 +1,32 @@
 meta:
-  name: "foil_lifting_baseline_20"
+  name: "foil_lifting_big"
   task: "Pick up the box and open it"
-  fps: 30
+  fps: 20
 
 # ─── Kinematics ───────────────────────────────────
 kinematics:
   urdf_path: "/ros2_ws/src/moveit_ur_hand_config/urdf/inspire_strong_hand_ur10e_flange_workcell.urdf"
-  end_link: "right_inspire_base_link"
+  end_link: "tool0"
+
+# resample:
+#   enabled: true
+#   target_fps: 15            # source_fps is measured PER EPISODE from timestamps
+#   state_smoothing:
+#     method: butter          # butter | savgol | none
+#     butter_cutoff_hz: 4.0   # smooth joints more aggressively
+#     butter_order: 4
+#     savgol_window: 7        # only used if method=savgol
+#     savgol_polyorder: 3
+#   force_smoothing:
+#     method: butter
+#     butter_cutoff_hz: 9.0   # higher -> preserve contact spikes
+#     butter_order: 4
 
 # ─── Cache Sources ─────────────────────────────────
 cache:
   base_dir: "foil_lifting_collection"
   front_rgb: true
-  wrist_rgb: false
+  wrist_rgb: true
   front_pc: true
   wrist_pc: false
 
@@ -37,7 +51,7 @@ proprioception:
   hand:
     hardware: "inspire"
     force:
-      enabled: false
+      enabled: true
       mode: "raw"
 
 # ─── Actions ──────────────────────────────────────
@@ -58,7 +72,7 @@ post_processing:
 # ─── Output ───────────────────────────────────────
 output:
   format: "both"
-  zarr_path: "foil_lifting_baseline_20.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_baseline_20"
+  zarr_path: "foil_lifting_big.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_big"
   compression: "zstd"
   chunk_size: 100

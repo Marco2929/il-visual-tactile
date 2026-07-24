@@ -18,7 +18,7 @@ from pathlib import Path
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 
-BASE_DIR = os.path.join("data/episodes", FOLDER_NAME)
+BASE_DIR = os.path.join("data/episodes/external", FOLDER_NAME)
 
 
 def find_episodes(base_dir):

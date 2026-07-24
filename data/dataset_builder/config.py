@@ -25,6 +25,13 @@ class DatasetConfig:
         return self.raw["meta"]["fps"]
     
     @property
+    def resample_config(self) -> Dict:
+        rs = self.raw.get("resample", {"enabled": False})
+        # target_fps defaults to output fps to avoid a duplicated source of truth
+        rs.setdefault("target_fps", self.fps)
+        return rs
+    
+    @property
     def kinematics(self) -> Dict:
         return self.raw.get("kinematics", {})
 

@@ -59,7 +59,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # --- 3. PYTHON PACKAGES & ROSDEP ---
-RUN python3 -m pip install opencv-python-headless durationpy --no-deps --break-system-packages && \
+RUN python3 -m pip install --break-system-packages \
+        opencv-python-headless durationpy && \
+    python3 -m pip install --break-system-packages \
+        torch torchvision torchaudio \
+        --extra-index-url https://download.pytorch.org/whl/cu126 && \
     rosdep init && rosdep update
 
 # --- 4. ZED SDK INSTALLATION ---

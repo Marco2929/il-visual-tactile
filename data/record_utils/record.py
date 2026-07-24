@@ -55,8 +55,10 @@ class SVORecorder(Node):
     def __init__(self):
         super().__init__('svo_recorder')
 
+
         default_workdir = os.environ.get('WORKDIR', '/root/ros2_ws/data/')
         self.root_dir = os.path.join(default_workdir, f'episodes/{FOLDER_NAME}')
+
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
 

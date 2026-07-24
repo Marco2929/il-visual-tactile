@@ -17,6 +17,7 @@ from processing.proprioception import (
 from processing.actions import compute_actions, compute_auxiliary_actions
 from processing.progress import compute_progress
 from processing.post_processing import apply_post_processing
+from processing.resampling import measure_fps, resample_episode
 
 import sys
 sys.path.insert(0, "/ros2_ws/third_party/ManiFlow_Policy/ManiFlow")
@@ -46,6 +47,20 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
     # --- 1. Load raw data from cache ---
     joint_states = load_joint_states(episode_dir)
     force_raw = load_force(episode_dir)
+    num_frames = len(joint_states)
+
+    src_fps = measure_fps(episode_dir)
+
+    # --- 1c. Smoothing + downsampling BEFORE FK ---
+    rs = config.resample_config
+    joint_states, force_raw, keep_idx = resample_episode(
+        joint_states, force_raw,
+        target_fps=rs["target_fps"],
+        src_fps=src_fps,
+        state_smooth=rs.get("state_smoothing", {}),
+        force_smooth=rs.get("force_smoothing", {}),
+        enabled=rs.get("enabled", True),
+    )
     num_frames = len(joint_states)
 
     # --- 2. RGB (optional) ---

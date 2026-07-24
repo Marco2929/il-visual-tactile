@@ -30,7 +30,7 @@ def run(args):
 
     # Discover raw episodes
     all_episodes = discover_and_validate(
-        cache_dir=os.path.join(HOME_DIR, "episodes", config.cache["base_dir"]),
+        cache_dir=os.path.join(HOME_DIR, "episodes/external", config.cache["base_dir"]),
         cache_flags=config.cache_flags,
         require_success=config.episodes.get("require_success", False),
     )

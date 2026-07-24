@@ -1,6 +1,6 @@
-name: foil_lifting_baseline_cleaned_proprio_mask
+name: foil_lifting_big
 
-task_name: foil_lifting_baseline_cleaned_proprio_mask
+task_name: foil_lifting_big
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -20,13 +20,13 @@ env_runner: null
 
 dataset:
   _target_: maniflow.dataset.realdex_dataset.RealDexDataset
-  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_baseline_20.zarr
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_big.zarr
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42
   val_ratio: 0.02
-  max_train_episodes: 165
+  max_train_episodes: null
   augment: True
   augment_shift: 0.08
   # Noise augmentation (critical for preventing proprio overfitting)

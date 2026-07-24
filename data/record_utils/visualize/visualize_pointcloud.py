@@ -87,33 +87,105 @@ def load_and_visualize_point_cloud(file_path, visualize=True):
         cprint(f"Error loading point cloud: {str(e)}", "red")
         return None, None
 
+def _load_cloud(file_path):
+    """Load one file -> (o3d cloud, info string). No visualization."""
+    ext = os.path.splitext(file_path)[1]
+    if ext in ['.ply', '.pcd']:
+        pc = o3d.io.read_point_cloud(file_path)
+        points = np.asarray(pc.points)
+        colors = np.asarray(pc.colors)
+        if len(colors) == 0:
+            colors = np.zeros((len(points), 3))
+    elif ext == '.npy':
+        data = np.load(file_path)
+        if data.ndim == 2 and data.shape[1] == 6:
+            points = data[:, :3]
+            raw = data[:, 3:]
+            colors = raw / 255.0 if raw.max() > 1.0 else raw
+        else:
+            points = data
+            colors = np.zeros((len(points), 3))
+    else:
+        return None, f"Unsupported: {ext}"
+
+    pc = o3d.geometry.PointCloud()
+    pc.points = o3d.utility.Vector3dVector(points)
+    pc.colors = o3d.utility.Vector3dVector(colors)
+
+    info = (f"{os.path.basename(file_path)} | {len(points)} pts | "
+            f"x=[{points[:,0].min():.2f},{points[:,0].max():.2f}] "
+            f"y=[{points[:,1].min():.2f},{points[:,1].max():.2f}] "
+            f"z=[{points[:,2].min():.2f},{points[:,2].max():.2f}]")
+    return pc, info
+
+
 def visualize_multiple_point_clouds(directory_path, file_pattern=None):
-    """
-    Visualize all point cloud files in a directory
-    Can specify file pattern (e.g., 'cloud_*.ply')
-    """
+    """Interactive browser: step through all clouds with N / P keys."""
     import glob
     
     if file_pattern:
         files = glob.glob(os.path.join(directory_path, file_pattern))
     else:
-        # Support multiple formats
-        extensions = ['.ply', '.pcd', '.npy']
         files = []
-        for ext in extensions:
+        for ext in ['.ply', '.pcd', '.npy']:
             files.extend(glob.glob(os.path.join(directory_path, f'*{ext}')))
-    
-    files.sort()  # Sort by filename
-    
+    files.sort()
+
     if not files:
         cprint(f"No point cloud files found in {directory_path}", "red")
         return
-    
-    cprint(f"Found {len(files)} point cloud files", "green")
-    
-    for file_path in files:
-        cprint(f"\nProcessing: {os.path.basename(file_path)}", "yellow")
-        load_and_visualize_point_cloud(file_path)
+
+    cprint(f"Found {len(files)} files. Controls: N/-> next | P/<- prev | Q quit",
+           "green")
+
+    state = {"cur": 0, "cache": {}}
+
+    def get(idx):
+        if idx not in state["cache"]:
+            state["cache"][idx] = _load_cloud(files[idx])
+        return state["cache"][idx]
+
+    frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1)
+
+    def refresh(vis):
+        pc, info = get(state["cur"])
+        vis.clear_geometries()
+        vis.add_geometry(frame, reset_bounding_box=False)
+        if pc is not None:
+            vis.add_geometry(pc, reset_bounding_box=False)
+        cprint(f"[{state['cur']+1}/{len(files)}] {info}", "cyan")
+
+    def nxt(vis):
+        if state["cur"] < len(files) - 1:
+            state["cur"] += 1
+            refresh(vis)
+        return False
+
+    def prv(vis):
+        if state["cur"] > 0:
+            state["cur"] -= 1
+            refresh(vis)
+        return False
+
+    vis = o3d.visualization.VisualizerWithKeyCallback()
+    vis.create_window(window_name="Point Cloud Browser", width=1024, height=768)
+    opt = vis.get_render_option()
+    opt.background_color = np.asarray([0.1, 0.1, 0.1])
+    opt.point_size = 5.0
+
+    vis.register_key_callback(ord("N"), nxt)
+    vis.register_key_callback(ord("P"), prv)
+    vis.register_key_callback(262, nxt)   # Right arrow
+    vis.register_key_callback(263, prv)   # Left arrow
+
+    pc0, _ = get(0)
+    vis.add_geometry(frame)
+    if pc0 is not None:
+        vis.add_geometry(pc0)
+    refresh(vis)
+
+    vis.run()
+    vis.destroy_window()
 
 def main():
     parser = argparse.ArgumentParser(description='Point Cloud Visualization Tool')

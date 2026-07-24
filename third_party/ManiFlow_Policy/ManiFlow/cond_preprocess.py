@@ -104,7 +104,7 @@ class PointCloudProcessor:
             (points[:, 2] <= self.WORK_SPACE['z'][1])
         )
         filtered_points = points[mask]
-        
+
         # Farthest point sampling
         if len(filtered_points) > 0:
             filtered_points = torch.from_numpy(filtered_points).cuda()
