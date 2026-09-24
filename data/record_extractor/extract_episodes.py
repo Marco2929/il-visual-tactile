@@ -54,33 +54,22 @@ def parse_args():
     parser.add_argument('--num_points', type=int, default=4096,
                         help='Points per point cloud')
     parser.add_argument('--skip_point_clouds', action='store_true',
-                        help='Skip point cloud generation (only RGB + state)')
+                        help='Skip ALL point cloud generation (only RGB + state)')
+    parser.add_argument('--skip_wrist_pc', action='store_true', default=True,
+                        help='Skip only the WRIST point clouds (front_pc is kept). '
+                             'On by default; use --keep_wrist_pc to generate them.')
+    parser.add_argument('--keep_wrist_pc', dest='skip_wrist_pc',
+                        action='store_false',
+                        help='Generate wrist point clouds into wrist_pc/')
     parser.add_argument('--wrist_color_topic', type=str,
                         default='/cam_right/cam_right/color/image_raw')
     parser.add_argument('--wrist_depth_topic', type=str,
                         default='/cam_right/cam_right/aligned_depth_to_color/image_raw')
     parser.add_argument('--include_failed', type=bool,
                         default=False)
-    # --- CDM depth refinement ---
-    # Front (ZED): OFF by default (opt-in).
-    parser.add_argument('--use_cdm', action='store_true',
-                        help='Refine FRONT depth with a CDM before PC generation')
-    parser.add_argument('--cdm_model', type=str,
-                        default='depth-anything/camera-depth-model-zed2i-neural',
-                        help='Front CDM HF repo id or local checkpoint path')
-    # Wrist (RealSense D435): ON by default (opt-out with --no_wrist_cdm).
-    parser.add_argument('--no_wrist_cdm', action='store_true',
-                        help='Disable CDM refinement on the WRIST depth')
-    parser.add_argument('--wrist_cdm_model', type=str,
-                        default='depth-anything/camera-depth-model-d435',
-                        help='Wrist CDM HF repo id or local checkpoint path')
-    parser.add_argument('--cdm_encoder', type=str, default='vitl',
-                        help='CDM ViT encoder size (shared)')
-    parser.add_argument('--cdm_input_size', type=int, default=518,
-                        help='CDM inference resolution (shared)')
     # --- Wrist depth range cap (camera frame, meters) ---
     parser.add_argument('--wrist_max_depth', type=float, default=0.5,
-                        help='Cap wrist depth (m) before CDM + PC gen. '
+                        help='Cap wrist depth (m) before PC gen. '
                              'Points farther than this are dropped. '
                              '<=0 disables the cap.')
     return parser.parse_args()
@@ -169,7 +158,7 @@ def get_header_stamp_ns(msg, fallback_ts):
     return fallback_ts
 
 
-def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=None):
+def extract_wrist_camera(episode_dir, output_timestamps_ns, args):
     """Extract wrist RGB + point cloud from rosbag, synced to ZED timestamps."""
     if not ROSBAGS_AVAILABLE:
         cprint("  [Error] 'rosbags' not installed.", "red")
@@ -180,10 +169,14 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=No
         cprint("  [Info] No realsense_bag found, skipping wrist.", "white")
         return False
 
+    # Wrist point clouds are skipped if either the global or the wrist-only
+    # flag is set.
+    build_wrist_pc = not args.skip_point_clouds and not args.skip_wrist_pc
+
     wrist_rgb_dir = os.path.join(episode_dir, 'wrist_rgb')
     wrist_pc_dir = os.path.join(episode_dir, 'wrist_pc')
     os.makedirs(wrist_rgb_dir, exist_ok=True)
-    if not args.skip_point_clouds:
+    if build_wrist_pc:
         os.makedirs(wrist_pc_dir, exist_ok=True)
 
     typestore = get_typestore(Stores.ROS2_JAZZY)
@@ -224,7 +217,7 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=No
     color_timestamps_ns = np.array(color_timestamps_ns, dtype=np.int64)
 
     depth_timestamps_ns = np.array([], dtype=np.int64)
-    if depth_entries:
+    if depth_entries and build_wrist_pc:
         d_ts = []
         for ts, rawdata, conn in depth_entries:
             msg = typestore.deserialize_cdr(rawdata, conn.msgtype)
@@ -247,7 +240,7 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=No
         cv2.imwrite(os.path.join(wrist_rgb_dir, f"frame_{idx:04d}.png"), color_img)
 
         # Depth → Point Cloud (no depth saved)
-        if (not args.skip_point_clouds and len(depth_entries) > 0
+        if (build_wrist_pc and len(depth_entries) > 0
                 and WRIST_INTRINSICS is not None):
             closest_d_idx = np.argmin(np.abs(depth_timestamps_ns - target_ts))
             _, rawdata_d, conn_d = depth_entries[closest_d_idx]
@@ -258,21 +251,11 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=No
             _valid = np.isfinite(depth_img) & (depth_img > 0)
             _is_mm = np.any(_valid) and np.median(depth_img[_valid]) > 20.0
 
-            # Cap depth range (camera frame) BEFORE CDM + PC gen so both the
-            # refiner and the point cloud focus on the near grasp region.
+            # Cap depth range (camera frame) before PC gen so the point cloud
+            # focuses on the near grasp region.
             if args.wrist_max_depth > 0:
                 cap = args.wrist_max_depth * 1000.0 if _is_mm else args.wrist_max_depth
                 depth_img[depth_img > cap] = 0.0
-
-            # Optional CDM refinement on the wrist depth.
-            # CDM expects meters; convert, refine, convert back.
-            if cdm_refiner is not None:
-                depth_m = depth_img / 1000.0 if _is_mm else depth_img.copy()
-                depth_m = cdm_refiner.refine(color_img, depth_m)
-                # CDM may hallucinate depth on capped (zeroed) regions; re-cap.
-                if args.wrist_max_depth > 0:
-                    depth_m[depth_m > args.wrist_max_depth] = 0.0
-                depth_img = depth_m * 1000.0  # back to mm for the PC builder
 
             pc = generate_point_cloud_from_depth(
                 color_img, depth_img.astype(np.float32),
@@ -290,8 +273,7 @@ def extract_wrist_camera(episode_dir, output_timestamps_ns, args, cdm_refiner=No
 # ZED SVO Extraction (Front Camera)
 # ═══════════════════════════════════════════════════════════════
 
-def extract_episode(episode_dir, args, source_fps = 60, cdm_refiner=None,
-                    wrist_cdm_refiner=None):
+def extract_episode(episode_dir, args, source_fps = 60):
     """
     Extract single episode from SVO.
     Saves: front_rgb/, front_pc/, state.npy, force.npy.
@@ -416,10 +398,6 @@ def extract_episode(episode_dir, args, source_fps = 60, cdm_refiner=None,
                     cam.retrieve_measure(depth_mat, sl.MEASURE.DEPTH)
                     depth_data = depth_mat.get_data().copy()
 
-                    # Optional CDM depth refinement (depth_data is in METERS here)
-                    if cdm_refiner is not None:
-                        depth_data = cdm_refiner.refine(color_bgr, depth_data)
-
                     pc = generate_point_cloud_from_depth(
                         color_bgr, depth_data,
                         intrinsics=FRONT_INTRINSICS, 
@@ -481,8 +459,7 @@ def extract_episode(episode_dir, args, source_fps = 60, cdm_refiner=None,
         cprint(f"  [QA] Missed states: {dropped_state_count}/{output_idx} frames.", "yellow")
 
     # Wrist camera
-    extract_wrist_camera(episode_dir, output_timestamps_ns, args,
-                         cdm_refiner=wrist_cdm_refiner)
+    extract_wrist_camera(episode_dir, output_timestamps_ns, args)
 
     cprint(f"  [Done] {output_idx} frames.", "green")
     return True
@@ -539,8 +516,50 @@ def verify_episode(episode_dir, check_wrist=True, check_pc=True):
 
 
 def is_already_extracted(episode_dir):
-    """Check if episode was already extracted."""
+    """Check if the FRONT/state part of an episode was already extracted."""
     return verify_episode(episode_dir, check_wrist=False, check_pc=False)
+
+
+def needs_wrist_extraction(episode_dir):
+    """
+    True if this episode still needs wrist_rgb/ extracted.
+
+    Requires a realsense_bag (otherwise there is nothing to extract) and
+    frame_timestamps_ns.npy (needed to sync without reopening the SVO).
+    """
+    if not os.path.exists(os.path.join(episode_dir, 'realsense_bag')):
+        return False
+    if not os.path.exists(os.path.join(episode_dir, 'frame_timestamps_ns.npy')):
+        return False
+
+    state_path = os.path.join(episode_dir, 'state.npy')
+    if not os.path.exists(state_path):
+        return False
+    n = len(np.load(state_path))
+    if n == 0:
+        return False
+
+    wrist_rgb_dir = os.path.join(episode_dir, 'wrist_rgb')
+    if not os.path.exists(wrist_rgb_dir):
+        return True
+    return len(glob.glob(os.path.join(wrist_rgb_dir, '*.png'))) != n
+
+
+def extract_wrist_only(episode_dir, args):
+    """
+    Extract ONLY the wrist camera for an already-extracted episode.
+
+    Reuses the stored frame_timestamps_ns.npy, so the SVO is never opened and
+    the max_frames deletion path in extract_episode() is never reached.
+    Nothing is ever deleted here.
+    """
+    ts_path = os.path.join(episode_dir, 'frame_timestamps_ns.npy')
+    output_timestamps_ns = np.load(ts_path).tolist()
+
+    cprint(f"\n--- {os.path.basename(episode_dir)} (wrist only, "
+           f"{len(output_timestamps_ns)} frames) ---", "cyan")
+
+    return extract_wrist_camera(episode_dir, output_timestamps_ns, args)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -556,32 +575,6 @@ def main():
     if FRONT_INTRINSICS is None and not args.skip_point_clouds:
         cprint("[Warning] Camera intrinsics not found. Point clouds disabled.", "yellow")
         args.skip_point_clouds = True
-
-    # Optional: load CDM depth refiners (front + wrist use different models)
-    cdm_refiner = None
-    wrist_cdm_refiner = None
-    if not args.skip_point_clouds:
-        from cdm_refiner import CDMRefiner
-
-        # Front CDM: opt-in.
-        if args.use_cdm:
-            cprint(f"[CDM] Front depth refiner: {args.cdm_model}",
-                   "cyan", attrs=["bold"])
-            cdm_refiner = CDMRefiner(
-                model_spec=args.cdm_model,
-                encoder=args.cdm_encoder,
-                input_size=args.cdm_input_size,
-            )
-
-        # Wrist CDM: on by default (opt-out).
-        if not args.no_wrist_cdm and ROSBAGS_AVAILABLE:
-            cprint(f"[CDM] Wrist depth refiner: {args.wrist_cdm_model}",
-                   "cyan", attrs=["bold"])
-            wrist_cdm_refiner = CDMRefiner(
-                model_spec=args.wrist_cdm_model,
-                encoder=args.cdm_encoder,
-                input_size=args.cdm_input_size,
-            )
 
     if args.include_failed:
         episodes = sorted([
@@ -605,12 +598,23 @@ def main():
 
     success_count = 0
     deleted_count = 0
+    wrist_backfilled = 0
 
     for ep in episodes:
         episode_dir = os.path.join(args.data_dir, ep)
 
         if is_already_extracted(episode_dir):
-            cprint(f"  Skipping {ep}: already extracted.", "yellow")
+            # Front/state already done. Backfill wrist_rgb/ if it is missing,
+            # without touching (or deleting) any existing data.
+            if needs_wrist_extraction(episode_dir):
+                cprint(f"  {ep}: front OK, wrist_rgb missing → extracting wrist.",
+                       "cyan")
+                if extract_wrist_only(episode_dir, args):
+                    wrist_backfilled += 1
+                else:
+                    cprint(f"  [Warn] Wrist extraction failed for {ep}.", "yellow")
+            else:
+                cprint(f"  Skipping {ep}: already extracted.", "yellow")
             success_count += 1
             continue
 
@@ -618,14 +622,15 @@ def main():
             deleted_count += 1
             continue
 
-        if extract_episode(episode_dir, args, cdm_refiner=cdm_refiner,
-                           wrist_cdm_refiner=wrist_cdm_refiner):
+        if extract_episode(episode_dir, args):
             success_count += 1
         elif not os.path.exists(episode_dir):
             deleted_count += 1
 
     cprint(f"\n{'='*50}", "green")
     cprint(f"Done: {success_count}/{len(episodes)} extracted.", "green", attrs=['bold'])
+    if wrist_backfilled > 0:
+        cprint(f"Wrist backfilled: {wrist_backfilled} episodes.", "green")
     if deleted_count > 0:
         cprint(f"Deleted: {deleted_count} episodes (>{args.max_frames} frames).", "red")
 

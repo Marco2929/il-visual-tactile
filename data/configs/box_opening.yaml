@@ -12,7 +12,7 @@ kinematics:
 cache:
   base_dir: "box_opening_collection"
   front_rgb: true
-  wrist_rgb: false
+  wrist_rgb: true
   front_pc: true
   wrist_pc: false
 

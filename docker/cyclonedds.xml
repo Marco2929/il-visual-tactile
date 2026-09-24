@@ -10,6 +10,16 @@
             <AllowMulticast>false</AllowMulticast>
             <MaxMessageSize>65500B</MaxMessageSize>
         </General>
+        <Discovery>
+            <!-- Unicast-only discovery on 'lo' assigns every participant a
+                 numbered port slot. The default limit is 9, which is quickly
+                 exhausted here: ros2_control_node + 8 controllers +
+                 robot_state_publisher + mapper + spawners all share the same
+                 range, across ALL host-network containers (ur_artus,
+                 senseglove_*). Exceeding it fails with
+                 "Failed to find a free participant index for domain 0". -->
+            <MaxAutoParticipantIndex>60</MaxAutoParticipantIndex>
+        </Discovery>
         <Internal>
             <Watermarks>
                 <WhcHigh>500kB</WhcHigh>

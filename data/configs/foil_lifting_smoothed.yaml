@@ -1,5 +1,5 @@
 meta:
-  name: "foil_lifting_big"
+  name: "foil_lifting_big2"
   task: "Pick up the box and open it"
   fps: 20
 
@@ -32,7 +32,7 @@ cache:
 
 # ─── Episode Limits ───────────────────────────────
 episodes:
-  max_episodes: null  # null = all
+  max_episodes: 5  # null = all
   require_success: true
 
 # ─── Point Cloud Configuration ────────────────────
@@ -72,7 +72,7 @@ post_processing:
 # ─── Output ───────────────────────────────────────
 output:
   format: "both"
-  zarr_path: "foil_lifting_big.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_big"
+  zarr_path: "foil_lifting_big2.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_big2"
   compression: "zstd"
   chunk_size: 100

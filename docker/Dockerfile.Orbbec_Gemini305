@@ -1,0 +1,55 @@
+# Orbbec Gemini 305 (Gemini 301 series)
+# Wrapper: https://github.com/orbbec/OrbbecSDK_ROS2  (v2-main branch)
+# Launch file: gemini_301_series.launch.py
+# Recommended camera firmware: 1.0.70
+FROM ros:jazzy-perception
+
+ENV WS_DIR="/ros2_ws"
+WORKDIR ${WS_DIR}
+
+SHELL ["/bin/bash", "-c"]
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y \
+    build-essential \
+    cmake \
+    git-all \
+    software-properties-common \
+ && rm -rf /var/lib/apt/lists/*
+
+# OrbbecSDK_ROS2 (v2.x) from the ROS apt repo.
+# ros-jazzy-orbbec-camera >= 2.7.2 is required for the Gemini 305.
+RUN apt-get update \
+ && apt-get install -y \
+    ros-${ROS_DISTRO}-orbbec-camera \
+    ros-${ROS_DISTRO}-orbbec-camera-msgs \
+    ros-${ROS_DISTRO}-orbbec-description \
+ && rm -rf /var/lib/apt/lists/*
+
+# Runtime deps the SDK links against / uses for visualisation
+RUN apt-get update \
+ && apt-get install -y \
+    libgflags-dev \
+    nlohmann-json3-dev \
+    libgoogle-glog-dev \
+    libdw-dev \
+    libssl-dev \
+    libgl1 \
+    mesa-utils \
+    udev \
+    ros-${ROS_DISTRO}-image-transport-plugins \
+    ros-${ROS_DISTRO}-compressed-image-transport \
+    ros-${ROS_DISTRO}-rviz2 \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+ && rm -rf /var/lib/apt/lists/*
+
+# udev rules so the camera can be opened without root.
+# NOTE: these must ALSO be installed on the *host* (see notes at the bottom).
+RUN cp /opt/ros/${ROS_DISTRO}/share/orbbec_camera/udev/99-obsensor-libusb.rules \
+       /etc/udev/rules.d/99-obsensor-libusb.rules
+
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc
+
+ARG DEBIAN_FRONTEND=dialog

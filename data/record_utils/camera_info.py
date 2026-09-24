@@ -10,6 +10,13 @@ except ImportError:
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 
+# Unterverzeichnis unterhalb von data/episodes, in dem die Collections liegen.
+# Default "external" entspricht dem Docker-Bind-Mount der zweiten Festplatte
+# (/mnt/data/data -> /ros2_ws/data/episodes/external), wie ihn auch
+# dataset_builder/cli.py verwendet. Fuer lokale Collections direkt unter
+# data/episodes/ kann EPISODES_SUBDIR="" gesetzt werden.
+EPISODES_SUBDIR = os.environ.get("EPISODES_SUBDIR", "external")
+
 # Dynamische Pfadermittlung:
 # 1. Ermittelt das aktuelle Verzeichnis (data/record_utils)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,9 +25,21 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 ros2_ws_root = os.path.abspath(os.path.join(current_dir, "../.."))
 
 # 3. Setzt den korrekten absoluten Pfad zusammen
-DATA_PATH = os.path.join(ros2_ws_root, "data", "episodes", FOLDER_NAME)
+DATA_PATH = os.path.join(
+    ros2_ws_root, "data", "episodes", EPISODES_SUBDIR, FOLDER_NAME
+)
 
-with open(os.path.join(DATA_PATH, "camera_intrinsics.json")) as f:
+_INTRINSICS_PATH = os.path.join(DATA_PATH, "camera_intrinsics.json")
+
+if not os.path.exists(_INTRINSICS_PATH):
+    raise FileNotFoundError(
+        f"camera_intrinsics.json nicht gefunden unter: {_INTRINSICS_PATH}\n"
+        f"  FOLDER_NAME={FOLDER_NAME!r}  EPISODES_SUBDIR={EPISODES_SUBDIR!r}\n"
+        "Passe FOLDER_NAME (Collection-Name) bzw. EPISODES_SUBDIR an. "
+        "EPISODES_SUBDIR='' nutzt data/episodes/<FOLDER_NAME> direkt."
+    )
+
+with open(_INTRINSICS_PATH) as f:
     intr = json.load(f)
 if o3d:
     camera_intrinsics = o3d.camera.PinholeCameraIntrinsic(

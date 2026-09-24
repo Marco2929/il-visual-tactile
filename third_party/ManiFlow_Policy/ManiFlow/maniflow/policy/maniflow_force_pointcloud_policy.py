@@ -44,6 +44,8 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             language_conditioned=False,
             use_progress=False,
             force_conditioned=False,
+            wrist_conditioned=False,
+            wrist_encoder_cfg=None,
             # Force
             aux_action=False,
             aux_force=False,
@@ -66,6 +68,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         super().__init__()
 
         self.force_conditioned = force_conditioned
+        self.wrist_conditioned = wrist_conditioned
         self.aux_action = aux_action
         self.aux_force = aux_force
         self.lambda_aux_ee = lambda_aux_ee
@@ -128,6 +131,27 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             pass
 
         self.use_progress = use_progress
+
+        # ====== Wrist-RGB encoder (own token group in cross-attention) ======
+        # Follows the exact same pattern as force_cond: a separate encoder
+        # produces conditioning tokens that are appended to the DiTX context.
+        # Wrist-RGB is used for the CONTACT phase, which the front camera
+        # cannot see due to physical occlusion (arm blocks the grasp point).
+        if self.wrist_conditioned:
+            from maniflow.model.vision_2d.timm_obs_encoder import TimmObsEncoder
+            assert wrist_encoder_cfg is not None, "wrist_encoder_cfg required when wrist_conditioned=True"
+            wrist_shape_meta = {'obs': {'wrist': dict(obs_shape_meta['wrist_rgb'])}}
+            self.wrist_encoder = TimmObsEncoder(shape_meta=wrist_shape_meta, **wrist_encoder_cfg)
+            # Determine token layout: encoder returns (1, F_flat).
+            # We reshape to (B, N_tokens, wrist_dim). N_tokens = n_obs_steps
+            # for option A (1 token/frame). For option B (all_tokens) the
+            # encoder returns more tokens per frame; wrist_dim is inferred.
+            wrist_out_flat = self.wrist_encoder.output_shape()[-1]
+            self.wrist_num_tokens = n_obs_steps
+            assert wrist_out_flat % n_obs_steps == 0, (
+                f"Wrist encoder output {wrist_out_flat} not divisible by n_obs_steps={n_obs_steps}")
+            self.wrist_dim = wrist_out_flat // n_obs_steps
+            cprint(f"[Policy] Wrist-RGB enabled: {self.wrist_num_tokens} tokens x {self.wrist_dim} dim", "cyan")
 
 
         # ====== Dimensions: PC only for context, state goes into input ======
@@ -202,7 +226,9 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             block_type=block_type,
             pre_norm_modality=pre_norm_modality,
             language_conditioned=language_conditioned,
-            force_conditioned=force_conditioned
+            force_conditioned=force_conditioned,
+            wrist_conditioned=wrist_conditioned,
+            wrist_dim=self.wrist_dim if wrist_conditioned else 0,
         )
         
         self.obs_encoder = obs_encoder
@@ -308,6 +334,21 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
 
         return vis_cond, state_cond, pc_pe
         
+    def _encode_wrist(self, nobs, batch_size):
+        """Encode wrist-RGB into conditioning tokens (B, N, wrist_dim).
+
+        Mirrors the force_cond pathway: the wrist encoder produces its own
+        token group that is appended to the DiTX cross-attention context.
+        Input nobs['wrist_rgb'] has shape (B, T, H, W, C) and is NOT
+        normalized (the image encoder does /255 itself).
+        """
+        wrist_rgb = nobs['wrist_rgb'][:, :self.n_obs_steps, ...].to(self.device)
+        # TimmObsEncoder expects obs_dict keyed by the rgb key ('wrist').
+        wrist_flat = self.wrist_encoder({'wrist': wrist_rgb})  # (B, F_flat)
+        # Reshape to token layout (B, N, wrist_dim).
+        wrist_cond = wrist_flat.reshape(batch_size, self.wrist_num_tokens, self.wrist_dim)
+        return wrist_cond
+
     # ========= inference  ============
     def conditional_sample(self, 
             condition_data, 
@@ -315,6 +356,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             state_cond=None,
             lang_cond=None,
             force_cond=None,
+            wrist_cond=None,
             rtc_processor=None,
             prev_chunk_left_over=None,
             inference_delay=0,
@@ -337,6 +379,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             state_cond=state_cond,
             lang_cond=lang_cond,
             force_cond=force_cond,
+            wrist_cond=wrist_cond,
            **kwargs)
         
         return ode_traj[-1] # sample ode returns the whole traj, return the last one
@@ -397,6 +440,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         # handle different ways of passing observation
         lang_cond = None
         force_cond = None
+        wrist_cond = None
 
         if self.language_conditioned:
             # assume nobs has 'task_name' key for language condition
@@ -421,6 +465,10 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             # Das bedeutet: Wir haben jetzt 16 echte Force-Tokens!
             force_cond = force_features.permute(0, 2, 1)
 
+        # Add wrist-RGB conditioning (own token group, no spatial fusion)
+        if self.wrist_conditioned:
+            wrist_cond = self._encode_wrist(nobs, B)
+
         # empty data for action
         cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
 
@@ -437,6 +485,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             state_cond=state_cond,
             lang_cond=lang_cond,
             force_cond=force_cond,
+            wrist_cond=wrist_cond,
             pc_pe=pc_pe,
             rtc_processor=rtc_processor,
             prev_chunk_left_over=prev_chunk_norm,
@@ -519,6 +568,12 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
                 "weight_decay": weight_decay,
             })
 
+        if self.wrist_conditioned:
+            optim_groups.append({
+                "params": list(self.wrist_encoder.parameters()),
+                "weight_decay": weight_decay,
+            })
+
         if self.use_progress:
             optim_groups.append({
                 "params": list(self.progress_head.parameters()),
@@ -586,6 +641,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         state_cond = model_kwargs.get('state_cond', None)
         lang_cond = model_kwargs.get('lang_cond', None)
         force_cond = model_kwargs.get('force_cond', None)
+        wrist_cond = model_kwargs.get('wrist_cond', None)
         flow_batchsize = actions.shape[0]
         device = actions.device
         
@@ -615,6 +671,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         target_dict['vis_cond'] = vis_cond
         target_dict['lang_cond'] = lang_cond
         target_dict['force_cond'] = force_cond
+        target_dict['wrist_cond'] = wrist_cond
 
         return target_dict
     
@@ -629,6 +686,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         vis_cond = model_kwargs.get('vis_cond', None)
         state_cond = model_kwargs.get('state_cond', None)
         force_cond = model_kwargs.get('force_cond', None)
+        wrist_cond = model_kwargs.get('wrist_cond', None)
         lang_cond = model_kwargs.get('lang_cond', None)
         pc_pe = model_kwargs.get('pc_pe', None)
         ema_model = model_kwargs.get('ema_model', None)
@@ -668,6 +726,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
                 state_cond=state_cond[-consistency_batchsize:] if state_cond is not None else None, 
                 lang_cond=lang_cond[-consistency_batchsize:] if lang_cond is not None else None,
                 force_cond=force_cond[-consistency_batchsize:] if force_cond is not None else None,
+                wrist_cond=wrist_cond[-consistency_batchsize:] if wrist_cond is not None else None,
                 pc_pe=pc_pe[-consistency_batchsize:] if pc_pe is not None else None,
             ) 
         # predict the target data point using the average velocity
@@ -734,6 +793,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
 
         lang_cond = None
         force_cond = None
+        wrist_cond = None
         ema_model = ema_model
 
         if self.language_conditioned:
@@ -745,6 +805,9 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             hand_obs = hand_obs.permute(0, 2, 1)
             force_features = self.force_encoder(hand_obs)
             force_cond = force_features.permute(0, 2, 1)
+
+        if self.wrist_conditioned:
+            wrist_cond = self._encode_wrist(nobs, batch_size)
 
         # ====== Encode: PC and State separately ======
         vis_cond, state_cond, pc_pe = self._encode_obs(nobs, batch_size)
@@ -769,6 +832,8 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
         pc_pe_ct = pc_pe[flow_batchsize:flow_batchsize + consistency_batchsize] if pc_pe is not None else None
         force_cond_flow = force_cond[:flow_batchsize] if force_cond is not None else None
         force_cond_ct = force_cond[flow_batchsize:flow_batchsize + consistency_batchsize] if force_cond is not None else None
+        wrist_cond_flow = wrist_cond[:flow_batchsize] if wrist_cond is not None else None
+        wrist_cond_ct = wrist_cond[flow_batchsize:flow_batchsize + consistency_batchsize] if wrist_cond is not None else None
         lang_cond_flow = lang_cond[:flow_batchsize] if lang_cond is not None else None
         lang_cond_ct = lang_cond[flow_batchsize:flow_batchsize + consistency_batchsize] if lang_cond is not None else None
 
@@ -779,6 +844,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             state_cond=state_cond_flow,
             lang_cond=lang_cond_flow,
             force_cond=force_cond_flow,
+            wrist_cond=wrist_cond_flow,
             pc_pe=pc_pe_flow,
         )
         v_flow_pred = self.model(
@@ -788,6 +854,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             vis_cond=vis_cond_flow,
             state_cond=state_cond_flow,
             force_cond=force_cond_flow,
+            wrist_cond=wrist_cond_flow,
             lang_cond=lang_cond_flow,
             pc_pe=pc_pe_flow,
         )
@@ -800,6 +867,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             state_cond=state_cond_ct,
             lang_cond=lang_cond_ct,
             force_cond=force_cond_ct,
+            wrist_cond=wrist_cond_ct,
             pc_pe=pc_pe_ct,
             ema_model=ema_model,
         )
@@ -810,6 +878,7 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             vis_cond=vis_cond_ct,
             state_cond=state_cond_ct,
             force_cond=force_cond_ct,
+            wrist_cond=wrist_cond_ct,
             lang_cond=lang_cond_ct,
             pc_pe=pc_pe_ct,
         )
@@ -868,5 +937,9 @@ class ManiFlowTransformerPointcloudPolicy(BasePolicy):
             'v_flow_pred_magnitude': v_flow_pred_magnitude,
             'v_ct_pred_magnitude': v_ct_pred_magnitude,
         }
+
+        # LOGGING: track whether the wrist encoder is actively learning.
+        if self.wrist_conditioned and wrist_cond is not None:
+            loss_dict['wrist_cond_magnitude'] = torch.sqrt(torch.mean(wrist_cond ** 2)).item()
 
         return loss, loss_dict

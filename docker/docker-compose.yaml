@@ -24,10 +24,10 @@ services:
     working_dir: /home/ros/ros2_ws
     command: ros2 launch libsurvive_ros2 libsurvive_ros2.launch.py foxbridge:=true composable:=false extra_args:="--no-global-scene-solver"
 
-  ur_artus:
+  ros2_dev:
     build:
-      dockerfile: Dockerfile.UR_Artus
-    container_name: ur_artus
+      dockerfile: Dockerfile.ROS_Dev
+    container_name: ros2_dev
     network_mode: host
     shm_size: '16gb'
     ipc: host
@@ -230,6 +230,46 @@ services:
       enable_sync:=true
       initial_reset:=true;
       wait"
+
+  orbbec_gemini305:
+    build:
+      context: .
+      dockerfile: Dockerfile.Orbbec_Gemini305
+    container_name: orbbec_gemini305
+    network_mode: host
+    shm_size: '16gb'
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=0
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - XAUTHORITY=/tmp/.docker.xauth
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
+      - /tmp/.docker.xauth:/tmp/.docker.xauth
+    tty: true
+    stdin_open: true
+    command: >
+      bash -c "
+      ros2 launch orbbec_camera gemini_301_series.launch.py
+      camera_name:=cam_gemini
+      depth_registration:=true
+      enable_point_cloud:=true
+      enable_colored_point_cloud:=false
+      color_width:=640 color_height:=480 color_fps:=30
+      depth_width:=640 depth_height:=480 depth_fps:=30
+      enable_sync_output_accel_gyro:=false;
+      wait"
+
+# Gemini 305 helpers:
+#   list connected devices:  ros2 run orbbec_camera list_devices_node
+#   multi-cam: add a second service and pass serial_number:=<SN> + unique camera_name
 
 # 239122070304
 # ros2 launch realsense2_camera rs_launch.py

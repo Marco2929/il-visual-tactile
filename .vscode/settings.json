@@ -6,15 +6,15 @@
             "splitTerminals": [
                 {
                     "name": "Inf1",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 },
                 {
                     "name": "Inf2",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 },
                 {
                     "name": "Inf3",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; source venv/bin/activate; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; source venv/bin/activate; exec /bin/bash'"]
                 }
             ]
         },
@@ -23,7 +23,7 @@
             "splitTerminals": [
                 {
                     "name": "Run1",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 },
                 {
                     "name": "Run2",
@@ -36,11 +36,11 @@
             "splitTerminals": [
                 {
                     "name": "Work1",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 },
                 {
                     "name": "Work2",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 }
             ]
         },
@@ -49,7 +49,7 @@
             "splitTerminals": [
                 {
                     "name": "Record1",
-                    "commands": ["docker exec -it ur_artus /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
+                    "commands": ["docker exec -it ros2_dev /bin/bash -c 'source install/setup.bash; exec /bin/bash'"]
                 },
                 {
                     "name": "Record2",

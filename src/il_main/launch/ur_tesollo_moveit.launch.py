@@ -33,13 +33,12 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(
                 get_package_share_directory('dg5f_driver'),
-                'launch', # Standard ROS 2 Unterordner für Launch-Dateien
+                'launch',
                 'dg5f_right_driver.launch.py'
             )
         ),
-        # Hier werden die Parameter (delto_ip und delto_port) übergeben
         launch_arguments={
-            'delto_ip': '169.254.186.72',
+            'delto_ip': '192.168.56.102',
             'delto_port': '502',
         }.items()
     )
@@ -54,13 +53,10 @@ def generate_launch_description():
                 }.items()
     )
 
-    # tesollo_teleop = 
-
     return LaunchDescription([
     ur_control,
-    # tesollo_control,
+    tesollo_control,
     TimerAction(period=5.0, actions=[
                                      moveit, 
-                                     #tesollo_teleop
                                      ])
     ])

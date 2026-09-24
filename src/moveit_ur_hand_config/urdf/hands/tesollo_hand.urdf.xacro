@@ -10,7 +10,7 @@
     <xacro:arg name="base_type" default="default" />
     <xacro:arg name="with_mount" default="true" />
 
-    <xacro:include filename="$(find dg_description)/urdf/dg5f_macro.xacro" />
+    <xacro:include filename="$(find dg5f_description)/urdf/dg5f_macro.xacro" />
 
     <xacro:macro name="tesollo_hand_macro" params="prefix parent *origin">
 

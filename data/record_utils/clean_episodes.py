@@ -19,7 +19,7 @@ import sys
 import shutil
 import argparse
 
-FOLDER_NAME = os.environ.get("FOLDER_NAME", "foil_lifting_collection_60")
+FOLDER_NAME = os.environ.get("FOLDER_NAME", "foil_lifting_collection")
 WORKDIR = os.environ.get("WORKDIR", "/ros2_ws/data")
 
 KEEP = {"realsense_bag", "recording.svo2"}

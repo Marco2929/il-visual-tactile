@@ -25,6 +25,7 @@ class RealDexDataset(BaseDataset):
             augment=False,
             # Additional modalitites
             use_force=False,
+            use_wrist_rgb=False,
             use_progress=False,
             aux_action=False,
             aux_force=False,
@@ -55,6 +56,7 @@ class RealDexDataset(BaseDataset):
         self.aux_action = aux_action
         self.aux_force = aux_force
         self.use_force = use_force
+        self.use_wrist_rgb = use_wrist_rgb
         self.use_progress = use_progress
 
         # 1. Base keys that must always be loaded
@@ -63,6 +65,10 @@ class RealDexDataset(BaseDataset):
         # 2. Dynamically add conditioning (Inputs)
         if use_force:
             keys_to_load.append('hand_obs')
+
+        # 2b. Dynamically add wrist RGB conditioning (Inputs)
+        if use_wrist_rgb:
+            keys_to_load.append('wrist_rgb')
 
         # 3. Dynamically add progress
         if use_progress:
@@ -88,6 +94,9 @@ class RealDexDataset(BaseDataset):
 
         if use_force:
             cprint("Conditioning: hand_obs (Force/Palm Features) enabled", "cyan")
+
+        if use_wrist_rgb:
+            cprint("Conditioning: wrist_rgb (Wrist RGB camera) enabled", "cyan")
             
         if aux_action or aux_force:
             cprint(f"Auxiliary Tasks enabled: ee_pose={aux_action}, force={aux_force}", "cyan")
@@ -228,6 +237,12 @@ class RealDexDataset(BaseDataset):
         # Inject hand_obs (Force/Palm features) if they were loaded by the dataset
         if 'hand_obs' in sample:
             obs_dict['hand_obs'] = sample['hand_obs'][:].astype(np.float32)
+
+        # Inject wrist_rgb if it was loaded by the dataset.
+        # NOTE: NOT normalized here - the image encoder does /255 itself.
+        # Wrist-RGB is stored as (T, H, W, C) in the zarr.
+        if 'wrist_rgb' in sample:
+            obs_dict['wrist_rgb'] = sample['wrist_rgb'][:].astype(np.float32)
 
         data = {
             'obs': obs_dict,

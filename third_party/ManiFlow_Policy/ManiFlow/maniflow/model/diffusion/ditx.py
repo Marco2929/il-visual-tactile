@@ -63,6 +63,8 @@ class DiTX(nn.Module):
         pre_norm_modality: bool = False,
         language_conditioned: bool=False,
         force_conditioned: bool=False,
+        wrist_conditioned: bool=False,
+        wrist_dim: int = 0,
         language_model: str = "t5-small",
     ):
         super().__init__()
@@ -70,6 +72,8 @@ class DiTX(nn.Module):
         self.visual_cond_len = visual_cond_len
         self.language_conditioned = language_conditioned
         self.force_conditioned = force_conditioned
+        self.wrist_conditioned = wrist_conditioned
+        self.wrist_dim = wrist_dim
         self.pre_norm_modality = pre_norm_modality
         self.state_cond_dim = state_cond_dim
         
@@ -146,6 +150,15 @@ class DiTX(nn.Module):
             self.force_cond_emb = nn.Linear(cond_dim, n_emb)
             if self.pre_norm_modality:
                 self.force_norm = AdaptiveLayerNorm(
+                    dim=n_emb,
+                    dim_cond=n_emb,
+                )
+
+        # Wrist-RGB conditioning (own token group, projected to n_emb)
+        if self.wrist_conditioned:
+            self.wrist_cond_emb = nn.Linear(wrist_dim, n_emb)
+            if self.pre_norm_modality:
+                self.wrist_norm = AdaptiveLayerNorm(
                     dim=n_emb,
                     dim_cond=n_emb,
                 )
@@ -317,6 +330,14 @@ class DiTX(nn.Module):
                 nn.init.zeros_(self.force_norm.cond_linear.weight)
                 nn.init.constant_(self.force_norm.cond_linear.bias[:self.hidden_dim], 1.)
                 nn.init.zeros_(self.force_norm.cond_linear.bias[self.hidden_dim:])
+
+        if self.wrist_conditioned:
+            nn.init.normal_(self.wrist_cond_emb.weight, std=0.02)
+            nn.init.constant_(self.wrist_cond_emb.bias, 0)
+            if self.pre_norm_modality:
+                nn.init.zeros_(self.wrist_norm.cond_linear.weight)
+                nn.init.constant_(self.wrist_norm.cond_linear.bias[:self.hidden_dim], 1.)
+                nn.init.zeros_(self.wrist_norm.cond_linear.bias[self.hidden_dim:])
         
         if self.pre_norm_modality:
             # Initialize the adaptive layer norm for visual condition
@@ -414,6 +435,7 @@ class DiTX(nn.Module):
             state_cond: torch.Tensor = None,  # ← state via input concat
             lang_cond: Union[torch.Tensor, list, str] = None,
             force_cond: torch.Tensor = None,
+            wrist_cond: torch.Tensor = None,
             pc_pe: torch.Tensor = None,  # ← spatial PE for PC tokens
             **kwargs):
         """
@@ -495,6 +517,13 @@ class DiTX(nn.Module):
             if self.pre_norm_modality:
                 force_c = self.force_norm(force_c, time_c)
             context_c = torch.cat([context_c, force_c], dim=1)  # (B, L + L_lang + N_force, n_emb)
+
+        # 4.6 wrist-RGB condition (own token group appended to context)
+        if self.wrist_conditioned and wrist_cond is not None:
+            wrist_c = self.wrist_cond_emb(wrist_cond)  # (B, N_wrist, n_emb)
+            if self.pre_norm_modality:
+                wrist_c = self.wrist_norm(wrist_c, time_c)
+            context_c = torch.cat([context_c, wrist_c], dim=1)  # (B, ... + N_wrist, n_emb)
 
         # 5. transformer blocks
         for block in self.blocks:

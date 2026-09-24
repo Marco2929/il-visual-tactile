@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # --- 3. PYTHON PACKAGES & ROSDEP ---
 RUN python3 -m pip install --break-system-packages \
-        opencv-python-headless durationpy && \
+        opencv-python-headless durationpy rosbag open3d && \
     python3 -m pip install --break-system-packages \
         torch torchvision torchaudio \
         --extra-index-url https://download.pytorch.org/whl/cu126 && \

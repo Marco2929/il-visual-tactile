@@ -14,7 +14,7 @@ cache:
   front_rgb: true
   wrist_rgb: true
   front_pc: true
-  wrist_pc: true
+  wrist_pc: false
 
 # ─── Episode Limits ───────────────────────────────
 episodes:

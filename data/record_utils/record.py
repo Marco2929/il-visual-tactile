@@ -4,7 +4,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import JointState, Joy, Image, CameraInfo
 from std_msgs.msg import Bool
-from service_interfaces.msg import GetForceAct1
+from dg_msgs.msg import ReceivedGripperData, ReceivedFingertipSensorData
 import pyzed.sl as sl
 import numpy as np
 import json
@@ -17,30 +17,44 @@ import time
 
 FOLDER_NAME = os.environ.get("FOLDER_NAME", "test_collection")
 
-REALSENSE_COLOR_TOPIC = "/cam_right/cam_right/color/image_raw"
-REALSENSE_DEPTH_TOPIC = "/cam_right/cam_right/aligned_depth_to_color/image_raw"
-
-JOINT_NAMES = [
-    'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
-    'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint',
-    'right_inspire_right_thumb_1_joint', 'right_inspire_right_thumb_2_joint',
-    'right_inspire_right_index_1_joint', 'right_inspire_right_middle_1_joint',
-    'right_inspire_right_ring_1_joint', 'right_inspire_right_little_1_joint'
-]
-
-ARM_JOINTS = {
-    'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
-    'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
+# --- Wrist camera configuration -------------------------------------------
+# The wrist camera is interchangeable: Intel RealSense D435i or Orbbec Gemini 305.
+# Select with WRIST_CAMERA=realsense|orbbec|auto (default: auto).
+#
+# Note on depth: RealSense publishes a separate aligned topic, while the Orbbec
+# wrapper aligns in-place on /depth/image_raw when launched with
+# depth_registration:=true. Both therefore yield depth registered to color.
+WRIST_CAMERA_PRESETS = {
+    "realsense": {
+        "color": "/cam_right/cam_right/color/image_raw",
+        "depth": "/cam_right/cam_right/aligned_depth_to_color/image_raw",
+        "info":  "/cam_right/cam_right/color/camera_info",
+    },
+    "orbbec": {
+        "color": "/cam_gemini/color/image_raw",
+        "depth": "/cam_gemini/depth/image_raw",
+        "info":  "/cam_gemini/color/camera_info",
+    },
 }
 
-FORCE_NAMES = [
-    'right_inspire_right_little_1_joint',
-    'right_inspire_right_ring_1_joint',
-    'right_inspire_right_middle_1_joint',
-    'right_inspire_right_index_1_joint',
-    'right_inspire_right_thumb_2_joint',
-    'right_inspire_right_thumb_1_joint'
+WRIST_CAMERA = os.environ.get("WRIST_CAMERA", "auto").lower()
+
+# Directory name inside each episode holding the wrist camera bag.
+# Kept as "realsense_bag" by default for compatibility with the existing
+# extractors (record_extractor/extract_episodes.py, clean_episodes.py).
+WRIST_BAG_NAME = os.environ.get("WRIST_BAG_NAME", "realsense_bag")
+
+# --- Robot configuration ---------------------------------------------------
+# UR arm joints come from /joint_states. The Tesollo DG-5F hand publishes its
+# own topics (raw joints + fingertip F/T), so it is NOT part of JointState.
+UR_JOINT_NAMES = [
+    'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
+    'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint',
 ]
+
+# Tesollo DG-5F: 20 joint values (degrees) and 5x6 fingertip force/torque.
+HAND_NUM_JOINTS = 20
+HAND_NUM_FT = 30
 
 TRACKER_BUTTON_INDEX = 3
 CONFIRMATION_TIMEOUT_SEC = 2.0
@@ -71,9 +85,13 @@ class SVORecorder(Node):
         self.pending_episode_idx = None
         self.confirmation_timer = None
 
-        self.latest_joint_state = {name: None for name in JOINT_NAMES}
-        self.latest_force_values = {name: 0 for name in FORCE_NAMES}
+        # UR arm state
+        self.latest_arm_state = {name: None for name in UR_JOINT_NAMES}
         self.arm_ready = False
+
+        # Tesollo hand state (raw, as published by the driver)
+        self.latest_hand_joints = None   # (20,) float32, degrees
+        self.latest_hand_ft = None       # (30,) float32, tip-local F/T
 
         self.pending_states_queue = []
         self.pending_lock = threading.Lock()
@@ -81,8 +99,8 @@ class SVORecorder(Node):
         self.prev_button_state = 0
         self.bag_process = None
 
-        # --- RealSense heartbeat ---
-        self._rs_last_seen = 0.0
+        # --- Wrist camera heartbeat ---
+        self._wrist_last_seen = 0.0
 
         # --- TELEOP PUBLISHER ---
         self.teleop_pub = self.create_publisher(Bool, '/teleop_enable', 10)
@@ -96,26 +114,36 @@ class SVORecorder(Node):
         )
         self.create_subscription(JointState, "/joint_states", self._joint_cb, qos_joints)
 
-        qos_force = QoSProfile(
-            depth=10, reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST
+        self.create_subscription(
+            ReceivedGripperData, '/tesollo/gripper_data',
+            self._gripper_cb, 10
         )
-        self.create_subscription(GetForceAct1, "force_data", self._force_cb, qos_force)
+        self.create_subscription(
+            ReceivedFingertipSensorData, '/tesollo/fingertip_sensor',
+            self._sensor_cb, 10
+        )
 
         qos_joy = QoSProfile(
             depth=10, reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST
         )
         self.create_subscription(Joy, "libsurvive/joy", self._joy_cb, qos_joy)
 
-        # --- RealSense heartbeat subscription ---
+        # --- Wrist camera subscriptions ---
+        self.wrist_model, self.wrist_topics = self._resolve_wrist_camera()
+        self.get_logger().info(
+            f"Wrist camera: {self.wrist_model} "
+            f"(color={self.wrist_topics['color']}, depth={self.wrist_topics['depth']})"
+        )
+
         qos_rs = QoSProfile(
             depth=1, reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST
         )
-        self.create_subscription(Image, REALSENSE_COLOR_TOPIC, self._rs_heartbeat, qos_rs)
-        self._rs_intrinsics_saved = False
+        self.create_subscription(Image, self.wrist_topics["color"], self._wrist_heartbeat, qos_rs)
+        self._wrist_intrinsics_saved = False
         self.create_subscription(
             CameraInfo,
-            "/cam_right/cam_right/color/camera_info",
-            self._rs_camera_info_cb,
+            self.wrist_topics["info"],
+            self._wrist_camera_info_cb,
             qos_rs
         )
 
@@ -148,24 +176,81 @@ class SVORecorder(Node):
         with open(os.path.join(self.root_dir, "camera_intrinsics.json"), 'w') as f:
             json.dump(intrinsics, f, indent=2)
 
-    # --- RealSense Health ---
-    def _rs_heartbeat(self, msg):
-        self._rs_last_seen = time.time()
+    # --- Wrist camera discovery & health ---
+    def _resolve_wrist_camera(self):
+        """Pick the wrist camera topics, either from WRIST_CAMERA or by probing the graph.
 
-    def _is_realsense_live(self) -> bool:
-        return (time.time() - self._rs_last_seen) < 2.0
+        Explicit presets are trusted immediately. In "auto" mode we wait briefly for
+        ROS graph discovery (subscribing before discovery completes yields no data)
+        and select the preset whose color topic is actually advertised.
+        """
+        if WRIST_CAMERA in WRIST_CAMERA_PRESETS:
+            topics = dict(WRIST_CAMERA_PRESETS[WRIST_CAMERA])
+            model = WRIST_CAMERA
+        else:
+            if WRIST_CAMERA != "auto":
+                self.get_logger().warn(
+                    f"Unknown WRIST_CAMERA='{WRIST_CAMERA}', falling back to auto-detection."
+                )
+            model, topics = self._probe_wrist_camera()
+
+        # Per-topic overrides always win, so odd namespaces stay usable.
+        for key, env in (("color", "WRIST_COLOR_TOPIC"),
+                         ("depth", "WRIST_DEPTH_TOPIC"),
+                         ("info", "WRIST_INFO_TOPIC")):
+            override = os.environ.get(env)
+            if override:
+                topics[key] = override
+                model = f"{model}+override"
+        return model, topics
+
+    def _probe_wrist_camera(self, timeout_sec: float = 5.0):
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            advertised = {name for name, _ in self.get_topic_names_and_types()}
+            for model, topics in WRIST_CAMERA_PRESETS.items():
+                if topics["color"] in advertised:
+                    return model, dict(topics)
+            time.sleep(0.25)
+
+        fallback = "realsense"
+        self.get_logger().warn(
+            f"No wrist camera detected within {timeout_sec:.0f}s; "
+            f"assuming '{fallback}'. Set WRIST_CAMERA to override."
+        )
+        return fallback, dict(WRIST_CAMERA_PRESETS[fallback])
+
+    def _wrist_heartbeat(self, msg):
+        self._wrist_last_seen = time.time()
+
+    def _is_wrist_camera_live(self) -> bool:
+        return (time.time() - self._wrist_last_seen) < 2.0
 
     # --- Bag Recording Helpers ---
     def _start_bag_recording(self, episode_dir):
-        bag_path = os.path.join(episode_dir, "realsense_bag")
+        bag_path = os.path.join(episode_dir, WRIST_BAG_NAME)
         yaml_path = os.path.join(episode_dir, "qos_overrides.yaml")
+        color_topic = self.wrist_topics["color"]
+        depth_topic = self.wrist_topics["depth"]
+
         with open(yaml_path, 'w') as f:
-            for t in [REALSENSE_COLOR_TOPIC, REALSENSE_DEPTH_TOPIC]:
+            for t in [color_topic, depth_topic]:
                 f.write(f"{t}:\n  reliability: best_effort\n  history: keep_last\n  depth: 10\n")
         
+        # Record the topic layout so extraction does not have to guess which
+        # camera produced this episode.
+        with open(os.path.join(episode_dir, "wrist_camera_topics.json"), 'w') as f:
+            json.dump({
+                "model": self.wrist_model,
+                "bag": WRIST_BAG_NAME,
+                "color_topic": color_topic,
+                "depth_topic": depth_topic,
+                "info_topic": self.wrist_topics["info"],
+            }, f, indent=2)
+
         cmd = [
         "ros2", "bag", "record",
-        REALSENSE_COLOR_TOPIC, REALSENSE_DEPTH_TOPIC,
+        color_topic, depth_topic,
         "-o", bag_path,
         "--qos-profile-overrides-path", yaml_path,
         "--compression-mode", "message",
@@ -196,8 +281,11 @@ class SVORecorder(Node):
             if self.state == State.IDLE:
                 if not self.arm_ready:
                     self.get_logger().warn("Arm joints not ready!")
-                elif not self._is_realsense_live():
-                    self.get_logger().error("❌ RealSense not publishing! Start camera first.")
+                elif not self._is_wrist_camera_live():
+                    self.get_logger().error(
+                        f"❌ Wrist camera ({self.wrist_model}) not publishing on "
+                        f"{self.wrist_topics['color']}! Start camera first."
+                    )
                 else:
                     self.state = State.SETUP
                     self.teleop_pub.publish(Bool(data=True))
@@ -280,17 +368,21 @@ class SVORecorder(Node):
         self.state = State.IDLE
 
     # --- Sensor Callbacks ---
-    def _force_cb(self, msg: GetForceAct1):
-        for name, force in zip(msg.finger_names, msg.force_values):
-            if name in self.latest_force_values:
-                self.latest_force_values[name] = force
+    def _gripper_cb(self, msg: ReceivedGripperData):
+        """Tesollo hand joint positions (20 DoF, degrees)."""
+        self.latest_hand_joints = np.array(msg.joint, dtype=np.float32)
 
-    def _rs_camera_info_cb(self, msg: CameraInfo):
-        """Save RealSense intrinsics once."""
-        if self._rs_intrinsics_saved:
+    def _sensor_cb(self, msg: ReceivedFingertipSensorData):
+        """Tesollo fingertip F/T sensor (5x6 = 30 values)."""
+        self.latest_hand_ft = np.array(msg.force_torque, dtype=np.float32)
+
+    def _wrist_camera_info_cb(self, msg: CameraInfo):
+        """Save wrist camera intrinsics once."""
+        if self._wrist_intrinsics_saved:
             return
 
         intrinsics = {
+            "camera_model": self.wrist_model,
             "width": msg.width,
             "height": msg.height,
             "fx": msg.k[0],
@@ -305,30 +397,44 @@ class SVORecorder(Node):
         with open(path, 'w') as f:
             json.dump(intrinsics, f, indent=2)
 
-        self._rs_intrinsics_saved = True
-        self.get_logger().info(f"Wrist camera (RealSense) intrinsics saved: {path}")
+        self._wrist_intrinsics_saved = True
+        self.get_logger().info(f"Wrist camera ({self.wrist_model}) intrinsics saved: {path}")
 
     def _joint_cb(self, msg):
+        """UR arm joint states; drives the recording tick."""
         for name, pos in zip(msg.name, msg.position):
-            if name in self.latest_joint_state:
-                self.latest_joint_state[name] = pos
+            if name in self.latest_arm_state:
+                self.latest_arm_state[name] = pos
 
-        if not self.arm_ready and all(self.latest_joint_state[n] is not None for n in ARM_JOINTS):
+        if not self.arm_ready and all(self.latest_arm_state[n] is not None for n in UR_JOINT_NAMES):
             self.arm_ready = True
             self.get_logger().info("Arm joints ready.")
 
         if self.state == State.RECORDING and self.arm_ready:
             ros_ts_ns = msg.header.stamp.sec * 10**9 + msg.header.stamp.nanosec
-            positions = [self.latest_joint_state[n] if self.latest_joint_state[n] is not None else 0.0 for n in JOINT_NAMES]
-            forces = [self.latest_force_values[n] for n in FORCE_NAMES]
+
+            arm_positions = [
+                self.latest_arm_state[n] if self.latest_arm_state[n] is not None else 0.0
+                for n in UR_JOINT_NAMES
+            ]
+
+            # Schema must match extract_svo_force.py (SVO key "robot_state").
+            state_entry = {
+                "timestamp_ns": ros_ts_ns,
+                "arm_joints": {
+                    "names": UR_JOINT_NAMES,
+                    "positions": arm_positions,
+                },
+                "hand_joints": (self.latest_hand_joints.tolist()
+                                if self.latest_hand_joints is not None
+                                else [0.0] * HAND_NUM_JOINTS),
+                "hand_ft": (self.latest_hand_ft.tolist()
+                            if self.latest_hand_ft is not None
+                            else [0.0] * HAND_NUM_FT),
+            }
+
             with self.pending_lock:
-                self.pending_states_queue.append({
-                    "timestamp_ns": ros_ts_ns,
-                    "names": JOINT_NAMES,
-                    "positions": positions,
-                    "force_names": FORCE_NAMES,
-                    "force_values": forces
-                })
+                self.pending_states_queue.append(state_entry)
 
     def _grab_loop(self):
         runtime = sl.RuntimeParameters(confidence_threshold=100, remove_saturated_areas=True, texture_confidence_threshold=100)
@@ -343,7 +449,7 @@ class SVORecorder(Node):
 
                     if queued_states:
                         data = sl.SVOData()
-                        data.key = "joint_states"
+                        data.key = "robot_state"
                         data.set_string_content(json.dumps(queued_states))
                         data.timestamp_ns = self.cam.get_timestamp(sl.TIME_REFERENCE.IMAGE)
                         self.cam.ingest_data_into_svo(data)
