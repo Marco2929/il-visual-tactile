@@ -99,7 +99,24 @@ def build_launch_command(product_key: str, product: dict, args: argparse.Namespa
         if hasattr(args, "delto_port") and args.delto_port is not None:
             extra.append(f"delto_port:={args.delto_port}")
 
-    return cmd + (" " + " ".join(extra) if extra else "")
+    cmd = cmd + (" " + " ".join(extra) if extra else "")
+
+    # MoveIt's planning scene monitor only subscribes to /joint_states, but the
+    # hand publishes on /dg5f_<hand>/joint_states. ur_tesollo_moveit.launch.py no
+    # longer starts tesollo_control (it would contend for Modbus 502 with this
+    # container), so without this relay move_group and servo_node warn forever:
+    #   "The complete state of the robot is not yet known. Missing rj_dg_1_1..."
+    # The monitor merges publishers by joint name, so the UR's 6 joints and the
+    # hand's 20 coexist. Needs ros-jazzy-topic-tools (in Dockerfile.cyclone).
+    if product_key == "tesollo" and not getattr(args, "no_joint_state_relay", False):
+        hand_val = getattr(args, "hand", None) or "right"
+        src_topic = f"/dg5f_{hand_val}/joint_states"
+        relay = f"ros2 run topic_tools relay {src_topic} /joint_states"
+        # Backgrounded; the launch is exec'd so it stays PID 1 and keeps owning
+        # shutdown. The relay is reaped with the container.
+        cmd = f"{relay} & exec {cmd}"
+
+    return cmd
 
 
 def allow_display_access() -> None:
@@ -233,6 +250,17 @@ if __name__ == "__main__":
         default=None,
         metavar="PORT",
         help="Modbus TCP port of the Tesollo hand (default: 502).",
+    )
+    tesollo_group.add_argument(
+        "--no-joint-state-relay",
+        dest="no_joint_state_relay",
+        action="store_true",
+        help=(
+            "Do not relay /dg5f_<hand>/joint_states onto /joint_states. "
+            "The relay is what lets MoveIt see the rj_dg_* joints; disable it "
+            "only if something else already publishes them (e.g. you re-enabled "
+            "tesollo_control in ur_tesollo_moveit.launch.py)."
+        ),
     )
 
     args = parser.parse_args()

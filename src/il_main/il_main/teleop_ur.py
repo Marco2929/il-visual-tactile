@@ -21,7 +21,7 @@ class ViveFollowNode(Node):
         self.target_frame = 'LHB-12898A07' 
         self.source_frame = 'LHR-9F6576C3'
         self.robot_base_frame = 'base_link'
-        self.robot_tip_frame = os.environ.get("ROBOT_TIP_FRAME", "right_inspire_base_link")     
+        self.robot_tip_frame = os.environ.get("ROBOT_TIP_FRAME", "tool0")     
         self.scale_pos = 1.0
 
         self.deadband = 0.00001
@@ -41,9 +41,9 @@ class ViveFollowNode(Node):
             ])
         elif self.hand == 'normal':
             self.R_fix = np.array([
-                [ 0,  -1,  0,  0], 
-                [ 0,  0,  1,  0], 
-                [-1,  0,  0,  0],  
+                [ 0,  1,  0,  0],   # tool X = +tracker Y
+                [ 0,  0, -1,  0],   # tool Y = -tracker Z
+                [-1,  0,  0,  0],   # tool Z = -tracker X
                 [ 0,  0,  0,  1]
             ])
         else:
@@ -64,6 +64,16 @@ class ViveFollowNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=True)
         
         self.pub = self.create_publisher(TwistStamped, '/servo_node/delta_twist_cmds', 10)
+
+        # The COMMANDED tool0 pose in base_link, i.e. where the operator asked
+        # the arm to be, before servo scaling / singularity damping / the
+        # arm's own tracking lag. This is the teleop twin of /target_frame in
+        # control_ur_tesollo_cartesian.py, and it is what record.py stores as
+        # the arm action. Published on its own topic rather than scraped from
+        # /debug/mapped_robot_delta_moved so the recorder does not depend on a
+        # debug channel that may be renamed or silenced.
+        self.pub_cmd_pose = self.create_publisher(
+            PoseStamped, '/teleop/target_pose', 10)
         
         # --- COMMAND SUBSCRIBER ---
         self.sub_enable = self.create_subscription(Bool, '/teleop_enable', self.enable_cb, 10)
@@ -179,6 +189,11 @@ class ViveFollowNode(Node):
         T_target = self.T_robot_ref @ T_delta_ros
         self.publish_debug_pose(self.pub_dbg_ref, self.T_robot_ref, self.robot_base_frame)
         self.publish_debug_pose(self.pub_dbg_moved, T_target, self.robot_base_frame)
+
+        # Published BEFORE the twist is computed: the recorder must see the
+        # commanded pose even on the ticks where TF for the current pose is
+        # momentarily unavailable and the twist below is skipped.
+        self.publish_debug_pose(self.pub_cmd_pose, T_target, self.robot_base_frame)
 
         T_curr, _, _ = self.get_matrix(self.robot_base_frame, self.robot_tip_frame)
         if T_curr is None: return

@@ -55,7 +55,7 @@ def generate_launch_description():
 
     return LaunchDescription([
     ur_control,
-    tesollo_control,
+    # tesollo_control,
     TimerAction(period=5.0, actions=[
                                      moveit, 
                                      ])
