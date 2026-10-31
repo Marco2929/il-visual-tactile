@@ -1,0 +1,51 @@
+name: abl_abs_wrist_pc
+
+task_name: abl_abs_wrist_pc
+
+# ABLATION B (absolute poses): wrist_rgb + point_cloud.
+#
+# This is the CURRENT BASELINE, reproduced under an ablation name so all three
+# conditions are launched the same way. Equivalent to foil_lifting_wrist.yaml.
+#
+# Token budget note: with pointwise=true and visual_cond_len=1024 the point
+# cloud contributes n_obs_steps * 1024 = 2048 context tokens against 384 for
+# the wrist (5.3:1). Condition C is far more balanced (384 vs 480), so B-vs-C
+# partly measures TOKEN BUDGET and not only modality. abl_abs_wrist_pc_small
+# controls for that.
+
+shape_meta: &shape_meta
+  obs:
+    point_cloud:
+      # (N, 1024, 6) = xyz + rgb; use_pc_color=true consumes all 6.
+      shape: [1024, 6]
+      type: point_cloud
+      horizon: 2
+    wrist_rgb:
+      shape: [3, 192, 256]
+      type: rgb
+      horizon: 2
+    agent_pos:
+      shape: [15]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [15]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.08
+  max_train_episodes: null
+  use_wrist_rgb: True
+  use_front_rgb: False
+  wrist_obs_steps: ${n_obs_steps}
+  front_obs_steps: ${n_obs_steps}
+  use_noise_augmentation: True
+  pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.005

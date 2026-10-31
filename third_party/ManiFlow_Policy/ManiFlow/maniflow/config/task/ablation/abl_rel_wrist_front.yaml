@@ -1,0 +1,57 @@
+name: abl_rel_wrist_front
+
+task_name: abl_rel_wrist_front
+
+# ABLATION C (RELATIVE poses): wrist_rgb + front_rgb, NO point cloud.
+#
+# Relative counterpart of abl_abs_wrist_front.yaml.
+#
+# Token groups (n_obs_steps=2), SORTED key order - front_rgb < wrist_rgb:
+#   front_rgb -> 480, wrist_rgb -> 384, total 864.
+#
+# This is arguably the most interesting cell of the matrix: relative actions
+# remove the proprioceptive shortcut STRUCTURALLY (the target is a delta from
+# the chunk's base frame, so absolute pose no longer predicts it), which means
+# the policy must read grasp location out of the images. Two dense 2D views
+# with no point cloud is the strongest form of that test.
+
+shape_meta: &shape_meta
+  obs:
+    wrist_rgb:
+      shape: [3, 192, 256]
+      type: rgb
+      horizon: 2
+    front_rgb:
+      shape: [3, 192, 320]
+      type: rgb
+      horizon: 2
+    agent_pos:
+      shape: [17]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [17]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.relative_dataset.RelativeRealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.08
+  max_train_episodes: null
+  use_wrist_rgb: True
+  use_front_rgb: True
+  wrist_obs_steps: ${n_obs_steps}
+  front_obs_steps: ${n_obs_steps}
+
+  n_obs_steps: ${n_obs_steps}
+  assert_invariants: True
+  normalizer_samples: 2000
+
+  use_noise_augmentation: True
+  pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.002

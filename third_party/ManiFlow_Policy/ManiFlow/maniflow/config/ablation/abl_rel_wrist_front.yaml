@@ -1,0 +1,41 @@
+# @package _global_
+#
+# NOTE: the @package directive MUST be the first line (see abl_abs_wrist.yaml).
+#
+# ABLATION C (RELATIVE): wrist_rgb + front_rgb, NO point cloud.
+#
+# Token groups (n_obs_steps=2), SORTED key order - front_rgb < wrist_rgb:
+#   front_rgb -> 480, wrist_rgb -> 384, total 864.
+#
+# Arguably the most interesting cell of the matrix: relative actions remove
+# the proprioceptive shortcut STRUCTURALLY (the target is a delta from the
+# chunk's base frame, so absolute pose no longer predicts it), which means the
+# policy must read grasp location out of the images. Two dense 2D views with
+# no point cloud is the strongest form of that test.
+#
+# Launch:
+#   bash scripts/train_policy.sh ablation/abl_rel_wrist_front ablation/abl_rel_wrist_front 0C02 0 0
+defaults:
+  - /maniflow_multimodal_policy
+  - override /task: ablation/abl_rel_wrist_front
+  - _self_
+
+policy:
+  pc_conditioned: false
+  # Sorted; cam_emb row order is baked into the checkpoint.
+  rgb_keys: ['front_rgb', 'wrist_rgb']
+  # See abl_rel_wrist.yaml for why every relative condition uses 0.0.
+  proprio_dropout_prob: 0.0
+
+  wrist_encoder_cfg:
+    share_rgb_model: false
+
+dataloader:
+  batch_size: 96
+
+logging:
+  group: ablation_modality_rel
+  tags:
+    - ablation
+    - relative
+    - wrist_front

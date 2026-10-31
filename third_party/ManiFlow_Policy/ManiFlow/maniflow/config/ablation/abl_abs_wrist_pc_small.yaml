@@ -1,0 +1,59 @@
+# @package _global_
+#
+# NOTE: the @package directive MUST be the first line (see abl_abs_wrist.yaml).
+#
+# ABLATION B-small (absolute): wrist_rgb + point_cloud at a REDUCED token
+# budget. This is a CONTROL, not a fourth modality condition.
+#
+# Why it exists: at the default visual_cond_len=1024 with pointwise=true the
+# point cloud contributes n_obs_steps * 1024 = 2048 context tokens, against
+# 384 for the wrist (5.3:1) and 864 total for condition C. So a B-beats-C
+# result is confounded - it could be 3D geometry, or it could be 2.8x more
+# context tokens. This run holds the modality fixed and cuts the budget:
+#
+#   B        2048 PC + 384 wrist = 2432
+#   B-small   512 PC + 384 wrist =  896   (~ C's 864)
+#   C         864 RGB            =  864
+#
+# Read it as:
+#   B vs B-small  -> does the PC token budget buy anything?
+#   B-small vs C  -> PC vs second camera at MATCHED token count.
+#
+# Upstream ManiFlow uses visual_cond_len: 64 for its point-cloud configs (see
+# ManiFlow_Policy_Base/.../maniflow_pointcloud_policy_dex.yaml), so 256 is
+# still generous by reference standards.
+#
+# WARNING: lowering num_points activates a code path that has NEVER executed
+# in this repo. DP3Encoder only runs FPS when points.shape[1] > num_points,
+# and the zarr holds exactly 1024 points, so downsample_points has so far
+# been a no-op. With 256 it will actually call fps_torch. Verify the sampled
+# cloud looks sane before trusting these numbers.
+#
+# Reuses the condition-B task config: only the token budget differs.
+#
+# Launch:
+#   bash scripts/train_policy.sh ablation/abl_abs_wrist_pc_small ablation/abl_abs_wrist_pc_small 0B01s 0 0
+defaults:
+  - /maniflow_multimodal_policy
+  - override /task: ablation/abl_abs_wrist_pc
+  - _self_
+
+policy:
+  pc_conditioned: true
+  rgb_keys: ['wrist_rgb']
+  proprio_dropout_prob: 0.8
+  # Drives both the DiTX positional-embedding length and, via the
+  # interpolation below, the FPS target. 256 * n_obs_steps(2) = 512 PC tokens.
+  visual_cond_len: 256
+  pointcloud_encoder_cfg:
+    # num_points references visual_cond_len in the parent config, so it stays
+    # in sync automatically; restated here only to make the intent explicit.
+    num_points: ${policy.visual_cond_len}
+
+logging:
+  group: ablation_modality_abs
+  tags:
+    - ablation
+    - absolute
+    - wrist_pc
+    - token_budget_control

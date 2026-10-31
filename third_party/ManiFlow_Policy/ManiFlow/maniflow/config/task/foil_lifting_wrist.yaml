@@ -1,0 +1,77 @@
+name: foil_lifting_wrist
+
+task_name: foil_lifting_wrist
+
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim, point_cloud
+  obs:
+    point_cloud:
+      # zarr stores (N, 1024, 6) = xyz + rgb. With use_pc_color=false the
+      # policy slices [..., :3], but shape_meta must match what is STORED so
+      # DP3Encoder infers the right number of points. Tracks
+      # point_cloud.final_num_points in data/configs/foil_lifting_wrist.yaml.
+      shape: [1024, 6]
+      type: point_cloud
+      horizon: 2
+    # CHW for both cameras. DINOv3ObsEncoder validates each key separately,
+    # so the two resolutions need not match.
+    wrist_rgb:
+      # 192x256 keeps the native 4:3 FOV; /16 -> 12x16 = 192 patch tokens.
+      shape: [3, 192, 256]
+      type: rgb
+      horizon: 2
+    front_rgb:
+      # 192x320 is 16:9 like the half-HD720 source (640x360), so nothing is
+      # cropped or distorted; /16 -> 12x20 = 240 patch tokens.
+      shape: [3, 192, 320]
+      type: rgb
+      horizon: 2
+    agent_pos:
+      # 7 (ee_pose: xyz + quat xyzw) + 8 (pinch hand: rj_dg_1_1..1_4,
+      # rj_dg_2_1..2_4). The full Tesollo hand would be 7 + 20 = 27; with
+      # proprioception.hand.pinch: true in the builder config, fingers 3-5
+      # are dropped.
+      shape: [15]
+      type: low_dim
+      horizon: 2
+  action:
+    # Actions are next_state of the SAME ee_pose + hand_state, so action_dim
+    # tracks agent_pos by construction (see processing/actions.py).
+    shape: [15]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  # Built by data/configs/foil_lifting_wrist.yaml. Not checkpoint-compatible
+  # with the earlier foil_lifting_wrist_3.zarr: that one carries the full
+  # 20-DoF hand (state/action 27) and 4096-point clouds.
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  # 259 episodes (bottom 108 + middle 49 + top_left 50 + top_right 52, after
+  # removing the aborted short recordings). 0.02 would leave 5 validation
+  # episodes, which is too few to read a val curve: a single hard episode
+  # moves it by 20%. 0.08 gives ~20 val / ~239 train.
+  val_ratio: 0.08
+  # Upper bound passed to downsample_mask; null = keep every training episode.
+  # The old value of 490 came from the 497-episode foil_lifting_collection
+  # and was silently inert here (490 > 259), which made it look like a cap
+  # was in force when none was.
+  max_train_episodes: null
+  # Controls what the dataset reads out of the zarr; policy.rgb_keys controls
+  # what the encoder consumes. Keep the two in sync - front_rgb stays in
+  # shape_meta above (it documents what the zarr holds) but is not loaded,
+  # so the baseline does not pay for decoding 2x192x320x3 per sample and
+  # shipping it through the workers only to drop it.
+  use_wrist_rgb: True
+  use_front_rgb: False
+  # Drop the unused tail of each image sequence in the worker, not on the GPU.
+  wrist_obs_steps: ${n_obs_steps}
+  front_obs_steps: ${n_obs_steps}
+  # Noise augmentation (critical for preventing proprio overfitting)
+  use_noise_augmentation: True
+  pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.005  # 5mm — must be comparable to PC noise!

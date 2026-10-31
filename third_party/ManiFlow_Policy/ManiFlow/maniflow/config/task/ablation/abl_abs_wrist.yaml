@@ -1,0 +1,60 @@
+name: abl_abs_wrist
+
+task_name: abl_abs_wrist
+
+# ABLATION A (absolute poses): wrist_rgb ONLY.
+#
+# Condition A of the visual-modality ablation:
+#   A  wrist_rgb only          <- this file
+#   B  wrist_rgb + point_cloud (abl_abs_wrist_pc.yaml)
+#   C  wrist_rgb + front_rgb   (abl_abs_wrist_front.yaml)
+#
+# Pair with policy config abl_abs_wrist.yaml (pc_conditioned: false).
+#
+# shape_meta deliberately OMITS point_cloud: with pc_conditioned=false the
+# policy builds a StateEncoder instead of DP3Encoder, and the presence of the
+# key would be misleading (it would not be read). The dataset still loads
+# 'state'/'action' plus the RGB streams listed below.
+#
+# Derived from foil_lifting_wrist.yaml; everything not related to the
+# modality under test is held fixed across A/B/C.
+
+shape_meta: &shape_meta
+  obs:
+    wrist_rgb:
+      # 192x256 keeps the native 4:3 FOV; /16 -> 12x16 = 192 patch tokens.
+      shape: [3, 192, 256]
+      type: rgb
+      horizon: 2
+    agent_pos:
+      # 7 (ee_pose: xyz + quat xyzw) + 8 (pinch hand) = 15.
+      shape: [15]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [15]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  # Identical seed + val_ratio across all conditions so the train/val episode
+  # split is byte-identical. get_val_mask is seed-driven, so any change here
+  # would make the conditions incomparable.
+  seed: 42
+  val_ratio: 0.08
+  max_train_episodes: null
+  use_wrist_rgb: True
+  use_front_rgb: False
+  wrist_obs_steps: ${n_obs_steps}
+  front_obs_steps: ${n_obs_steps}
+  use_noise_augmentation: True
+  # Kept even though no point cloud is consumed: the dataset still loads the
+  # 'point_cloud' array (it is a base key in RealDexDataset) and applies
+  # noise to it. Harmless, and leaving it avoids a spurious config diff.
+  pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.005

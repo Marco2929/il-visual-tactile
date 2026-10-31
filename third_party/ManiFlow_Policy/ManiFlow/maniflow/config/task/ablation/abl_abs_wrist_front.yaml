@@ -1,0 +1,62 @@
+name: abl_abs_wrist_front
+
+task_name: abl_abs_wrist_front
+
+# ABLATION C (absolute poses): wrist_rgb + front_rgb, NO point cloud.
+#
+# The Patch Policy question applied here: can a second dense 2D view replace
+# explicit 3D geometry?
+#
+# Token groups (n_obs_steps=2), SORTED key order - front_rgb < wrist_rgb:
+#   front_rgb  192x320 -> 12x20 = 240 tokens/step -> 480
+#   wrist_rgb  192x256 -> 12x16 = 192 tokens/step -> 384
+#   total 864 context tokens, vs 2432 for condition B.
+#
+# NOTE: this condition builds TWO frozen DINOv3 trunks (share_rgb_model=false),
+# so total params roughly double vs A/B (43.5M vs 21.7M). Because the trunks
+# are FROZEN, trainable capacity differs only by one extra
+# Linear(384,384) (~148k) - so C adds a VIEW, not capacity. State that when
+# reporting.
+#
+# Requires front_rgb in the zarr AND use_front_rgb: True below. The flag
+# controls what the dataset reads; policy.rgb_keys controls what the encoder
+# consumes. A key listed in rgb_keys but not loaded here fails the shape_meta
+# assert; loaded but not listed is read and thrown away.
+
+shape_meta: &shape_meta
+  obs:
+    wrist_rgb:
+      shape: [3, 192, 256]
+      type: rgb
+      horizon: 2
+    front_rgb:
+      # 192x320 is 16:9; /16 -> 12x20 = 240 patch tokens.
+      shape: [3, 192, 320]
+      type: rgb
+      horizon: 2
+    agent_pos:
+      shape: [15]
+      type: low_dim
+      horizon: 2
+  action:
+    shape: [15]
+
+env_runner: null
+
+dataset:
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.08
+  max_train_episodes: null
+  use_wrist_rgb: True
+  # The one dataset-level difference from A and B.
+  use_front_rgb: True
+  wrist_obs_steps: ${n_obs_steps}
+  front_obs_steps: ${n_obs_steps}
+  use_noise_augmentation: True
+  pc_xyz_noise_std: 0.002
+  agent_pos_noise_std: 0.005
