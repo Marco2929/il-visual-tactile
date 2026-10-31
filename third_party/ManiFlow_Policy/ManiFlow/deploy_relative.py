@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
         # requesting one would (correctly) raise at startup now. Flip to
         # True once a checkpoint emits progress_score - leave
         # progress_threshold=None at first to monitor it before letting it
-        # terminate runs.
+        # terminate runs. 
         use_progress=False,
         progress_threshold=0.9,
         progress_patience=3,
@@ -1095,5 +1095,6 @@ if __name__ == "__main__":
         control_hz=20.0,
         min_execution_horizon=20,
         cooldown_epsilon=2,
+
     )
 
