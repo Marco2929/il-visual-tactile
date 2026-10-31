@@ -1,10 +1,27 @@
-# Python und IDE Caches (global)
+# Python, IDE & Agent Caches
 **/__pycache__/
+*.py[cod]
 .idea/
+**/.vscode/
+**/.claude/
+.continue/
 
-# Virtuelle Umgebungen
-data/venv/
-src/il_main/venv/
+# Virtuelle Umgebungen & Builds
+**/venv/
+**/.venv/
+build/
+install/
+log/
+*.egg-info/
+
+# Logs
+*.log
+senseglove_guard/logs/
+
+# Große Binärdateien & Dokumente
+*.pdf
+*.svo
+*.svo2
 
 # Große Datensätze und Model-Outputs
 data/episodes/
@@ -13,4 +30,17 @@ data/lerobot_datasets/
 data/zarr_datasets/
 data/dataset_builder/cache/
 data/calibration/
+data/experiments/
+
+# Rollout-Logs (Rohdaten + Reports ignorieren, Skripte in viz/ behalten)
+data/rollout_logs/*/
+!data/rollout_logs/viz/
+data/rollout_logs/reports/
+
+# Third-Party Caches & separate Repos
 third_party/ManiFlow_Policy/third_party/pytorch3d/
+third_party/flex-pi/
+third_party/mimic-video/
+third_party/patch_policy/
+third_party/UniFlow/
+third_party/ManiFlow_Policy_Base/
