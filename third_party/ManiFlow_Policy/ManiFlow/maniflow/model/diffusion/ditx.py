@@ -65,6 +65,11 @@ class DiTX(nn.Module):
         force_conditioned: bool=False,
         wrist_conditioned: bool=False,
         wrist_dim: int = 0,
+        # False = no point-cloud token group; the cross-attention context is
+        # built from the RGB group alone. vis_cond_obs_emb and
+        # vis_cond_pos_embed are still constructed (so checkpoints keep a
+        # stable key set) but are never called -- see forward().
+        pc_conditioned: bool = True,
         language_model: str = "t5-small",
     ):
         super().__init__()
@@ -74,6 +79,7 @@ class DiTX(nn.Module):
         self.force_conditioned = force_conditioned
         self.wrist_conditioned = wrist_conditioned
         self.wrist_dim = wrist_dim
+        self.pc_conditioned = pc_conditioned
         self.pre_norm_modality = pre_norm_modality
         self.state_cond_dim = state_cond_dim
         
@@ -92,12 +98,11 @@ class DiTX(nn.Module):
             torch.zeros(1, (visual_cond_len + 1) * n_obs_steps, n_emb)
             )  # learnable visual condition positional embedding (checkpoint: 2050 = (1024+1)*2)
 
-        # Optional SPATIAL positional encoding for PC tokens (PointSAM / Uni3D).
-        # When pc_pe is passed at forward time, it replaces the index-based
-        # vis_cond_pos_embed above. This is required when FPS token order is
-        # shuffled (index PE becomes meaningless), but pointnet leaves pc_pe
-        # None → falls back to index PE (fully backward compatible).
         self.pc_pe_proj = nn.Linear(cond_dim, n_emb)
+
+        # Per-modality embedding (0=pc, 1=wrist, 2=force). Zero-init -> no-op
+        # at step 0; lets the blocks tell the token groups apart once learned.
+        self.modality_emb = nn.Parameter(torch.zeros(3, n_emb))
 
         if state_cond_dim > 0:
             cprint(f"[DiTX] State conditioning via INPUT concatenation: "
@@ -312,6 +317,9 @@ class DiTX(nn.Module):
         if self.pc_pe_proj.bias is not None:
             nn.init.constant_(self.pc_pe_proj.bias, 0)
 
+        # Keep the modality embedding at zero so it starts as a no-op.
+        nn.init.zeros_(self.modality_emb)
+
         # Initialize the adapter for timestep and target_t
         nn.init.normal_(self.timestep_target_t_adaptor.weight, std=0.02)
         nn.init.constant_(self.timestep_target_t_adaptor.bias, 0)
@@ -389,6 +397,8 @@ class DiTX(nn.Module):
         if self.vis_cond_pos_embed is not None:
             # this is a learnable parameter, so we don't want to decay it
             no_decay.add("vis_cond_pos_embed") 
+        # bare nn.Parameter: matches no module rule above, so register by hand
+        no_decay.add("modality_emb")
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}
@@ -489,18 +499,37 @@ class DiTX(nn.Module):
         time_c = self.timestep_target_t_adaptor(time_c) # (B, n_emb)
         
 
-        # 3. visual condition
-        vis_con_obs_emb = self.vis_cond_obs_emb(vis_cond) # (B, L, n_emb)
-        if pc_pe is not None:
-            # SPATIAL PE: bind each token to its true 3D position (order-invariant)
-            context_c = vis_con_obs_emb + self.pc_pe_proj(pc_pe)
-        else:
-            # INDEX PE: fallback for pointnet / global features (backward compat)
-            vis_cond_pos_embed = self.vis_cond_pos_embed[:, :vis_cond.shape[1]]
-            context_c = vis_con_obs_emb + vis_cond_pos_embed # (B, L, n_emb)
-        if self.pre_norm_modality:
-            context_c = self.vis_norm(context_c, time_c)
+        # 3. visual condition (point cloud token group)
+        #
+        # Skipped entirely when the point cloud is disabled: `context_c` then
+        # starts as None and the first token group to append (RGB, below)
+        # becomes the whole context. Note the PC group is what carries
+        # modality_emb[0] and the index/spatial PE -- none of that applies to
+        # the RGB group, which brings its own 2D sin-cos grid PE and cam_emb
+        # from DINOv3ObsEncoder and gets modality_emb[1].
+        context_c = None
+        if self.pc_conditioned and vis_cond is not None:
+            vis_con_obs_emb = self.vis_cond_obs_emb(vis_cond) # (B, L, n_emb)
+            if pc_pe is not None:
+                # SPATIAL PE: bind each token to its true 3D position
+                # (order-invariant). Only produced by the pointsam/Uni3D
+                # extractor; pointnet_type="pointnet" always yields None and
+                # takes the index-PE branch below (as upstream does).
+                context_c = vis_con_obs_emb + self.pc_pe_proj(pc_pe)
+            else:
+                # INDEX PE: pointnet / global features (upstream behaviour)
+                vis_cond_pos_embed = self.vis_cond_pos_embed[:, :vis_cond.shape[1]]
+                context_c = vis_con_obs_emb + vis_cond_pos_embed # (B, L, n_emb)
+            context_c = context_c + self.modality_emb[0]
+            if self.pre_norm_modality:
+                context_c = self.vis_norm(context_c, time_c)
 
+
+        # Append a token group to the context, tolerating an empty context.
+        # Without this every group below would need its own None check, and a
+        # missed one would only surface as a TypeError at runtime.
+        def _append(ctx, group):
+            return group if ctx is None else torch.cat([ctx, group], dim=1)
 
         # 4. language condition
         if self.language_conditioned:
@@ -509,21 +538,29 @@ class DiTX(nn.Module):
             lang_c = self.lang_adaptor(lang_c) # (B, L, D) or (B, D)
             if self.pre_norm_modality:
                 lang_c = self.lang_norm(lang_c, time_c)
-            context_c = torch.cat([context_c, lang_c], dim=1) # (B, L + L_lang, n_emb)
+            context_c = _append(context_c, lang_c) # (B, L + L_lang, n_emb)
 
         # 4.5 force condition
         if self.force_conditioned and force_cond is not None:
             force_c = self.force_cond_emb(force_cond)  # (B, N_force, n_emb)
+            force_c = force_c + self.modality_emb[2]
             if self.pre_norm_modality:
                 force_c = self.force_norm(force_c, time_c)
-            context_c = torch.cat([context_c, force_c], dim=1)  # (B, L + L_lang + N_force, n_emb)
+            context_c = _append(context_c, force_c)  # (B, L + L_lang + N_force, n_emb)
 
         # 4.6 wrist-RGB condition (own token group appended to context)
         if self.wrist_conditioned and wrist_cond is not None:
             wrist_c = self.wrist_cond_emb(wrist_cond)  # (B, N_wrist, n_emb)
+            wrist_c = wrist_c + self.modality_emb[1]
             if self.pre_norm_modality:
                 wrist_c = self.wrist_norm(wrist_c, time_c)
-            context_c = torch.cat([context_c, wrist_c], dim=1)  # (B, ... + N_wrist, n_emb)
+            context_c = _append(context_c, wrist_c)  # (B, ... + N_wrist, n_emb)
+
+        if context_c is None:
+            raise ValueError(
+                "DiTX received no conditioning context at all (no point "
+                "cloud, no RGB, no language, no force). The blocks below "
+                "cross-attend to it, so there is nothing to attend to.")
 
         # 5. transformer blocks
         for block in self.blocks:

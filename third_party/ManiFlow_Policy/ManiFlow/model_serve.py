@@ -7,14 +7,14 @@ import os
 import numpy as np
 from hydra.core.global_hydra import GlobalHydra
 
-from maniflow.policy.maniflow_pointcloud_policy import ManiFlowTransformerPointcloudPolicy
+from maniflow.policy.maniflow_multimodal_policy import ManiFlowMultimodalPolicy
 
 class DeployManiWorkspace:
     """Model loading and management"""
     def __init__(self, cfg: OmegaConf):
         self.cfg = cfg
-        self.model: ManiFlowTransformerPointcloudPolicy = hydra.utils.instantiate(cfg.policy)
-        self.ema_model: ManiFlowTransformerPointcloudPolicy = None
+        self.model: ManiFlowMultimodalPolicy = hydra.utils.instantiate(cfg.policy)
+        self.ema_model: ManiFlowMultimodalPolicy = None
         if cfg.training.use_ema:
             self.ema_model = hydra.utils.instantiate(cfg.policy)
             

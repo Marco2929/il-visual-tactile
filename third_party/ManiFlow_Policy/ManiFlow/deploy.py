@@ -29,6 +29,7 @@ Key differences from old design:
   - Cooldown prevents wasteful double-inference
   - Latency estimator adapts (Jacobson-Karels) instead of growing monotonically
 """
+import os
 import time
 import threading
 import math
@@ -55,8 +56,83 @@ import message_filters
 import collections
 
 from model_serve import init_model, normalize
-from cond_preprocess import PointCloudProcessor, setup_kinematics, compute_fk
+from cond_preprocess import (PointCloudProcessor, setup_kinematics, compute_fk,
+                             preprocess_wrist_rgb, WRIST_RGB_HW)
 from rtc_utils import RTCProcessor
+from progress_utils import ProgressTracker, flush as flush_dds, latched_qos
+
+
+
+WRIST_RGB_TOPIC = os.environ.get(
+    "WRIST_COLOR_TOPIC", "/cam_gemini/color/image_raw")
+
+
+# ---------------------------------------------------------------------------
+# Hand action layout: policy output -> full-hand wire format
+# ---------------------------------------------------------------------------
+# The policy is trained on a SUBSET of the hand's DoF (see
+# proprioception.hand.pinch in data/configs/foil_lifting_wrist.yaml), but the
+# executor should not have to know which subset. So the expansion to all 20
+# joints happens HERE, where the model's configuration is already loaded, and
+# the wire format stays fixed at 7 pose + 20 hand = 27 regardless of model.
+ARM_JOINT_NAMES = [
+    "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+    "wrist_1_joint", "wrist_2_joint", "wrist_3_joint",
+]
+
+# Finger-major order, matching record_utils/record.py's HAND_JOINT_NAMES, the
+# recorded state vector, and dg5f_right_controller.yaml's `joints:` list.
+FULL_HAND_JOINTS = [f"rj_dg_{finger}_{joint}"
+                    for finger in range(1, 6)
+                    for joint in range(1, 5)]
+
+# The hand joints this checkpoint actually predicts, in the order they appear
+# in the action vector. For the pinch models that is thumb + index; for a
+# full-hand model set this to FULL_HAND_JOINTS and the expansion below becomes
+# an identity mapping.
+POLICY_HAND_JOINTS = [f"rj_dg_{finger}_{joint}"
+                      for finger in (1, 2)
+                      for joint in range(1, 5)]
+
+# Pose where the un-predicted joints are held, degrees. This is the URDF zero
+# configuration (straight, unspread), which is inside every joint's limits.
+#
+# Verified against the recordings rather than assumed, because these fingers
+# are not unobserved - they appear in the wrist camera and the front point
+# cloud: over 252 episodes / 51719 frames the median of the 12 non-pinch
+# joints deviates from zero by at most 12.7 deg (mean 4.7). The demonstrations
+# kept them near straight, so holding them at zero is not a configuration the
+# policy never saw.
+HELD_JOINT_POSE_DEG = 0.0
+
+POSE_DIM = 7
+WIRE_ACTION_DIM = POSE_DIM + len(FULL_HAND_JOINTS)  # 27
+
+
+def expand_hand_action(actions: np.ndarray) -> np.ndarray:
+    """(N, 7 + len(POLICY_HAND_JOINTS)) -> (N, 27), by joint NAME.
+
+    Scatters the predicted hand values into their slots in the full 20-joint
+    vector and fills the rest with HELD_JOINT_POSE_DEG. Mapping is by name, so
+    a reordering of either list cannot silently permute joints.
+    """
+    expected = POSE_DIM + len(POLICY_HAND_JOINTS)
+    if actions.shape[1] != expected:
+        raise ValueError(
+            f"policy produced action_dim={actions.shape[1]}, but "
+            f"POLICY_HAND_JOINTS implies {expected} "
+            f"({POSE_DIM} pose + {len(POLICY_HAND_JOINTS)} hand). Update "
+            f"POLICY_HAND_JOINTS in deploy.py to match the checkpoint.")
+
+    out = np.empty((actions.shape[0], WIRE_ACTION_DIM), dtype=actions.dtype)
+    out[:, :POSE_DIM] = actions[:, :POSE_DIM]
+    out[:, POSE_DIM:] = HELD_JOINT_POSE_DEG
+
+    for src, name in enumerate(POLICY_HAND_JOINTS):
+        dst = POSE_DIM + FULL_HAND_JOINTS.index(name)
+        out[:, dst] = actions[:, POSE_DIM + src]
+
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +227,14 @@ class Cooldown:
 # ---------------------------------------------------------------------------
 
 class RobotCameraSync:
-    """Synchronizes ZED cameras with joint state using timestamp matching."""
+    """Synchronizes ZED + wrist cameras with joint state by timestamp.
+
+    The wrist camera joins the same ApproximateTimeSynchronizer group as the
+    ZED colour/depth pair rather than being sampled independently. The policy
+    consumes point cloud and wrist image as ONE observation, so a wrist frame
+    paired with a cloud from a different instant would present a hand in a
+    place the cloud does not show it - and nothing downstream could detect it.
+    """
 
     def __init__(self, node, callback_function, joint_names):
         self.node = node
@@ -180,11 +263,17 @@ class RobotCameraSync:
             node, Image, '/zed/zed_node/rgb/color/rect/image', qos_profile=qos_slow)
         self.sub_depth = message_filters.Subscriber(
             node, Image, '/zed/zed_node/depth/depth_registered', qos_profile=qos_slow)
+        self.sub_wrist = message_filters.Subscriber(
+            node, Image, WRIST_RGB_TOPIC, qos_profile=qos_slow)
 
+        # slop is raised from 15 ms to 30 ms because the wrist camera runs on
+        # its own clock and is not hardware-synced to the ZED. At 20 Hz
+        # (50 ms/frame) 30 ms still rejects a full-frame offset, while 15 ms
+        # would drop most triples and starve the observation buffer.
         self.ts = message_filters.ApproximateTimeSynchronizer(
-            [self.sub_color, self.sub_depth],
+            [self.sub_color, self.sub_depth, self.sub_wrist],
             queue_size=15,
-            slop=0.015
+            slop=0.030
         )
         self.ts.registerCallback(self._camera_sync_cb)
 
@@ -206,18 +295,18 @@ class RobotCameraSync:
             self.joint_history.append(full_msg)
             self._try_process_buffers()
 
-    def _camera_sync_cb(self, color_msg, depth_msg):
-        self.camera_buffer.append((color_msg, depth_msg))
+    def _camera_sync_cb(self, color_msg, depth_msg, wrist_msg):
+        self.camera_buffer.append((color_msg, depth_msg, wrist_msg))
         self._try_process_buffers()
 
     def _try_process_buffers(self):
         while self.camera_buffer and self.joint_history:
-            color_msg, depth_msg = self.camera_buffer[0]
+            color_msg, depth_msg, wrist_msg = self.camera_buffer[0]
             t_cam = self._get_sec(color_msg.header.stamp)
             t_newest_joint = self._get_sec(self.joint_history[-1].header.stamp)
 
             if t_newest_joint >= (t_cam - 0.002):
-                color_msg, depth_msg = self.camera_buffer.popleft()
+                color_msg, depth_msg, wrist_msg = self.camera_buffer.popleft()
 
                 closest_joint_msg = None
                 min_time_diff = float('inf')
@@ -234,7 +323,8 @@ class RobotCameraSync:
                         f"SEVERE SYNC MISMATCH! Gap: {min_time_diff*1000:.2f} ms")
 
                 if closest_joint_msg is not None:
-                    self.callback(closest_joint_msg, color_msg, depth_msg)
+                    self.callback(closest_joint_msg, color_msg, depth_msg,
+                                  wrist_msg)
             else:
                 break
 
@@ -246,7 +336,9 @@ class RealDexEnv(Node):
     triggered externally by the main loop based on buffer demand.
     """
 
-    def __init__(self, cfg, fps: float, progress_threshold: float = None):
+    def __init__(self, cfg, fps: float, use_progress: bool = False,
+                 progress_threshold: float = None,
+                 progress_patience: int = 3):
         super().__init__('flow_policy')
 
         self.cfg = cfg
@@ -254,35 +346,44 @@ class RealDexEnv(Node):
         self.n_obs_steps = cfg.n_obs_steps
         self.n_action_steps = cfg.n_action_steps
         self.fps = fps
-        self.progress_threshold = progress_threshold
 
-        self.JOINT_NAMES = [
-            'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint',
-            'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint',
-            'right_inspire_right_thumb_1_joint', 'right_inspire_right_thumb_2_joint',
-            'right_inspire_right_index_1_joint', 'right_inspire_right_middle_1_joint',
-            'right_inspire_right_ring_1_joint', 'right_inspire_right_little_1_joint'
-        ]
+        # 6 arm + 20 hand, in the exact order record_utils/record.py writes
+        # state.npy: UR_JOINT_NAMES then HAND_JOINT_NAMES (finger-major). The
+        # order matters because compute_fk() slices positionally.
+        #
+        # Both groups arrive on the single global /joint_states:
+        # dg5f_right_driver.launch.py remaps the controller's
+        # /dg5f_right/joint_states onto it so MoveIt sees the 20 rj_dg_*
+        # joints, and ur_tesollo_cartesian.launch.py includes that file.
+        self.JOINT_NAMES = ARM_JOINT_NAMES + FULL_HAND_JOINTS
 
         self.point_cloud_array = []
         self.robot_state_array = []
+        self.wrist_rgb_array = []
 
         self.pc_processor = PointCloudProcessor()
         self.bridge = CvBridge()
         self.chain = setup_kinematics()
+
+        self._check_wrist_shape_meta()
 
         self.syncer = RobotCameraSync(self, self.observation_callback, self.JOINT_NAMES)
 
         # --- Publishers ---
         self.action_pub = self.create_publisher(
             Float64MultiArray, '/predicted_action_chunk', 10)
-        self.progress_pub = self.create_publisher(
-            Float64MultiArray, '/policy_progress', 10)
-        self.progress_marker_pub = self.create_publisher(
-            Marker, '/policy_progress_marker', 10)
-        self.done_pub = self.create_publisher(
-            Bool, '/policy_done', 10)
-        self.status_pub = self.create_publisher(String, '/policy_status', 10)
+        # Latched: the final status is written immediately before teardown,
+        # and a volatile sample would be lost to any subscriber not matched
+        # at that instant (log_rollout.py in particular).
+        self.status_pub = self.create_publisher(
+            String, '/policy_status', latched_qos())
+
+        # Owns /policy_progress, /policy_progress_marker and /policy_done.
+        self.progress = ProgressTracker(
+            self,
+            use_progress=use_progress,
+            progress_threshold=progress_threshold,
+            patience=progress_patience)
         self.debug_pub = self.create_publisher(PointCloud2, '/debug_pc', 10)
         self.debug_action_pub = self.create_publisher(PoseStamped, '/debug_action_pose', 10)
         self.traj_pub = self.create_publisher(PoseArray, '/predicted_trajectory', 10)
@@ -299,6 +400,7 @@ class RealDexEnv(Node):
         # --- Observation gating ---
         self.static_pc_tensor = None
         self.static_state_tensor = None
+        self.static_wrist_tensor = None
         self.last_obs_time = 0.0
         self.target_dt = (1.0 / self.fps) - 0.005
 
@@ -309,6 +411,36 @@ class RealDexEnv(Node):
         self.get_logger().info(
             f"RealDexEnv initialized. FPS={fps}, "
             f"n_obs={self.n_obs_steps}, n_action={self.n_action_steps}")
+
+    def _check_wrist_shape_meta(self):
+        """Fail at startup if the live wrist resolution differs from training.
+
+        The encoder would not: DINOv3ObsEncoder.forward() silently
+        F.interpolate()s any mismatched input to the configured size. That
+        turns a preprocessing divergence into a quiet accuracy loss instead of
+        an error, so the comparison is made here, where it is cheap and loud.
+        """
+        try:
+            shape = tuple(self.cfg.task.shape_meta['obs']['wrist_rgb']['shape'])
+        except (AttributeError, KeyError, TypeError):
+            self.get_logger().warn(
+                "shape_meta has no wrist_rgb entry; skipping resolution check. "
+                "If this checkpoint has no wrist camera, remove the wrist "
+                "stream from the observation path as well.")
+            return
+
+        # shape_meta is CHW (the encoder's layout); WRIST_RGB_HW is (H, W).
+        expected_hw = (int(shape[1]), int(shape[2]))
+        if expected_hw != tuple(WRIST_RGB_HW):
+            raise ValueError(
+                f"wrist_rgb resolution mismatch: shape_meta wants "
+                f"{expected_hw[0]}x{expected_hw[1]}, but cond_preprocess "
+                f"produces {WRIST_RGB_HW[0]}x{WRIST_RGB_HW[1]}. Align "
+                f"WRIST_RGB_HW with the task config (and with "
+                f"dataset_builder rgb.resolution) before deploying.")
+        self.get_logger().info(
+            f"wrist_rgb: {expected_hw[0]}x{expected_hw[1]} uint8 HWC RGB, "
+            f"matches shape_meta.")
 
     # ------------------------------------------------------------------
     # Buffer status feedback
@@ -341,7 +473,8 @@ class RealDexEnv(Node):
         """Publish without anchor (legacy, anchors at receiver cursor)."""
         msg = Float64MultiArray()
         # Convention: first element = -1 means "no anchor, use local cursor"
-        msg.data = [-1.0] + full_action_sequence[:, :13].flatten().tolist()
+        wire = expand_hand_action(full_action_sequence)
+        msg.data = [-1.0] + wire.flatten().tolist()
         self.action_pub.publish(msg)
 
     def publish_action_chunk_with_anchor(self, full_action_sequence: np.ndarray,
@@ -354,52 +487,14 @@ class RealDexEnv(Node):
         even if DDS delivery is delayed.
         """
         msg = Float64MultiArray()
-        msg.data = [float(anchor_step)] + full_action_sequence[:, :13].flatten().tolist()
+        wire = expand_hand_action(full_action_sequence)
+        msg.data = [float(anchor_step)] + wire.flatten().tolist()
         self.action_pub.publish(msg)
 
     def publish_status(self, status_text: str):
         msg = String()
         msg.data = status_text
         self.status_pub.publish(msg)
-
-    def publish_progress(self, progress_score: float):
-        msg = Float64MultiArray()
-        msg.data = [progress_score]
-        self.progress_pub.publish(msg)
-
-        marker = Marker()
-        marker.header.frame_id = "base_link"
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "policy_progress"
-        marker.id = 0
-        marker.type = Marker.TEXT_VIEW_FACING
-        marker.action = Marker.ADD
-        marker.pose.position.x = 0.0
-        marker.pose.position.y = 0.0
-        marker.pose.position.z = 1.0
-        marker.pose.orientation.w = 1.0
-        marker.scale.z = 0.08
-        progress_clamped = max(0.0, min(1.0, progress_score))
-        marker.color.a = 1.0
-        marker.color.r = 1.0 - progress_clamped
-        marker.color.g = progress_clamped
-        marker.color.b = 0.0
-        marker.text = f"Progress: {progress_score:.3f}"
-        if self.progress_threshold is not None:
-            marker.text += f" / {self.progress_threshold:.2f}"
-        marker.lifetime.sec = 1
-        self.progress_marker_pub.publish(marker)
-
-    def check_progress_done(self, progress_score: float) -> bool:
-        if self.progress_threshold is not None and progress_score >= self.progress_threshold:
-            self.get_logger().info(
-                f"[DONE] Progress {progress_score:.3f} >= threshold "
-                f"{self.progress_threshold:.2f}. Stopping.")
-            done_msg = Bool()
-            done_msg.data = True
-            self.done_pub.publish(done_msg)
-            return True
-        return False
 
     def publish_debug_pointcloud(self, point_cloud: np.ndarray):
         header = Header()
@@ -431,7 +526,7 @@ class RealDexEnv(Node):
     # Observation capture (callback-driven, continuous)
     # ------------------------------------------------------------------
 
-    def observation_callback(self, joint_msg, color_msg, depth_msg):
+    def observation_callback(self, joint_msg, color_msg, depth_msg, wrist_msg):
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
             if (current_time - self.last_obs_time) < self.target_dt:
@@ -440,25 +535,59 @@ class RealDexEnv(Node):
 
             color_img = self.bridge.imgmsg_to_cv2(color_msg, "bgr8")
             depth_img = self.bridge.imgmsg_to_cv2(depth_msg, "32FC1")
+            # bgr8 so the channel order entering preprocess_wrist_rgb matches
+            # the builder's cv2.imread, which is also BGR. That function does
+            # the flip to RGB.
+            wrist_img = self.bridge.imgmsg_to_cv2(wrist_msg, "bgr8")
 
+            # Indexed BY NAME, never by position: JointState ordering is not
+            # guaranteed stable across driver versions, and a permutation here
+            # would be invisible - the FK would just return a wrong pose.
+            # record.py indexes by name for the same reason.
             pos_dict = dict(zip(joint_msg.name, joint_msg.position))
+            missing = [n for n in self.JOINT_NAMES if n not in pos_dict]
+            if missing:
+                self.get_logger().error(
+                    f"/joint_states is missing {len(missing)} expected joints "
+                    f"(e.g. {missing[:4]}). Is the dg5f driver up and remapped "
+                    f"onto /joint_states? Skipping this observation.",
+                    throttle_duration_sec=2.0)
+                return
+
             ordered_state = [pos_dict[name] for name in self.JOINT_NAMES]
             robot_state = np.array(ordered_state, dtype=np.float32)
+
+            # ros2_control publishes radians; the dataset stores hand joints in
+            # DEGREES (record.py's HAND_JOINTS_IN_DEGREES=1, which converts on
+            # the way in). Without this the hand block of agent_pos is off by
+            # ~57x - a silent error, since the vector stays well-formed and
+            # only the policy's view of the hand is wrong. Arm joints stay in
+            # radians: they feed FK, and record.py does not convert them.
+            robot_state[len(ARM_JOINT_NAMES):] = np.degrees(
+                robot_state[len(ARM_JOINT_NAMES):])
 
             cartesian_state_phys = compute_fk(self.chain, robot_state)
             point_cloud = self.pc_processor.process_rgbd(color_img, depth_img)
 
             if point_cloud is not None:
                 self.publish_debug_pointcloud(point_cloud)
+                wrist_rgb = preprocess_wrist_rgb(wrist_img)
 
+                # Appended under one lock so the three buffers cannot be
+                # observed at different lengths: snapshot_obs() takes the last
+                # n_obs_steps of each and would otherwise pair a cloud with a
+                # wrist frame from a different tick.
                 with self._obs_lock:
                     self.point_cloud_array.append(point_cloud)
                     self.robot_state_array.append(cartesian_state_phys)
+                    self.wrist_rgb_array.append(wrist_rgb)
 
                     if len(self.point_cloud_array) > self.n_obs_steps:
                         self.point_cloud_array.pop(0)
                     if len(self.robot_state_array) > self.n_obs_steps:
                         self.robot_state_array.pop(0)
+                    if len(self.wrist_rgb_array) > self.n_obs_steps:
+                        self.wrist_rgb_array.pop(0)
 
                 self.new_obs_event.set()
             else:
@@ -489,22 +618,33 @@ class RealDexEnv(Node):
                 self.point_cloud_array[-self.n_obs_steps:], axis=0)[np.newaxis, ...]
             state_np = np.stack(
                 self.robot_state_array[-self.n_obs_steps:], axis=0)[np.newaxis, ...]
+            # (1, T, H, W, 3) uint8, channels-LAST. That is the zarr layout,
+            # and maniflow_multimodal_policy._encode_wrist() is the single
+            # place the HWC->CHW permute happens - handing it CHW here would
+            # double-permute. Kept uint8: DINOv3ObsEncoder does /255 plus its
+            # own mean/std, and scaling here would be applied twice.
+            wrist_np = np.stack(
+                self.wrist_rgb_array[-self.n_obs_steps:], axis=0)[np.newaxis, ...]
 
         self.new_obs_event.clear()
 
         pc_tensor_cpu = torch.from_numpy(pc_np)
         state_tensor_cpu = torch.from_numpy(state_np)
+        wrist_tensor_cpu = torch.from_numpy(wrist_np)
 
         if self.static_pc_tensor is None:
             self.static_pc_tensor = pc_tensor_cpu.to(self.device)
             self.static_state_tensor = state_tensor_cpu.to(self.device)
+            self.static_wrist_tensor = wrist_tensor_cpu.to(self.device)
         else:
             self.static_pc_tensor.copy_(pc_tensor_cpu, non_blocking=True)
             self.static_state_tensor.copy_(state_tensor_cpu, non_blocking=True)
+            self.static_wrist_tensor.copy_(wrist_tensor_cpu, non_blocking=True)
 
         return {
             'point_cloud': self.static_pc_tensor,
-            'agent_pos': self.static_state_tensor
+            'agent_pos': self.static_state_tensor,
+            'wrist_rgb': self.static_wrist_tensor,
         }
 
 
@@ -527,7 +667,9 @@ def run_policy(
     addition_info: int = 1211,
     fps: float = 20.0,
     sport_mode_active: bool = False,
+    use_progress: bool = False,
     progress_threshold: float = None,
+    progress_patience: int = 3,
     warmup_steps: int = 3,
     num_inference_steps: int = None,
     use_rtc: bool = True,
@@ -559,7 +701,9 @@ def run_policy(
         print(f"[INFO] num_inference_steps: {getattr(policy, 'num_inference_steps', '?')}")
 
     # --- Environment node ---
-    env = RealDexEnv(cfg=cfg, fps=fps, progress_threshold=progress_threshold)
+    env = RealDexEnv(cfg=cfg, fps=fps, use_progress=use_progress,
+                     progress_threshold=progress_threshold,
+                     progress_patience=progress_patience)
 
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(env)
@@ -606,12 +750,18 @@ def run_policy(
 
         # --- Warmup: stabilize CUDA kernels ---
         print(f"[INFO] Warming up model ({warmup_steps} steps)...")
+        warmup_result = None
         for i in range(warmup_steps):
             with torch.no_grad():
-                _ = policy.predict_action(obs)
+                warmup_result = policy.predict_action(obs)
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
             print(f"  Warmup {i+1}/{warmup_steps} done.")
+
+        # Compare the declared progress config against what the policy
+        # actually returns, before the robot moves. Raises if
+        # use_progress=True on a checkpoint with no progress head.
+        env.progress.validate(warmup_result)
         print("[INFO] Warmup complete. Starting DRTC inference loop.")
 
         # --- Telemetry ---
@@ -706,6 +856,20 @@ def run_policy(
             if sport_mode_active:
                 action_queue = sport_mode(action_queue, speedup=1.3)
 
+            # --- 6b. PROGRESS CHECK (BEFORE publishing) ---
+            # Checked ahead of the publish: a chunk sent now would be
+            # executed in full (~26 steps, over a second) before anything
+            # could stop it, so "done" would always mean "plus one more
+            # chunk of motion". Monitor-only mode returns False here and
+            # the loop continues untouched.
+            task_done = env.progress.update(action_queue_raw)
+            bar = env.progress.render_bar()
+            if bar:
+                print(bar)
+            if task_done:
+                env.publish_status("DONE")
+                break
+
             # --- 7. LATENCY SHIFT + PUBLISH WITH ABSOLUTE ANCHOR ---
             # The anchor step is determined NOW (at publish time), not at
             # receive time. This prevents time dilation if DDS delivery is
@@ -742,21 +906,7 @@ def run_policy(
                           f"mean={per_step.mean()*1000:.1f}mm "
                           f"max={per_step.max()*1000:.1f}mm")
 
-            # --- 9. PROGRESS CHECK ---
-            if 'progress_score' in action_queue_raw:
-                progress_val = float(action_queue_raw['progress_score'][0].item())
-                env.publish_progress(progress_val)
-                thr_str = (f" / {env.progress_threshold:.2f}"
-                           if env.progress_threshold is not None else "")
-                bar_len = 20
-                filled = int(max(0.0, min(1.0, progress_val)) * bar_len)
-                bar = "█" * filled + "░" * (bar_len - filled)
-                print(f"[PROGRESS] {bar} {progress_val:.3f}{thr_str}")
-                if env.check_progress_done(progress_val):
-                    env.publish_status("DONE")
-                    break
-
-            # --- 10. TELEMETRY ---
+            # --- 9. TELEMETRY ---
             inference_count += 1
             if inference_count % 10 == 0:
                 rtc_tag = f"RTC(d={rtc_delay}) " if rtc is not None else ""
@@ -772,6 +922,10 @@ def run_policy(
     except KeyboardInterrupt:
         pass
     finally:
+        # Settle before teardown: destroying the node drops the
+        # transient-local history with it, and /policy_done is what the
+        # controllers act on to stop the arm.
+        flush_dds()
         executor.shutdown()
         env.destroy_node()
         if rclpy.ok():
@@ -780,18 +934,45 @@ def run_policy(
 
 if __name__ == "__main__":
     run_policy(
-        alg_name="maniflow_force_pointcloud_policy_v5",
-        task_name="foil_lifting_augmented_v2",
-        run_dir="/ros2_ws/data/outputs/foil_lifting_augmented_v2-maniflow_force_pointcloud_policy_v5-0112_seed0",
-        ckpt_file="epoch=0200-mse=0.000205",
+        alg_name="maniflow_multimodal_policy",
+        task_name="foil_lifting_wrist",
+        run_dir="/ros2_ws/data/outputs/foil_lifting_wrist-maniflow_multimodal_policy-0113_seed0",
+        ckpt_file="epoch=0040-val_action_mse=9.478029",
         addition_info=1211,
         fps=20.0,
-        sport_mode_active=True,
+        sport_mode_active=False,
+        THINK OF THE OFFSET FROM TELEOP FOR CLAUDE LEAVE THIS ERROR SO I REALIZE
+        # False: maniflow_multimodal_policy has no progress head, so
+        # requesting one would (correctly) raise at startup now. Flip to
+        # True once a checkpoint emits progress_score - leave
+        # progress_threshold=None at first to monitor it before letting it
+        # terminate runs.
+        use_progress=False,
         progress_threshold=0.9,
+        progress_patience=3,
         warmup_steps=3,
-        num_inference_steps=6,
+        num_inference_steps=10,
         use_rtc=True,
-        rtc_execution_horizon=16,
+        # 18. Chunks carry 26 actions and overlap by 17 (measured: anchor
+        # stride p50 = 8, n_steps p50 = 26, over 297 chunks in r035), so 18
+        # binds the whole overlap and a little beyond.
+        #
+        # Horizon 8 was tried and was clearly worse: it matched the ARRIVAL
+        # RATE on the theory that the prefix weights should finish decaying
+        # between chunks. The opposite is true. get_prefix_weights goes ones
+        # -> decay -> ZERO, so a horizon shorter than the overlap means the
+        # weight is already zero exactly where the next chunk takes over,
+        # i.e. an unbound seam. Measured over r038/r039:
+        #
+        #   horizon  commanded a p95   seam residual   within chunk   ratio
+        #       16        7354             19.0 mm         7.3 mm      2.6x
+        #        8       10779             22.4 mm         4.5 mm      4.3x
+        #
+        # Smoother inside each chunk, markedly rougher at the joins - the
+        # discontinuity got concentrated into the seams. The binding has to
+        # REACH ACROSS the seam, so the horizon must exceed the overlap, not
+        # match the stride.
+        rtc_execution_horizon=18,
         rtc_max_guidance=5.0,
         # DRTC scheduling
         control_hz=20.0,

@@ -27,18 +27,17 @@ kinematics:
 # Four collections recorded with the pallet at different positions. They are
 # merged into ONE dataset on purpose: the policy should lift the foil
 # regardless of pallet position, which is exactly the generalisation the
-# position variation was recorded for. The pallet position reaches the dataset
-# metadata as the `scene` label from each episode's labels.json, so
-# per-position splits/analyses stay possible (e.g. train on bottom+middle,
-# validate on top_right).
-# Episode counts on disk after removing the aborted short recordings
+# position variation was recorded for. The `position` label is carried through
+# to the dataset metadata so per-position splits/analyses stay possible
+# (e.g. train on front+middle, validate on top_right).
+# Episode counts after removing the aborted short recordings
 # (see data/record_utils/delete_short_episodes.py):
 #   bottom     108
-#   middle      47
-#   top_left    45
-#   top_right   52
+#   middle      49   (7 removed)
+#   top_left    50   (2 removed)
+#   top_right   52   (3 removed)
 #   ---------------
-#   total      252
+#   total      259
 cache:
   base_dirs:
     # ── Older tesollo collections, capped to 35% ──
@@ -47,12 +46,16 @@ cache:
     # divergence in the source list or the subsample would confound the
     # comparison.
     - dir: "foil_lifting_collection_tesollo_bottom"
+      position: "bottom"
       fraction: 0.35
     - dir: "foil_lifting_collection_tesollo_middle"
+      position: "middle"
       fraction: 0.35
     - dir: "foil_lifting_collection_tesollo_top_left"
+      position: "top_left"
       fraction: 0.35
     - dir: "foil_lifting_collection_tesollo_top_right"
+      position: "top_right"
       fraction: 0.35
     # ── New `folien_*` collections (357 episodes, all success) ──
     # No `fraction` = keep all.

@@ -1,6 +1,6 @@
-# il-visual-tactile
+# il-flexible-object-grasping
 
-Visual-tactile imitation learning on a UR10e workcell with interchangeable
+Imitation learning on a UR10e workcell with interchangeable
 multi-finger hands (Tesollo DG5F, Inspire), SenseGlove-based teleoperation and
 policy deployment.
 
@@ -16,7 +16,8 @@ workflow, from bringing up hardware to training and deploying a policy.
 5. [Recording and dataset preparation](#5-recording-and-dataset-preparation)
 6. [Training](#6-training)
 7. [Deployment](#7-deployment)
-8. [Debugging](#8-debugging)
+8. [Rollout logging and analysis](#8-rollout-logging-and-analysis)
+9. [Debugging](#9-debugging)
 
 ---
 
@@ -48,6 +49,26 @@ Send a test pose to verify the hand responds:
 ros2 topic pub --once /set_angle_data service_interfaces/msg/SetAngle1 \
   "{finger_ids: [1, 2, 3, 4, 5, 6], angles: [1000, 1000, 1000, 1000, 1000, 000]}"
 ```
+
+ros2 topic pub --once /dg5f_right/dg5f_right_controller/joint_trajectory   trajectory_msgs/msg/JointTrajectory "{
+  joint_names: [
+    rj_dg_1_1, rj_dg_1_2, rj_dg_1_3, rj_dg_1_4,
+    rj_dg_2_1, rj_dg_2_2, rj_dg_2_3, rj_dg_2_4,
+    rj_dg_3_1, rj_dg_3_2, rj_dg_3_3, rj_dg_3_4,
+    rj_dg_4_1, rj_dg_4_2, rj_dg_4_3, rj_dg_4_4,
+    rj_dg_5_1, rj_dg_5_2, rj_dg_5_3, rj_dg_5_4],
+  points: [{
+    positions: [0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0],
+    velocities: [0.0, 0.0, 0.0, 0.0,
+                 0.0, 0.0, 0.0, 0.0,
+                 0.0, 0.0, 0.0, 0.0,
+                 0.0, 0.0, 0.0, 0.0,
+                 0.0, 0.0, 0.0, 0.0],
+    time_from_start: {sec: 2, nanosec: 500000000}}]}"
 
 ### SenseGlove (R1 glove + Tesollo mapper)
 
@@ -186,6 +207,14 @@ signal, so during data collection it is armed automatically.
 
 ---
 
+### Senseglove+Tesollo
+
+cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py r1 --tag cyclone-latest --num-gloves 1
+
+cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py tesollo --tag cyclone-latest --hand right --glove-id 70 --delto-ip 192.168.56.102
+
+bash senseglove_guard/run_watchdog.sh
+
 ## 5. Recording and dataset preparation
 
 ### Environment
@@ -202,7 +231,7 @@ export ROBOT_TIP_FRAME="right_inspire_base_link"
 `FOLDER_NAME` is set per collection campaign, for example:
 
 ```bash
-export FOLDER_NAME="foil_lifting_collection"
+export FOLDER_NAME="foil_lifting_collection_tesollo_middle"
 export FOLDER_NAME="box_opening_collection"
 ```
 
@@ -223,11 +252,10 @@ python data/record_utils/generatePointCloud.py
 python data/record_utils/merge_episodes.py
 ```
 
-To produce a LeRobot-format dataset instead:
+To produce a LeRobot-format dataset instead run this command in lerobot-dataset-visualizer:
 
 ```bash
-python data/record_utils/merge_episodes_lerobot.py \
-  --repo_id your-hf-user/box_opening_collection --task "test test" --fps 30
+bun dev
 ```
 
 ### Building configured datasets
@@ -275,7 +303,7 @@ Training runs for a long time, so start it inside a tmux session and detach with
 
 ```bash
 tmux new -s training
-bash scripts/train_policy.sh maniflow_r3d_pointcloud_policy foil_lifting_augmented_r3d 0112 0 0
+bash scripts/train_policy.sh maniflow_multimodal_policy foil_lifting_wrist 0112 0 0
 ```
 
 Reattach later with:
@@ -284,20 +312,19 @@ Reattach later with:
 tmux attach -t training
 ```
 
-### LeRobot SARM policy
+### Evaluating checkpoints
+
+The run ranks checkpoints by `val_loss` (flow/velocity loss), which does not
+necessarily match the action error after the full ODE rollout. This script
+computes the action MSE on held-out episodes for every saved checkpoint and
+prints the best one:
 
 ```bash
-lerobot-train \
-  --dataset.repo_id=Marco2929/foil_lifting_baseline \
-  --dataset.root=/root/.cache/huggingface/lerobot/Marco2929/foil_lifting_baseline \
-  --policy.type=sarm \
-  --policy.annotation_mode=single_stage \
-  --policy.image_key=observation.images.front \
-  --output_dir=outputs/train/sarm_single \
-  --batch_size=28 --steps=5000 \
-  --wandb.enable=true --wandb.project=sarm \
-  --policy.repo_id=your-hf-user/your-model-name --policy.push_to_hub=false
+python third_party/ManiFlow_Policy/ManiFlow/scripts/sweep_checkpoints.py \
+  --ckpt-dir /ros2_ws/data/outputs/<run>/checkpoints --n-batches 5
 ```
+
+
 
 ---
 
@@ -313,6 +340,7 @@ Four terminals, in this order:
 | 2 | ZED camera | `ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i` |
 | 3 | Control node | `ros2 run il_main cartesian_inference_control` |
 | 4 | Policy inference | `python third_party/ManiFlow_Policy/ManiFlow/deploy.py` |
+| 5 | Temperature watchdog | `bash senseglove_guard/run_watchdog.sh --table` |
 
 The control node starts inactive: the policy runs inference continuously, but no
 motion is executed until the policy gate is opened.
@@ -340,7 +368,82 @@ python data/record_utils/record_dagger.py
 
 ---
 
-## 8. Debugging
+## 8. Rollout logging and analysis
+
+### Recording a rollout
+
+Start the logger **before** opening the policy gate: `ros2 topic pub --once`
+is volatile, so a subscriber that joins afterwards never sees the message.
+
+```bash
+python data/rollout_logs/log_rollout.py \
+  --ckpt  "epoch=0040-val_action_mse=0.022836" \
+  --label "foil_lifting_relative_e40" \
+  --run-dir /ros2_ws/data/outputs/foil_lifting_relative-maniflow_multimodal_policy-0112_seed0 \
+  --inference-steps 10 \
+  --notes "Palette Nominalhoehe"
+```
+
+`--notes` becomes the label in every plot and table, so record the condition
+that was varied (pallet height, foil thickness) rather than leaving it empty.
+
+Each gate open/close pair writes one `rollout_NNN/` directory. `Ctrl-C` closes
+a rollout that is still open.
+
+```bash
+ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: true}"    # start
+ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: false}"   # stop
+```
+
+### Labeling the Success and behaviour
+
+To label the success and exact behaviour qualitativily there's a seperate script that extracts the info from the ran policy:
+
+```bash
+python3 data/rollout_logs/annotate_rollouts.py --ckpt "foil_lifting_relative_e40"
+```
+
+### Analysing rollouts
+
+Note the interpreter: the logger needs `rclpy` (system `python`), the viewer
+needs `plotly`/`rerun` (venv only).
+
+```bash
+python rollout_viz.py table              # per-rollout numbers + aggregates
+python rollout_viz.py dash               # -> reports/<ckpt>.html, opens via file://
+python rollout_viz.py filters 10         # what the executor's filters cost
+python rollout_viz.py rerun 10 --save reports/r010.rrd
+```
+
+`dash` compares all rollouts (scatter / single rollout / sortable table),
+`rerun` is for understanding one: 3D path, point cloud and all time series on
+one timeline. Rerun runs headless here, so write an `.rrd` and open it on the
+host with `rerun data/rollout_logs/reports/r010.rrd`.
+
+Rollouts can be named `rollout_010`, `010` or `10`; without a name the last
+one is used. Add `--video` to overlay the wrist camera (off by default - the
+bags are ~1 GB each; `--max-frames`, default 200, spreads frames over the
+run). Generated files land in `reports/` and are gitignored.
+
+`rerun` also plots the **pinch width** (thumb tip to index tip, mm) via URDF
+forward kinematics, because the closure metric sums joint angles and a sum is
+not a grasp width: a curled fingertip and a flat finger can sum alike while
+gripping very differently. The URDF is found automatically (installed share
+dir or source checkout); override with `--urdf` / `$DG5F_URDF`, or skip the
+kinematics with `--no-pinch`.
+
+```bash
+rerun - < data/rollout_logs/reports/r010.rrd
+```
+
+or raise the limit once:
+
+```bash
+echo 'fs.inotify.max_user_instances=1024' | sudo tee /etc/sysctl.d/99-inotify.conf
+sudo sysctl --system
+```
+
+## 9. Debugging
 
 Live plotting of topics:
 

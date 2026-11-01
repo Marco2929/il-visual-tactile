@@ -1,84 +1,33 @@
-name: foil_lifting_relative
+name: foil_lifting_baseline_cleaned_proprio_mask
 
-task_name: foil_lifting_relative
-
-# EXPERIMENT: base-relative EE poses, 6D rotations.
-#
-# Clone of foil_lifting_wrist.yaml. The dataset expresses every pose in the
-# window relative to the last OBSERVED pose, so the absolute position in the
-# cell - which correlates with the pallet position, and therefore with the
-# answer - is gone from the proprioception. Where to grasp has to come from
-# the wrist image.
-#
-# Pairs with deploy_relative.py, which decodes predictions back to absolute
-# poses before they reach the executor. deploy.py and realdex_dataset.py are
-# untouched, so the absolute baseline is unaffected.
-#
-# Actions are future MEASURED poses, not commanded teleop targets: the
-# recorder does not log the command stream. Under contact the impedance
-# controller lags, so an action is the pose that was achieved rather than the
-# one requested. Applies to the baseline equally, so the A/B stays fair.
+task_name: foil_lifting_baseline_cleaned_proprio_mask
 
 shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
   obs:
     point_cloud:
-      shape: [1024, 6]
+      shape: [1025, 3]
       type: point_cloud
       horizon: 2
-    wrist_rgb:
-      shape: [3, 192, 256]
-      type: rgb
-      horizon: 2
-    front_rgb:
-      shape: [3, 192, 320]
-      type: rgb
-      horizon: 2
     agent_pos:
-      # 17, not 15: xyz (3) + 6D rotation (6) + pinch hand (8). The builder
-      # writes a quaternion (4); RelativeRealDexDataset converts it to the 6D
-      # representation, which is unique per rotation - a quaternion target is
-      # two-valued because q and -q are the same rotation.
-      shape: [17]
+      shape: [13]
       type: low_dim
       horizon: 2
   action:
-    shape: [17]
+    shape: [13]
 
 env_runner: null
 
 dataset:
-  # The relative subclass, NOT realdex_dataset.RealDexDataset.
-  _target_: maniflow.dataset.relative_dataset.RelativeRealDexDataset
-  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  _target_: maniflow.dataset.realdex_dataset.RealDexDataset
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_baseline_cleaned.zarr
   horizon: ${horizon}
+  use_progress: true
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42
-  val_ratio: 0.08
-  max_train_episodes: null
-  use_wrist_rgb: True
-  use_front_rgb: False
-  wrist_obs_steps: ${n_obs_steps}
-  front_obs_steps: ${n_obs_steps}
-
-  # Must equal the policy's n_obs_steps: the base pose is
-  # state[n_obs_steps-1], and a mismatch would relativise against a
-  # different frame than deploy does, silently.
-  n_obs_steps: ${n_obs_steps}
-
-  # Checks P_rel[t] == (0, I) and that decoded rotations are valid, on every
-  # sample. A few hundred flops; the failure it catches is otherwise silent.
-  assert_invariants: True
-
-  # Windows drawn to fit the normalizer. Statistics must come from
-  # relativised samples - fitting on the absolute zarr arrays would compute
-  # them for a representation the policy never sees.
-  normalizer_samples: 2000
-
-  use_noise_augmentation: True
+  val_ratio: 0.02
+  max_train_episodes: 100
+  use_noise_augmentation: true      # Enable data augmentation
   pc_xyz_noise_std: 0.002
-  # Applied to the relative vector, where 9 of 17 channels are a rotation
-  # with values in [-1, 1] rather than metres. 5 mm of positional noise is
-  # large relative to that, so the value is lowered; the rotation columns are
-  # re-orthonormalised by Gram-Schmidt on decode either way.
-  agent_pos_noise_std: 0.002
+  use_relative: true

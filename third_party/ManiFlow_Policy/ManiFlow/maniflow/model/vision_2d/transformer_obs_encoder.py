@@ -65,7 +65,13 @@ class TransformerObsEncoder(ModuleAttrMixin):
             # use single rgb model for all rgb inputs
             share_rgb_model: bool=False,
             feature_aggregation: str=None,
-            downsample_ratio: int=32
+            downsample_ratio: int=32,
+            # apply ImageNet mean/std after the /255 (required for pretrained backbones)
+            imagenet_norm: bool=False,
+            # photometric jitter, applied on [0,1] data before imagenet_norm
+            color_jitter: dict=None,
+            # let a ViT interpolate its pos-embed to a non-square / non-224 input
+            dynamic_img_size: bool=True
         ):
         """
         Assumes rgb input: B,T,C,H,W
@@ -81,13 +87,26 @@ class TransformerObsEncoder(ModuleAttrMixin):
         key_shape_map = dict()
 
         assert global_pool == ''
-        model = timm.create_model(
+        timm_kwargs = dict(
             model_name=model_name,
             pretrained=pretrained,
             global_pool=global_pool, # '' means no pooling
             num_classes=0            # remove classification layer
         )
+        if model_name.startswith('vit'):
+            # Without this timm's PatchEmbed asserts strict_img_size and
+            # rejects anything that is not the model's native resolution.
+            timm_kwargs['dynamic_img_size'] = dynamic_img_size
+        model = timm.create_model(**timm_kwargs)
         self.model_name = model_name
+        self.imagenet_norm = imagenet_norm
+
+        # Must run on [0,1] values, so it cannot live in key_transform_map
+        # (that is applied after imagenet_norm in forward).
+        self.color_jitter = None
+        if color_jitter is not None:
+            self.color_jitter = torchvision.transforms.ColorJitter(**dict(color_jitter))
+            cprint(f"[TransformerObsEncoder] ColorJitter: {dict(color_jitter)}", 'cyan')
 
         if frozen:
             assert pretrained
@@ -108,6 +127,12 @@ class TransformerObsEncoder(ModuleAttrMixin):
                 feature_dim = 256
             else:
                 raise NotImplementedError(f"Unsupported downsample_ratio: {downsample_ratio}")
+        elif model_name.startswith('vit'):
+            feature_dim = model.embed_dim
+            patch_size = model.patch_embed.patch_size
+            self.patch_size = (patch_size if isinstance(patch_size, (tuple, list))
+                               else (patch_size, patch_size))
+            self.num_prefix_tokens = getattr(model, 'num_prefix_tokens', 1)
         elif model_name.startswith('convnext'):
             # the last layer is nn.Identity() because num_classes is 0
             # second last layer is AdaptivePool2d, which is also identity because global_pool is empty
@@ -127,14 +152,30 @@ class TransformerObsEncoder(ModuleAttrMixin):
                     num_channels=x.num_features)
             )
             
+        # image_shape must be known before the aggregators below are sized
+        image_shape = None
+        obs_shape_meta = shape_meta['obs']
+        for key, attr in obs_shape_meta.items():
+            shape = tuple(attr['shape'])
+            type = attr.get('type', 'low_dim')
+            if type == 'rgb':
+                assert image_shape is None or image_shape == shape[1:]
+                image_shape = shape[1:]
+
+        if model_name.startswith('vit'):
+            # (h, w) patch grid for the ACTUAL input, not the 224x224 default.
+            feature_map_shape = [image_shape[0] // self.patch_size[0],
+                                 image_shape[1] // self.patch_size[1]]
+            self.patch_grid = tuple(feature_map_shape)
+        else:
+            feature_map_shape = [x // downsample_ratio for x in image_shape]
+
         # handle feature aggregation
         self.feature_aggregation = feature_aggregation
         if model_name.startswith('vit'):
-            # assert self.feature_aggregation is None # vit uses the CLS token
-            if self.feature_aggregation is None:
-                # Use all tokens from ViT
-                pass
-            elif self.feature_aggregation != 'cls':
+            # 'avg'/'max'/None operate on the patch tokens, 'cls' on the class
+            # token. Anything else has no meaning for a ViT.
+            if self.feature_aggregation not in (None, 'cls', 'avg', 'max'):
                 logger.warn(f'vit will use the CLS token. feature_aggregation ({self.feature_aggregation}) is ignored!')
                 self.feature_aggregation = 'cls'
         
@@ -153,20 +194,24 @@ class TransformerObsEncoder(ModuleAttrMixin):
                 output_dim=feature_dim
             )
         
-        image_shape = None
-        obs_shape_meta = shape_meta['obs']
-        for key, attr in obs_shape_meta.items():
-            shape = tuple(attr['shape'])
-            type = attr.get('type', 'low_dim')
-            if type == 'rgb':
-                assert image_shape is None or image_shape == shape[1:]
-                image_shape = shape[1:]
+        if imagenet_norm:
+            # (3,1,1) broadcasts against both B,T,C,H,W and B*T,C,H,W
+            self.register_buffer('image_mean',
+                torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1), persistent=False)
+            self.register_buffer('image_std',
+                torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1), persistent=False)
+
         if transforms is not None and not isinstance(transforms[0], torch.nn.Module):
             assert transforms[0].type == 'RandomCrop'
             ratio = transforms[0].ratio
+            # Crop and resize per-axis: using image_shape[0] for both would
+            # squash a non-square input (252x336 -> 252x252) and silently
+            # change the ViT patch grid, hence the token count.
+            crop_h = int(image_shape[0] * ratio)
+            crop_w = int(image_shape[1] * ratio)
             transforms = [
-                torchvision.transforms.RandomCrop(size=int(image_shape[0] * ratio)),
-                torchvision.transforms.Resize(size=image_shape[0], antialias=True)
+                torchvision.transforms.RandomCrop(size=(crop_h, crop_w)),
+                torchvision.transforms.Resize(size=tuple(image_shape), antialias=True)
             ] + transforms[1:]
         transform = nn.Identity() if transforms is None else torch.nn.Sequential(*transforms)
 
@@ -205,8 +250,6 @@ class TransformerObsEncoder(ModuleAttrMixin):
             else:
                 cprint(f"Skipping obs key {key} with type {type}", 'red')
                 # raise RuntimeError(f"Unsupported obs type: {type}")
-        
-        feature_map_shape = [x // downsample_ratio for x in image_shape]
             
         rgb_keys = sorted(rgb_keys)
         low_dim_keys = sorted(low_dim_keys)
@@ -229,13 +272,18 @@ class TransformerObsEncoder(ModuleAttrMixin):
         # Return: B, N, C
         
         if self.model_name.startswith('vit'):
-            # vit uses the CLS token
             if self.feature_aggregation == 'cls':
                 return feature[:, [0], :]
-            
-            # or use all tokens
-            assert self.feature_aggregation is None 
-            return feature
+
+            # Drop CLS / register tokens so only patch tokens remain.
+            patch_tokens = feature[:, self.num_prefix_tokens:, :]
+            if self.feature_aggregation == 'avg':
+                return torch.mean(patch_tokens, dim=1, keepdim=True)
+            elif self.feature_aggregation == 'max':
+                return torch.amax(patch_tokens, dim=1, keepdim=True)
+
+            assert self.feature_aggregation is None
+            return patch_tokens
         
         # resnet
         assert len(feature.shape) == 4
@@ -277,10 +325,18 @@ class TransformerObsEncoder(ModuleAttrMixin):
                     # B, H, W, C --> B, C, H, W
                     img = img.permute(0, 3, 1, 2)
 
+            if self.color_jitter is not None and self.training:
+                img = self.color_jitter(img)
+
+            if self.imagenet_norm:
+                img = (img - self.image_mean) / self.image_std
+
             B, T = img.shape[:2]
             assert B == batch_size
             img = img.reshape(B*T, *img.shape[2:])
-            if img.shape[2:] != self.key_shape_map[key]:
+            # Compare against (C,H,W); img.shape[2:] is only (H,W) and would
+            # make this branch fire on every forward.
+            if img.shape[1:] != self.key_shape_map[key]:
                 target_H, target_W = self.key_shape_map[key][1], self.key_shape_map[key][2]
                 # do torchvision resize
                 # img shape: Bx3xHxW
@@ -309,6 +365,29 @@ class TransformerObsEncoder(ModuleAttrMixin):
         # concatenate all features along t
         result = torch.cat(embeddings, dim=1)
         return result
+
+    def grad_cam_target(self):
+        """Return (layer, is_tokens) to hook for attribution.
+
+        A ViT's only Conv2d is patch_embed.proj, the very first op, which
+        carries no spatial semantics. Hook the last transformer block instead
+        and let the caller reshape tokens via tokens_to_map().
+        """
+        if self.model_name.startswith('vit'):
+            model = next(iter(self.key_model_map.values()))
+            return model.blocks[-1], True
+
+        last_conv = None
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                last_conv = m
+        return last_conv, False
+
+    def tokens_to_map(self, x):
+        """(B, prefix + h*w, D) -> (B, D, h, w)."""
+        h, w = self.patch_grid
+        x = x[:, self.num_prefix_tokens:, :]
+        return x.transpose(1, 2).reshape(x.shape[0], -1, h, w)
 
     @torch.no_grad()
     def output_shape(self):

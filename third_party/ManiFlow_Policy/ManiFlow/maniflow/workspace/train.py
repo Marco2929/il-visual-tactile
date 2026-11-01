@@ -21,6 +21,7 @@ def _copy_to_cpu(x):
         return copy.deepcopy(x)
 
 import os
+import string
 import hydra
 import torch
 import dill
@@ -45,11 +46,12 @@ from PIL import Image
 import time
 import threading
 from hydra.core.hydra_config import HydraConfig
-from maniflow.policy.maniflow_pointcloud_policy import ManiFlowTransformerPointcloudPolicy
+from maniflow.policy.maniflow_multimodal_policy import ManiFlowMultimodalPolicy
 from maniflow.dataset.base_dataset import BaseDataset
 from maniflow.env_runner.base_runner import BaseRunner
 from maniflow.common.checkpoint_util import TopKCheckpointManager
 from maniflow.common.pytorch_util import dict_apply, optimizer_to
+from maniflow.common.val_action_metrics import ValActionEvaluator
 from maniflow.model.diffusion.ema_model import EMAModel
 from maniflow.model.common.lr_scheduler import get_scheduler
 
@@ -71,9 +73,9 @@ class TrainManiFlowDexWorkspace:
         random.seed(seed)
 
         # configure model
-        self.model: ManiFlowTransformerPointcloudPolicy = hydra.utils.instantiate(cfg.policy)
+        self.model: ManiFlowMultimodalPolicy = hydra.utils.instantiate(cfg.policy)
 
-        self.ema_model: ManiFlowTransformerPointcloudPolicy = None
+        self.ema_model: ManiFlowMultimodalPolicy = None
         if cfg.training.use_ema:
             try:
                 self.ema_model = copy.deepcopy(self.model)
@@ -81,13 +83,81 @@ class TrainManiFlowDexWorkspace:
                 self.ema_model = hydra.utils.instantiate(cfg.policy)
 
 
-        # configure training state
-        self.optimizer = hydra.utils.instantiate(
-            cfg.optimizer, params=self.model.parameters())
+        # Use the policy's own optimizer so per-module lr groups (notably the
+        # pretrained wrist backbone) actually take effect. Instantiating
+        # cfg.optimizer directly would flatten everything into one lr.
+        self.optimizer = self.model.get_optimizer(
+            lr=cfg.optimizer.lr,
+            weight_decay=cfg.optimizer.weight_decay,
+            betas=tuple(cfg.optimizer.betas),
+            obs_encoder_lr=cfg.get('obs_encoder_lr', None),
+            obs_encoder_weight_decay=cfg.get('obs_encoder_weight_decay', None),
+            wrist_encoder_lr=cfg.get('wrist_encoder_lr', None),
+        )
 
         # configure training state
         self.global_step = 0
         self.epoch = 0
+
+    def get_grad_cam_batch(self, dataset, fallback_batch, device):
+        """Build a DETERMINISTIC batch for Grad-CAM visualization.
+
+        The training loop's `train_sampling_batch` is captured once on the first
+        batch of the first epoch and never refreshed, and Grad-CAM then takes
+        only sample [:1] of it. That means you always look at the SAME shuffled
+        frame for all epochs, and you cannot choose which one.
+
+        With `training.grad_cam_source: fixed` we instead pull explicit dataset
+        indices (`training.grad_cam_indices`), so the visualization is stable
+        across epochs (differences reflect LEARNING, not a different frame) and
+        you can deliberately target a task phase, e.g. a mid-episode contact
+        frame that the front camera cannot see.
+
+        Returns a batch dict, or `fallback_batch` if fixed sampling is off/fails.
+        """
+        cfg = self.cfg
+        source = cfg.training.get('grad_cam_source', 'fixed')
+        if source != 'fixed' or dataset is None:
+            return fallback_batch
+
+        indices = cfg.training.get('grad_cam_indices', [0])
+        indices = list(indices) if indices is not None else [0]
+
+        try:
+            samples = []
+            n = len(dataset)
+            for idx in indices:
+                if idx < 0 or idx >= n:
+                    cprint(f"[Grad-CAM] index {idx} out of range (dataset={n}), skipped.",
+                           "yellow")
+                    continue
+                samples.append(dataset[idx])
+            if len(samples) == 0:
+                return fallback_batch
+
+            # Collate: stack each leaf across the selected samples.
+            def _stack(key_path, vals):
+                if isinstance(vals[0], np.ndarray):
+                    return torch.from_numpy(np.stack(vals))
+                if torch.is_tensor(vals[0]):
+                    return torch.stack(vals)
+                return vals[0]
+
+            batch = {}
+            for top_key in samples[0].keys():
+                if isinstance(samples[0][top_key], dict):
+                    batch[top_key] = {
+                        k: _stack(k, [s[top_key][k] for s in samples])
+                        for k in samples[0][top_key].keys()
+                    }
+                else:
+                    batch[top_key] = _stack(
+                        top_key, [s[top_key] for s in samples])
+            return batch
+        except Exception as e:
+            cprint(f"[Grad-CAM] Fixed-index sampling failed ({e}); "
+                   f"falling back to training batch.", "yellow")
+            return fallback_batch
 
     def compute_grad_cam(self, batch, policy, device):
         """
@@ -225,11 +295,16 @@ class TrainManiFlowDexWorkspace:
         # --- Log statistics ---
         top_k = 50
         top_indices = np.argsort(cam)[-top_k:]
+        # _raw = pre-normalization gradient magnitude (absolute sensitivity,
+        # comparable across epochs). _norm = after per-map [0,1] rescaling
+        # (shape only). Mixing the two made mean look larger than max.
         grad_stats = {
-            'grad_cam/max_importance': float(cam_max),
-            'grad_cam/mean_importance': float(cam.mean()),
-            'grad_cam/top50_mean': float(cam[top_indices].mean()),
-            'grad_cam/nonzero_ratio': float((cam > 0.01).sum() / len(cam)),
+            'grad_cam/max_importance_raw': float(cam_max),
+            'grad_cam/min_importance_raw': float(cam_min),
+            'grad_cam/mean_importance_raw': float(importance.mean()),
+            'grad_cam/mean_importance_norm': float(cam.mean()),
+            'grad_cam/top50_mean_norm': float(cam[top_indices].mean()),
+            'grad_cam/nonzero_ratio_norm': float((cam > 0.01).sum() / len(cam)),
         }
 
         # --- Visualization ---
@@ -297,15 +372,322 @@ class TrainManiFlowDexWorkspace:
         # Return image + stats dict for logging
         result_img = wandb.Image(img, caption=f"Gradient Saliency Epoch {self.epoch}")
 
-        # Log stats separately
-        try:
-            wandb.log(grad_stats, step=self.global_step)
-        except Exception:
-            pass
+        # Same reasoning as in compute_grad_cam_rgb: logging here with a stale
+        # global_step makes wandb discard the scalars. Hand them to the caller.
+        self._last_pc_cam_stats = grad_stats
 
         return result_img
     
-    
+    # ------------------------------------------------------------------
+    # True Grad-CAM for the wrist-RGB branch
+    # ------------------------------------------------------------------
+    def compute_grad_cam_rgb(self, batch, device):
+        """True Grad-CAM (Selvaraju et al.) for the wrist-RGB encoder.
+
+        The point-cloud version above is raw INPUT-gradient saliency. This is
+        real Grad-CAM: it hooks the last conv layer, weights each channel by
+        its spatially-averaged gradient, and overlays the resulting heatmap on
+        the wrist image.
+
+            w_k = mean_{h,w} dL/dA_k       (channel importance)
+            cam = relu(sum_k w_k * A_k)    (spatial saliency)
+
+        Visualizes every obs step and every selected frame in the batch.
+        """
+        model = self.model
+
+        if not getattr(model, 'wrist_conditioned', False):
+            return None
+
+        # Which camera to visualize. The encoder may hold several towers at
+        # different resolutions, so the key is resolved here instead of being
+        # hardcoded to wrist_rgb.
+        enc = model.wrist_encoder
+        cam_key = self.cfg.training.get('grad_cam_rgb_key', None)
+        available = [k for k in getattr(enc, 'rgb_keys', ['wrist_rgb'])
+                     if k in batch['obs']]
+        if not available:
+            return None
+        if cam_key is None:
+            cam_key = available[0]
+        elif cam_key not in available:
+            cprint(f"[Grad-CAM/RGB] key '{cam_key}' not in batch "
+                   f"(available: {available}); skipping.", "yellow")
+            return None
+        if hasattr(enc, 'set_grad_cam_key'):
+            enc.set_grad_cam_key(cam_key)
+
+        # --- Locate the target layer ---
+        # The encoder knows what to hook: last Conv2d for a CNN, last
+        # transformer block for a ViT (whose only Conv2d is patch_embed.proj,
+        # the very first op, which is useless for Grad-CAM).
+        if hasattr(enc, 'grad_cam_target'):
+            target_layer, is_tokens = enc.grad_cam_target()
+        else:
+            target_layer, is_tokens = None, False
+            for m in enc.modules():
+                if isinstance(m, nn.Conv2d):
+                    target_layer = m
+        if target_layer is None:
+            cprint("[Grad-CAM/RGB] No hookable layer in wrist encoder.", "yellow")
+            return None
+
+        acts, grads = {}, {}
+
+        def fwd_hook(_m, _i, out):
+            # ViT blocks return a tuple in some timm versions.
+            if isinstance(out, (tuple, list)):
+                out = out[0]
+            acts['v'] = out
+            if out.requires_grad:
+                out.register_hook(lambda g: grads.__setitem__('v', g))
+
+        handle = target_layer.register_forward_hook(fwd_hook)
+        # eval(), not train(): keeps autograd but drops dropout/ColorJitter,
+        # which would make the map noisy and mismatch the un-jittered overlay.
+        model.eval()
+        model.zero_grad(set_to_none=True)
+
+        n_vis = batch['obs'][cam_key].shape[0]
+
+        # A frozen encoder runs its trunk under torch.no_grad(), so the hook
+        # would capture an activation carrying no gradient and the map would
+        # come out silently zero. Reopen the graph for this attribution pass
+        # only; no parameter becomes trainable.
+        if hasattr(enc, 'grad_cam_mode'):
+            enc._grad_cam_enabled = True
+        try:
+            obs_dict = {k: v[:n_vis].clone().to(device) for k, v in batch['obs'].items()}
+            gt_action = batch['action'][:n_vis].clone().to(device)
+
+            nobs = model.normalizer.normalize(obs_dict)
+            nactions = model.normalizer['action'].normalize(gt_action).to(device)
+            if not model.use_pc_color:
+                nobs['point_cloud'] = nobs['point_cloud'][..., :3]
+
+            # Encode via the policy's own helper so reshaping/PE matches exactly.
+            vis_cond, state_cond, pc_pe = model._encode_obs(nobs, n_vis)
+            wrist_cond = model._encode_wrist(nobs, n_vis)
+
+            # Needed for the per-modality gradient norms below.
+            for _t in (vis_cond, wrist_cond, state_cond):
+                if _t is not None and _t.requires_grad:
+                    _t.retain_grad()
+
+            # Flow forward pass at t=0.5
+            T, Da = model.horizon, model.action_dim
+            noise = torch.randn(n_vis, T, Da, device=device)
+            t_val = 0.5
+            t = torch.full((n_vis,), t_val, device=device)
+            x_t = (1.0 - t_val) * noise + t_val * nactions
+
+            dt_val = 1.0 / max(model.num_inference_steps or 1, 1)
+            if model.sample_target_t_mode == "absolute":
+                target_t = torch.full((n_vis,), t_val + dt_val, device=device)
+            else:
+                target_t = torch.full((n_vis,), dt_val, device=device)
+
+            v_pred = model.model(
+                sample=x_t,
+                timestep=t,
+                target_t=target_t,
+                vis_cond=vis_cond,
+                state_cond=state_cond,
+                wrist_cond=wrist_cond,
+                lang_cond=None,
+                pc_pe=pc_pe,
+            )
+            proxy_loss = F.mse_loss(v_pred, nactions - noise)
+            proxy_loss.backward()
+        except Exception as e:
+            cprint(f"[Grad-CAM/RGB] Forward/backward failed: {e}", "yellow")
+            import traceback
+            traceback.print_exc()
+            model.zero_grad(set_to_none=True)
+            return None
+        finally:
+            handle.remove()
+            if hasattr(enc, 'grad_cam_mode'):
+                enc._grad_cam_enabled = False
+
+        if 'v' not in acts or 'v' not in grads:
+            cprint(f"[Grad-CAM/RGB] Hooks captured nothing for '{cam_key}' "
+                   f"(no activation gradient reached the hooked block).",
+                   "yellow")
+            model.zero_grad(set_to_none=True)
+            return None
+
+        A = acts['v'].detach().float()    # (n_vis*To, C, h, w) or (B, N, D)
+        G = grads['v'].detach().float()
+
+        if is_tokens:
+            # (B, num_prefix + h*w, D) -> (B, D, h, w) so the rest of the
+            # channel-weighting / upsampling math is identity to the CNN case.
+            A = enc.tokens_to_map(A)
+            G = enc.tokens_to_map(G)
+
+        w = G.mean(dim=(2, 3), keepdim=True)
+
+        cam_signed = (w * A).sum(dim=1, keepdim=True)   # BEFORE relu
+        cam = F.relu(cam_signed)                       # (n_vis*To, 1, h, w)
+
+        # Standard Grad-CAM relu()s away all negative evidence. If the weighted
+        # sum is negative EVERYWHERE for an image, the whole map collapses to
+        # zero and renders as flat blue — which looks identical to "no gradient"
+        # but actually means "these features push the loss DOWN".
+        # Log both so the two cases are distinguishable, and optionally show the
+        # signed map (diverging colormap) instead.
+        signed_mode = self.cfg.training.get('grad_cam_rgb_signed', False)
+        n_dead = int((cam.amax(dim=(1, 2, 3)) <= 1e-8).sum())
+        if n_dead > 0 and not signed_mode:
+            cprint(f"[Grad-CAM/RGB] {n_dead}/{cam.shape[0]} maps fully zero after "
+                   f"ReLU (negative evidence). Set training."
+                   f"grad_cam_rgb_signed=true to see them.", "yellow")
+        elif n_dead > 0:
+            cprint(f"[Grad-CAM/RGB] signed mode: {n_dead}/{cam.shape[0]} maps "
+                   f"would have been zeroed by ReLU; shown as blue below.",
+                   "cyan")
+        if signed_mode:
+            cam = cam_signed
+
+        # Raw frames for the overlay: (n_vis, To, H, W, C)
+        wrist = batch['obs'][cam_key][:n_vis].detach().float().cpu()
+        if wrist.max() > 1.0:
+            wrist = wrist / 255.0
+        To = min(model.n_obs_steps, wrist.shape[1])
+        H, W = wrist.shape[2], wrist.shape[3]
+
+        cam_up = F.interpolate(cam, size=(H, W), mode='bilinear',
+                               align_corners=False).squeeze(1).cpu().numpy()
+
+        # ||dL/dcond|| per token, so an 864-token group is not automatically
+        # 'bigger' than a 2-token one.
+        def _per_token_gnorm(t):
+            if t is None or t.grad is None:
+                return None
+            return float(t.grad.detach().norm() / (t.shape[1] ** 0.5))
+
+        g_wrist = _per_token_gnorm(wrist_cond)
+        g_vis = _per_token_gnorm(vis_cond)
+        g_state = _per_token_gnorm(state_cond)
+
+        rgb_stats = {
+            'grad_cam_rgb/grad_abs_mean': float(G.abs().mean()),
+            'grad_cam_rgb/act_mean': float(A.mean()),
+            'grad_cam_rgb/cam_max': float(cam.max()),
+            # Fraction of maps killed entirely by the ReLU. If this is high the
+            # visualization is misleading, not the model.
+            'grad_cam_rgb/dead_map_frac': float(n_dead) / float(cam.shape[0]),
+            'grad_cam_rgb/signed_min': float(cam_signed.min()),
+            'grad_cam_rgb/signed_max': float(cam_signed.max()),
+        }
+        # Per-image gradient magnitude: separates "no gradient reaching this
+        # frame" from "gradient exists but ReLU removed it".
+        per_img_grad = G.abs().mean(dim=(1, 2, 3))
+        for i in range(min(per_img_grad.numel(), 8)):
+            rgb_stats[f'grad_cam_rgb/grad_img{i}'] = float(per_img_grad[i])
+
+        # Which modality the loss actually depends on.
+        if g_wrist is not None:
+            rgb_stats['modality/grad_wrist'] = g_wrist
+        if g_vis is not None:
+            rgb_stats['modality/grad_pc'] = g_vis
+        if g_state is not None:
+            rgb_stats['modality/grad_state'] = g_state
+        if g_wrist is not None and g_vis is not None and g_vis > 0:
+            rgb_stats['modality/wrist_over_pc'] = g_wrist / g_vis
+
+        # Per-obs-step wrist gradient (encoder folds obs steps into batch dim).
+        _To_g = max(min(model.n_obs_steps, G.shape[0] // max(n_vis, 1)), 1)
+        for tt in range(_To_g):
+            sel = [b * _To_g + tt for b in range(n_vis)
+                   if b * _To_g + tt < G.shape[0]]
+            if sel:
+                rgb_stats[f'modality/grad_wrist_t{tt}'] = float(
+                    G[sel].abs().mean())
+
+        # Near-zero means the model found no use in separating token groups.
+        if hasattr(model.model, 'modality_emb'):
+            me = model.model.modality_emb.detach()
+            for i, nm in enumerate(['pc', 'wrist']):
+                if i < me.shape[0]:
+                    rgb_stats[f'modality/emb_norm_{nm}'] = float(me[i].norm())
+
+        # --- Plot: one row per (frame, obs step): raw | heatmap | overlay ---
+        rows = []
+        for b in range(n_vis):
+            for tt in range(To):
+                flat = b * To + tt
+                if flat < cam_up.shape[0]:
+                    rows.append((b, tt, flat))
+        if not rows:
+            model.zero_grad(set_to_none=True)
+            return None
+
+        idx_labels = self.cfg.training.get('grad_cam_indices', None)
+
+        # Shared colour scale across ALL maps so relative importance between
+        # frames stays visible. Normalizing each map on its own (the obvious
+        # choice) rescales a near-zero map up to full brightness, making weak
+        # and strong frames look identical.
+        if signed_mode:
+            vabs = float(np.abs(cam_up).max())
+            vmin, vmax, cmap = -vabs, vabs, 'bwr'
+        else:
+            vmin, vmax, cmap = 0.0, float(cam_up.max()), 'jet'
+        if vmax - vmin < 1e-12:
+            vmax = vmin + 1e-12
+
+        fig, axes = plt.subplots(len(rows), 3,
+                                 figsize=(11, 3.4 * len(rows)), squeeze=False)
+        for r, (b, tt, flat) in enumerate(rows):
+            frame = np.clip(wrist[b, tt].numpy(), 0, 1)
+            c = cam_up[flat]
+
+            label = (f"idx={idx_labels[b]}"
+                     if idx_labels is not None and b < len(idx_labels)
+                     else f"sample {b}")
+
+            axes[r][0].imshow(frame)
+            axes[r][0].set_title(f'Wrist RGB ({label}, t={tt})', fontsize=9)
+            axes[r][0].axis('off')
+
+            im = axes[r][1].imshow(c, cmap=cmap, vmin=vmin, vmax=vmax)
+            axes[r][1].set_title(f'Grad-CAM (max={c.max():.2e})', fontsize=9)
+            axes[r][1].axis('off')
+            plt.colorbar(im, ax=axes[r][1], shrink=0.7)
+
+            axes[r][2].imshow(frame)
+            axes[r][2].imshow(c, cmap=cmap, alpha=0.5, vmin=vmin, vmax=vmax)
+            axes[r][2].set_title('Overlay', fontsize=9)
+            axes[r][2].axis('off')
+
+        fig.suptitle(f'Wrist-RGB Grad-CAM | Epoch {self.epoch} | '
+                     f'feat {A.shape[2]}x{A.shape[3]} | '
+                     f'{"SIGNED" if signed_mode else "ReLU"} | '
+                     f'scale [{vmin:.2e}, {vmax:.2e}] | '
+                     f'dead {n_dead}/{cam.shape[0]}', fontsize=10)
+        plt.tight_layout()
+
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        img = Image.open(buf)
+        plt.close(fig)
+
+        model.zero_grad(set_to_none=True)
+
+        # NOTE: do NOT wandb.log() here with step=self.global_step. Grad-CAM runs
+        # at the END of an epoch, when global_step is already behind the main
+        # logger's step, so wandb silently DROPS these scalars
+        # ("Tried to log to step N that is less than the current step M").
+        # Instead hand them back so the caller merges them into step_log, which
+        # is logged once at the correct step.
+        self._last_rgb_cam_stats = rgb_stats
+
+        return wandb.Image(img, caption=f"Wrist-RGB Grad-CAM Epoch {self.epoch}")
+
+
     def run(self):
         cfg = copy.deepcopy(self.cfg)
         
@@ -325,7 +707,13 @@ class TrainManiFlowDexWorkspace:
             RUN_CKPT = True
             verbose = False
         
-        RUN_VALIDATION = False # reduce time cost
+
+        # Upstream hardcoded this to False ("reduce time cost"), which silently
+        # disabled the whole validation block below - val_loss was never
+        # written, so it could not be used to pick checkpoints. The cost is
+        # small for this dataset: ~36 forward-only batches every val_every
+        # epochs against 429 training steps per epoch, i.e. ~1%.
+        RUN_VALIDATION = cfg.training.get("run_validation", True)
         
         # resume training
         if cfg.training.resume:
@@ -350,7 +738,36 @@ class TrainManiFlowDexWorkspace:
 
         # configure validation dataset
         val_dataset = dataset.get_validation_dataset()
+
+        # Action MSE on held-out data, per task phase and optionally
+        # min-over-k to stay fair under grasp ambiguity. Built from the val
+        # dataset because the phase labels come from its replay buffer.
+        val_action_evaluator = None
+        if cfg.training.get('val_action_metrics', True):
+            try:
+                val_action_evaluator = ValActionEvaluator(
+                    val_dataset,
+                    n_samples=cfg.training.get('val_action_samples', 1),
+                    max_batches=cfg.training.get('val_action_max_batches',
+                                                 cfg.training.max_val_steps))
+            except Exception as e:
+                cprint(f"[val-metrics] disabled: {e}", "yellow")
         val_dataloader = DataLoader(val_dataset, **cfg.val_dataloader)
+
+        # Action MSE on held-out data, split by task phase and optionally
+        # min-over-k so grasp ambiguity is not counted as error. This is the
+        # metric val_loss is NOT: val_loss is flow-velocity MSE at a random t,
+        # while the policy is judged on the ODE rollout endpoint.
+        val_action_evaluator = None
+        if cfg.training.get('val_action_metrics', True):
+            try:
+                val_action_evaluator = ValActionEvaluator(
+                    val_dataset,
+                    n_samples=cfg.training.get('val_action_samples', 1),
+                    max_batches=cfg.training.get(
+                        'val_action_max_batches', cfg.training.max_val_steps))
+            except Exception as e:
+                cprint(f"[val-metrics] disabled: {e}", "yellow")
 
         self.model.set_normalizer(normalizer)
         if cfg.training.use_ema:
@@ -565,6 +982,20 @@ class TrainManiFlowDexWorkspace:
                         # log epoch average validation loss
                         step_log['val_loss'] = val_loss
 
+                # --- action MSE on held-out data, split by task phase ---
+                # val_loss above is flow-velocity MSE at a random t; this is
+                # the endpoint of the actual ODE rollout. The two disagree
+                # (see val_action_metrics.py), and only this one matches what
+                # the policy is judged on.
+                if val_action_evaluator is not None:
+                    try:
+                        step_log.update(val_action_evaluator.evaluate(
+                            policy=policy,
+                            val_dataloader=val_dataloader,
+                            device=device))
+                    except Exception as e:
+                        cprint(f"[val-metrics] failed: {e}", "yellow")
+
             # run diffusion sampling on a training batch
             if (self.epoch % cfg.training.sample_every) == 0:
                 with torch.no_grad():
@@ -587,17 +1018,47 @@ class TrainManiFlowDexWorkspace:
             # ========= Grad-CAM Visualization =========
             grad_cam_every = cfg.training.get('grad_cam_every', 0)
             if grad_cam_every > 0 and (self.epoch % grad_cam_every) == 0:
+                # Deterministic frames (see get_grad_cam_batch) so the same
+                # frames are shown every epoch and differences reflect learning.
+                cam_batch = self.get_grad_cam_batch(
+                    dataset=dataset,
+                    fallback_batch=train_sampling_batch,
+                    device=device)
+                cam_batch = dict_apply(
+                    cam_batch, lambda x: x.to(device, non_blocking=True))
+
+                # --- Point cloud: input-gradient saliency ---
                 try:
                     grad_cam_img = self.compute_grad_cam(
-                        batch=train_sampling_batch,
+                        batch=cam_batch,
                         policy=policy,
                         device=device
                     )
                     if grad_cam_img is not None:
                         step_log['grad_cam'] = grad_cam_img
+                        # Merge scalars here so they land on the same (current)
+                        # step as the rest of step_log.
+                        step_log.update(getattr(self, '_last_pc_cam_stats', {}) or {})
                         cprint(f"[Grad-CAM] Logged at epoch {self.epoch}", "cyan")
                 except Exception as e:
                     cprint(f"[Grad-CAM] Failed: {e}", "yellow")
+
+                # --- Wrist RGB: true conv-layer Grad-CAM ---
+                try:
+                    rgb_cam_img = self.compute_grad_cam_rgb(
+                        batch=cam_batch,
+                        device=device
+                    )
+                    if rgb_cam_img is not None:
+                        step_log['grad_cam_rgb'] = rgb_cam_img
+                        step_log.update(getattr(self, '_last_rgb_cam_stats', {}) or {})
+                        cprint(f"[Grad-CAM/RGB] Logged at epoch {self.epoch}", "cyan")
+                except Exception as e:
+                    cprint(f"[Grad-CAM/RGB] Failed: {e}", "yellow")
+
+                # Both passes call .backward(), leaving grads on parameters.
+                # Clear them so the next optimizer.step() is not contaminated.
+                self.optimizer.zero_grad(set_to_none=True)
             # ============================================
 
             if env_runner is None:
@@ -617,13 +1078,54 @@ class TrainManiFlowDexWorkspace:
                     new_key = key.replace('/', '_')
                     metric_dict[new_key] = value
                 
-                # We can't copy the last checkpoint here
-                # since save_checkpoint uses threads.
-                # therefore at this point the file might have been empty!
-                topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
+                # TopKCheckpointManager indexes metric_dict directly, and
+                # format_str interpolates it too, so a key that is only
+                # written on some epochs raises KeyError mid-run. val_loss is
+                # written under `epoch % val_every == 0` and
+                # train_action_mse_error under `epoch % sample_every == 0`,
+                # neither of which has to line up with checkpoint_every.
+                # Skip top-k selection for this epoch instead of dying; the
+                # last/snapshot checkpoints above are already saved.
+                required = {cfg.checkpoint.topk.monitor_key}
+                required |= set(
+                    f for _, f, _, _ in string.Formatter().parse(
+                        cfg.checkpoint.topk.format_str) if f
+                )
+                missing = sorted(required - set(metric_dict))
+                if missing:
+                    cprint(
+                        f"[topk] epoch {self.epoch}: skipping top-k checkpoint, "
+                        f"missing metric(s) {missing}. Set checkpoint_every "
+                        f"({cfg.training.checkpoint_every}) to a multiple of "
+                        f"val_every ({cfg.training.val_every}) and "
+                        f"sample_every ({cfg.training.sample_every}).",
+                        "yellow",
+                    )
+                    topk_ckpt_path = None
+                else:
+                    # We can't copy the last checkpoint here
+                    # since save_checkpoint uses threads.
+                    # therefore at this point the file might have been empty!
+                    topk_ckpt_path = topk_manager.get_ckpt_path(metric_dict)
 
                 if topk_ckpt_path is not None:
                     self.save_checkpoint(path=topk_ckpt_path)
+
+                # --- rank-independent checkpoint grid ---
+                # Top-k alone can leave large holes: if the monitor metric
+                # moves monotonically, the first k measurements occupy every
+                # slot and later checkpoints are discarded on write. On run
+                # bmq17ag4 that meant nothing past epoch 100 was kept, while
+                # the true action-MSE optimum sat at epoch 50 - inside the
+                # saved range by luck, not by design. This grid is
+                # independent of any ranking, so the metric used to choose a
+                # checkpoint stays revisable after training.
+                grid = cfg.checkpoint.get('save_every_n_epochs', 0)
+                if grid and (self.epoch % grid) == 0:
+                    grid_path = pathlib.Path(self.output_dir).joinpath(
+                        'checkpoints', f'grid_epoch={self.epoch:04d}.ckpt')
+                    self.save_checkpoint(path=grid_path)
+                    cprint(f"[grid] saved {grid_path.name}", "cyan")
             # ========= eval end for this epoch ==========
             policy.train()
 
@@ -632,12 +1134,6 @@ class TrainManiFlowDexWorkspace:
             wandb_run.log(step_log, step=self.global_step)
             self.global_step += 1
             self.epoch += 1
-
-            # Progressive Proprioception Masking
-            max_prob = cfg.training.get('proprio_mask_max_prob', 0.2)
-            warmup_epochs = cfg.training.get('proprio_mask_warmup_epochs', 100)
-            dataset.proprio_mask_prob = min(max_prob, (self.epoch / warmup_epochs) * max_prob)
-
 
             del step_log
 

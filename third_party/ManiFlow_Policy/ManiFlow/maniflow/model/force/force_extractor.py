@@ -20,3 +20,4 @@ def force_cnn(force_cond_len: int, encoder_output_dim: int):
             nn.ReLU(),
             nn.Conv1d(in_channels=128, out_channels=encoder_output_dim, kernel_size=3, padding=1),
         )
+

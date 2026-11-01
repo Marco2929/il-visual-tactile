@@ -6,7 +6,7 @@ from maniflow.common.pytorch_util import dict_apply
 from maniflow.common.replay_buffer import ReplayBuffer
 from maniflow.common.sampler import (
     SequenceSampler, get_val_mask, downsample_mask)
-from maniflow.model.common.normalizer import LinearNormalizer, SingleFieldLinearNormalizer
+from maniflow.model.common.normalizer import LinearNormalizer
 from maniflow.dataset.base_dataset import BaseDataset
 from termcolor import cprint
 
@@ -21,87 +21,63 @@ class RealDexDataset(BaseDataset):
             val_ratio=0.0,
             max_train_episodes=None,
             task_name=None,
-            # Spatial augmentation
-            augment=False,
-            # Additional modalitites
-            use_force=False,
             use_wrist_rgb=False,
-            use_progress=False,
-            aux_action=False,
-            aux_force=False,
-            augment_shift=0.05,
+            # Keep only the first N wrist frames per sample (None = full horizon).
+            wrist_obs_steps=None,
+            use_front_rgb=False,
+            # Same for the front camera. Independent of wrist_obs_steps so the
+            # two cameras can carry different history lengths if needed.
+            front_obs_steps=None,
             # Noise augmentation 
             use_noise_augmentation=False,
             pc_xyz_noise_std=0.002,
-            pc_rgb_noise_std=0.01,
             agent_pos_noise_std=0.0002,
-            # Color jitter
-            use_color_jitter=False,
-            brightness_range=(-0.125, 0.125),
-            contrast_range=(0.5, 1.5),
-            saturation_range=(0.5, 1.5),
             ):
         super().__init__()
         self.task_name = task_name
-        self.augment = augment
-        self.augment_shift = augment_shift
         self.use_noise_augmentation = use_noise_augmentation
         self.pc_xyz_noise_std = pc_xyz_noise_std
-        self.pc_rgb_noise_std = pc_rgb_noise_std
         self.agent_pos_noise_std = agent_pos_noise_std
-        self.use_color_jitter = use_color_jitter
-        self.brightness_range = brightness_range
-        self.contrast_range = contrast_range
-        self.saturation_range = saturation_range
-        self.aux_action = aux_action
-        self.aux_force = aux_force
-        self.use_force = use_force
         self.use_wrist_rgb = use_wrist_rgb
-        self.use_progress = use_progress
+        self.wrist_obs_steps = wrist_obs_steps
+        self.use_front_rgb = use_front_rgb
+        self.front_obs_steps = front_obs_steps
 
         # 1. Base keys that must always be loaded
         keys_to_load = ['state', 'action', 'point_cloud']
 
-        # 2. Dynamically add conditioning (Inputs)
-        if use_force:
-            keys_to_load.append('hand_obs')
+        # 2. Dynamically add RGB conditioning (Inputs).
+        # Order is SORTED, not insertion order: the encoder concatenates its
+        # per-key token groups in sorted key order, and the two must agree or
+        # the conditioning tokens land in the wrong group after a reload.
+        # ('front_rgb' < 'wrist_rgb')
+        self.rgb_keys = sorted(
+            (["wrist_rgb"] if use_wrist_rgb else [])
+            + (["front_rgb"] if use_front_rgb else [])
+        )
+        # Per-key history length, consumed in _sample_to_data().
+        self.rgb_obs_steps = {
+            "wrist_rgb": wrist_obs_steps,
+            "front_rgb": front_obs_steps,
+        }
+        keys_to_load.extend(self.rgb_keys)
 
-        # 2b. Dynamically add wrist RGB conditioning (Inputs)
-        if use_wrist_rgb:
-            keys_to_load.append('wrist_rgb')
-
-        # 3. Dynamically add progress
-        if use_progress:
-            keys_to_load.append('progress')
-
-        # 4. Dynamically add Auxiliary Tasks (Outputs)
-        if aux_action:
-            keys_to_load.append('aux_action/ee_pose')
-        if aux_force:
-            keys_to_load.append('aux_action/force')
-
-        # 5. Load the ReplayBuffer exactly ONCE
+        # 3. Load the ReplayBuffer exactly ONCE
         self.replay_buffer = ReplayBuffer.copy_from_path(
             zarr_path, keys=keys_to_load
         )
 
-        # 6. Dynamic logging for clarity
+        # 4. Dynamic logging for clarity
         cprint("--------------------------", "cyan")
         cprint(f"Dataset loaded with keys: {keys_to_load}", "cyan")
-        
-        if use_force:
-            cprint("Progress pediction enabled", "cyan")
 
-        if use_force:
-            cprint("Conditioning: hand_obs (Force/Palm Features) enabled", "cyan")
-
-        if use_wrist_rgb:
-            cprint("Conditioning: wrist_rgb (Wrist RGB camera) enabled", "cyan")
-            
-        if aux_action or aux_force:
-            cprint(f"Auxiliary Tasks enabled: ee_pose={aux_action}, force={aux_force}", "cyan")
-        else:
-            cprint("Auxiliary Tasks disabled: action dim = joint only", "yellow")
+        for key in self.rgb_keys:
+            cprint(f"Conditioning: {key} enabled "
+                   f"{self.replay_buffer[key].shape[1:]}", "cyan")
+            steps = self.rgb_obs_steps.get(key)
+            if steps is not None:
+                cprint(f"  {key} sliced to first {steps} frames "
+                       f"of horizon {horizon}", "cyan")
             
         cprint("--------------------------", "cyan")
             
@@ -134,14 +110,10 @@ class RealDexDataset(BaseDataset):
         pc_shape = self.replay_buffer['point_cloud'].shape
         self.has_pc_color = pc_shape[-1] == 6
 
-        self.proprio_mask_prob = 0.0
-
         # Log augmentation settings
         cprint("--------------------------", "green")
         cprint(f"[RealDexDataset] Augmentation settings:", "green")
-        cprint(f"  Spatial shift: {augment} (±{augment_shift}m)", "green")
-        cprint(f"  Noise: {use_noise_augmentation} (xyz={pc_xyz_noise_std}, rgb={pc_rgb_noise_std}, pos={agent_pos_noise_std})", "green")
-        cprint(f"  Color jitter: {use_color_jitter} (has_color={self.has_pc_color})", "green")
+        cprint(f"  Noise: {use_noise_augmentation} (xyz={pc_xyz_noise_std}, pos={agent_pos_noise_std})", "green")
         cprint("--------------------------", "green")
 
     def get_validation_dataset(self):
@@ -154,37 +126,16 @@ class RealDexDataset(BaseDataset):
             episode_mask=~self.train_mask)
         val_set.train_mask = ~self.train_mask
         # Disable ALL augmentation for validation
-        val_set.augment = False
         val_set.use_noise_augmentation = False
-        val_set.use_color_jitter = False
         return val_set
 
     def get_normalizer(self, mode='limits', **kwargs):
-        action_components = [self.replay_buffer['action']]
-        
-        if 'aux_action/ee_pose' in self.replay_buffer:
-            action_components.append(self.replay_buffer['aux_action/ee_pose'])
-            
-        if 'aux_action/force' in self.replay_buffer:
-            action_components.append(self.replay_buffer['aux_action/force'])
-            
-        combined_action = np.concatenate(action_components, axis=-1)
-        
         data = {
-            'action': combined_action,
+            'action': self.replay_buffer['action'],
             'agent_pos': self.replay_buffer['state'],
             'point_cloud': self.replay_buffer['point_cloud'],
         }
-        
-        if 'hand_obs' in self.replay_buffer:
-            data['hand_obs'] = self.replay_buffer['hand_obs']
 
-        if 'progress' in self.replay_buffer:
-            progress_data = self.replay_buffer['progress']
-            if progress_data.ndim == 1:
-                progress_data = progress_data[:, np.newaxis]
-            data['progress'] = progress_data
-            
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
         
@@ -198,64 +149,38 @@ class RealDexDataset(BaseDataset):
         agent_pos = sample['state'][:].astype(np.float32)
         point_cloud = sample['point_cloud'][:].astype(np.float32)
 
-        # 2. Dynamically build the action array based on available keys
-        action_components = [sample['action'][:].astype(np.float32)]
+        # 2. Action
+        action = sample['action'][:].astype(np.float32)
 
-        if 'aux_action/ee_pose' in sample:
-            action_components.append(sample['aux_action/ee_pose'][:].astype(np.float32))
-            
-        if 'aux_action/force' in sample:
-            action_components.append(sample['aux_action/force'][:].astype(np.float32))
-
-        action = np.concatenate(action_components, axis=-1)
-
-        if self.augment:
-            if self.aux_action:
-                cprint("Aux action is not using spatial shift", "red")
-                pass
-            else: 
-                point_cloud, action, agent_pos = self._apply_spatial_shift(point_cloud, action, agent_pos)
-
-        # 4. Sensor-Noise (XYZ + RGB + Proprioception)
+        # 3. Sensor noise (PC xyz + proprioception)
         if self.use_noise_augmentation:
             point_cloud, agent_pos = self._apply_noise(point_cloud, agent_pos)
 
-        # 5. Color Jitter (only if PC has color)
-        if self.use_color_jitter and self.has_pc_color:
-            point_cloud = self._apply_color_jitter(point_cloud)
-
-        # 6. Progressive Proprioception Masking
-        if self.augment and np.random.random() < self.proprio_mask_prob:
-                agent_pos = np.random.uniform(-1.0, 1.0, size=agent_pos.shape).astype(np.float32)
-
-        # 7. Dynamically build the observation dictionary
+        # 4. Build the observation dictionary
         obs_dict = {
             'point_cloud': point_cloud,
             'agent_pos': agent_pos,
         }
-        
-        # Inject hand_obs (Force/Palm features) if they were loaded by the dataset
-        if 'hand_obs' in sample:
-            obs_dict['hand_obs'] = sample['hand_obs'][:].astype(np.float32)
 
-        # Inject wrist_rgb if it was loaded by the dataset.
+        # Inject every loaded RGB stream.
         # NOTE: NOT normalized here - the image encoder does /255 itself.
-        # Wrist-RGB is stored as (T, H, W, C) in the zarr.
-        if 'wrist_rgb' in sample:
-            obs_dict['wrist_rgb'] = sample['wrist_rgb'][:].astype(np.float32)
+        # RGB is stored as (T, H, W, C) uint8 in the zarr.
+        # Keep it uint8! Casting to float32 here is a 4x memory blowup in every
+        # dataloader worker (horizon=64 -> 9.4MB vs 37.7MB per sample) and is
+        # pure waste, since the encoder divides by 255 on the GPU anyway.
+        # Only the first n_obs_steps frames are ever consumed by the encoder,
+        # so keeping the full horizon wastes ~30x memory per worker.
+        for key in self.rgb_keys:
+            if key not in sample:
+                continue
+            steps = self.rgb_obs_steps.get(key)
+            obs_dict[key] = (sample[key][:steps] if steps is not None
+                             else sample[key][:])
 
-        data = {
+        return {
             'obs': obs_dict,
             'action': action
         }
-
-        if 'progress' in sample:
-            progress = sample['progress'][:].astype(np.float32)
-            if progress.ndim == 1:
-                progress = progress[:, np.newaxis]  # (T,) → (T, 1)
-            data['progress'] = progress
-
-        return data
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         sample = self.sampler.sample_sequence(idx)
@@ -267,19 +192,6 @@ class RealDexDataset(BaseDataset):
     # Augmentation methods
     # =========================================================================
 
-    def _apply_spatial_shift(self, point_cloud, action, agent_pos):
-        """Geometrisch konsistenter Shift — simuliert andere Objektposition."""
-        shift = np.random.uniform(
-            [-self.augment_shift, -self.augment_shift, -0.01],
-            [ self.augment_shift,  self.augment_shift,  0.01],
-            size=(3,)
-        ).astype(np.float32)
-
-        point_cloud[:, :, :3] += shift.reshape(1, 1, 3)
-        action[:, :3] += shift.reshape(1, 3)
-        agent_pos[:, :3] += shift.reshape(1, 3)
-        return point_cloud, action, agent_pos
-
     def _apply_noise(self, point_cloud, agent_pos):
         """Unabhängiges Sensor-Noise — Robustheit gegen Messrauschen."""
         # XYZ noise auf Punktwolke
@@ -289,16 +201,6 @@ class RealDexDataset(BaseDataset):
         xyz_noise = np.clip(xyz_noise, -2*self.pc_xyz_noise_std, 2*self.pc_xyz_noise_std)
         point_cloud[:, :, :3] += xyz_noise
 
-        # RGB noise (nur wenn Farbe vorhanden)
-        if self.has_pc_color and self.pc_rgb_noise_std > 0:
-            rgb_noise = np.random.normal(
-                0, self.pc_rgb_noise_std, point_cloud[:, :, 3:].shape
-            ).astype(np.float32)
-            rgb_noise = np.clip(rgb_noise, -2*self.pc_rgb_noise_std, 2*self.pc_rgb_noise_std)
-            point_cloud[:, :, 3:] += rgb_noise
-            # Clip RGB to valid range [0, 1]
-            point_cloud[:, :, 3:] = np.clip(point_cloud[:, :, 3:], 0.0, 1.0)
-
         # Leichtes Noise auf Propriozeption
         pos_noise = np.random.normal(
             0, self.agent_pos_noise_std, agent_pos.shape
@@ -307,35 +209,3 @@ class RealDexDataset(BaseDataset):
         agent_pos += pos_noise
 
         return point_cloud, agent_pos
-
-    def _apply_color_jitter(self, point_cloud):
-        """Color Jitter auf RGB-Kanäle der Punktwolke."""
-        # Nur auf RGB (Kanäle 3:6)
-        rgb = point_cloud[:, :, 3:]  # (T, N, 3)
-        original_shape = rgb.shape
-        rgb_flat = rgb.reshape(-1, 3)
-
-        # 1. Brightness
-        brightness_delta = np.random.uniform(
-            self.brightness_range[0], self.brightness_range[1])
-        rgb_flat = rgb_flat + brightness_delta
-
-        # 2. Contrast
-        contrast_factor = np.random.uniform(
-            self.contrast_range[0], self.contrast_range[1])
-        rgb_mean = rgb_flat.mean()
-        rgb_flat = (rgb_flat - rgb_mean) * contrast_factor + rgb_mean
-
-        # 3. Saturation
-        saturation_factor = np.random.uniform(
-            self.saturation_range[0], self.saturation_range[1])
-        gray = (0.299 * rgb_flat[:, 0:1] +
-                0.587 * rgb_flat[:, 1:2] +
-                0.114 * rgb_flat[:, 2:3])
-        rgb_flat = gray + (rgb_flat - gray) * saturation_factor
-
-        # Clip to [0, 1]
-        rgb_flat = np.clip(rgb_flat, 0.0, 1.0)
-
-        point_cloud[:, :, 3:] = rgb_flat.reshape(original_shape)
-        return point_cloud

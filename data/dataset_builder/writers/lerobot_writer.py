@@ -10,6 +10,11 @@ from lerobot.datasets import LeRobotDataset
 import torch
 import shutil
 
+from metadata import (
+    build_prehensio_jsonl_row,
+    build_prehensio_record,
+)
+
 
 class LeRobotWriter:
     """Write dataset in LeRobot format iteratively to avoid memory overflow."""
@@ -25,6 +30,18 @@ class LeRobotWriter:
         self.existing_episodes = 0
         self.existing_frames = 0
         self.dataset = None
+
+        # Rows for meta/prehensio/episodes.jsonl, collected during the build
+        # and written once in finalize(). Buffered rather than appended
+        # per-episode so an aborted build cannot leave the index file
+        # describing episodes whose parquet/video never got written.
+        self._prehensio_rows = []
+
+        # Identity fields the Prehensio viewer shows but that are not part of
+        # the recording itself. Overridable from the task YAML's meta block.
+        meta_cfg = getattr(config, "meta_config", None) or {}
+        self.cell = meta_cfg.get("cell", "bosch")
+        self.recording_pc = meta_cfg.get("pc", "")
 
         # Determine local path
         self.local_dir = os.path.join(
@@ -52,8 +69,17 @@ class LeRobotWriter:
             self.existing_episodes = info.get("total_episodes", 0)
             self.existing_frames = info.get("total_frames", 0)
 
-    def append_episode(self, episode_data: dict):
-        """Write episode directly to LeRobot Dataset to save RAM."""
+    def append_episode(self, episode_data: dict, episode_ref=None):
+        """Write episode directly to LeRobot Dataset to save RAM.
+
+        Args:
+            episode_data: the per-frame streams for one episode.
+            episode_ref: optional EpisodeRef. Carries `.metadata`
+                (labels.json) and `.name`, which together make up the
+                Prehensio sidecar. Optional so the writer stays usable
+                standalone, in which case only the viewer's mandatory
+                fields get written.
+        """
         
         # Initialize the dataset on the very first call if not started in append mode
         if self.dataset is None:
@@ -103,17 +129,121 @@ class LeRobotWriter:
         # Trigger saving the episode to disk
         self.dataset.save_episode()
         
+        # Episode index must be read BEFORE the counter is bumped: the
+        # episode just written is the one at the current count.
+        self._record_prehensio_meta(
+            episode_ref=episode_ref,
+            episode_index=self.existing_episodes,
+            n_frames=n_frames,
+        )
+
         # Update counters
         self.existing_episodes += 1
         self.existing_frames += n_frames
         
         cprint(f"   Episode {self.existing_episodes - 1}: {n_frames} frames", "cyan")
 
+    def _record_prehensio_meta(self, episode_ref, episode_index: int,
+                              n_frames: int):
+        """Write one meta/prehensio/episode_XXXXXX.json and buffer its row.
+
+        The viewer reads this directory, not LeRobot's own metadata, so the
+        file is written per episode (cheap, and survives an interrupted
+        build) while the index file is deferred to finalize().
+
+        Failures here are logged and swallowed: the sidecar is for the
+        viewer, and losing it must not destroy an otherwise complete
+        dataset.
+        """
+        record = getattr(episode_ref, "metadata", None) or {}
+        source = getattr(episode_ref, "name", "") or ""
+
+        try:
+            prehensio_dir = Path(self.local_dir) / "meta" / "prehensio"
+            prehensio_dir.mkdir(parents=True, exist_ok=True)
+
+            episode_json = build_prehensio_record(
+                record,
+                episode_index=episode_index,
+                source=source,
+                dataset=self.config.name,
+                task=self.task,
+                n_frames=n_frames,
+                fps=self.fps,
+                cell=self.cell,
+                pc=self.recording_pc,
+            )
+            out_path = prehensio_dir / f"episode_{episode_index:06d}.json"
+            with open(out_path, "w") as f:
+                json.dump(episode_json, f, indent=2)
+
+            self._prehensio_rows.append(build_prehensio_jsonl_row(
+                record,
+                episode_index=episode_index,
+                task=self.task,
+                n_frames=n_frames,
+                fps=self.fps,
+                cell=self.cell,
+                pc=self.recording_pc,
+            ))
+        except OSError as e:
+            cprint(f"   ⚠️  Prehensio metadata not written: {e}", "yellow")
+
+    def _write_prehensio_index(self):
+        """Write meta/prehensio/episodes.jsonl from the buffered rows.
+
+        In append mode the existing rows are read back and kept, then only
+        the indices this build produced are replaced. Rewriting the file from
+        the buffer alone would drop every episode from previous builds, which
+        is exactly what append mode exists to avoid.
+        """
+        if not self._prehensio_rows:
+            return
+
+        path = Path(self.local_dir) / "meta" / "prehensio" / "episodes.jsonl"
+        rows_by_index = {}
+
+        if self.append and path.exists():
+            try:
+                with open(path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        row = json.loads(line)
+                        rows_by_index[row.get("episode_index")] = row
+            except (OSError, json.JSONDecodeError) as e:
+                cprint(
+                    f"   ⚠️  Could not read existing episodes.jsonl "
+                    f"({e}); writing only this build's rows",
+                    "yellow",
+                )
+                rows_by_index = {}
+
+        for row in self._prehensio_rows:
+            rows_by_index[row["episode_index"]] = row
+
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w") as f:
+                for index in sorted(
+                    k for k in rows_by_index if k is not None
+                ):
+                    f.write(json.dumps(rows_by_index[index]) + "\n")
+            cprint(
+                f"   Prehensio metadata: {len(rows_by_index)} episodes",
+                "green",
+            )
+        except OSError as e:
+            cprint(f"   ⚠️  episodes.jsonl not written: {e}", "yellow")
+
     def finalize(self, push: bool = False):
         """Finalize the LeRobot dataset (push if requested)."""
         if self.dataset is None:
             cprint("⚠️  No episodes to write to LeRobot", "yellow")
             return
+
+        self._write_prehensio_index()
 
         if push:
             self.dataset.push_to_hub()
