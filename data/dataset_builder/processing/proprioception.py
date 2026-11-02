@@ -86,6 +86,25 @@ def compute_ee_pose(joint_names: List[str],
     return ee_poses
 
 
+# Tesollo DG-5F hand constants
+TESOLLO_HAND_DOF = 20
+JOINTS_PER_FINGER = 4
+PINCH_FINGERS = (1, 2)  # thumb + index: rj_dg_1_*, rj_dg_2_*
+PINCH_HAND_INDICES = [(f - 1) * JOINTS_PER_FINGER + j
+                      for f in PINCH_FINGERS
+                      for j in range(JOINTS_PER_FINGER)]
+
+
+def pinch_hand_indices() -> list:
+    """Return the 8 hand-local joint indices for thumb + index pinch."""
+    return list(PINCH_HAND_INDICES)
+
+
+def tesollo_joint_name(finger: int, joint: int) -> str:
+    """Return the canonical joint name for finger (1-5) and joint (1-4)."""
+    return f"rj_dg_{finger}_{joint}"
+
+
 def compute_hand_state(joint_states: np.ndarray, hand_config: Dict) -> np.ndarray:
     """
     Extract hand joint positions.
@@ -94,7 +113,7 @@ def compute_hand_state(joint_states: np.ndarray, hand_config: Dict) -> np.ndarra
     """
     hand_joints = joint_states[:, 6:]
     num_hand = hand_joints.shape[1]
-    hardware = hand_config["hardware"]
+    hardware = hand_config.get("hardware", "tesollo")
     expected = {"inspire": 6, "tesollo": 20}
 
     if hardware in expected and num_hand != expected[hardware]:
@@ -102,6 +121,9 @@ def compute_hand_state(joint_states: np.ndarray, hand_config: Dict) -> np.ndarra
             f"Hand mismatch: expected {expected[hardware]} for '{hardware}', got {num_hand}",
             "yellow", attrs=["bold"]
         )
+
+    if hand_config.get("pinch", False) and hardware == "tesollo":
+        hand_joints = hand_joints[:, pinch_hand_indices()]
 
     return hand_joints.astype(np.float32)
 

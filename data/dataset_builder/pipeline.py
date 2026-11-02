@@ -72,88 +72,93 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
         recorded_action = reduce_recorded_action(
             recorded_action, config.hand_config)
 
-    src_fps = measure_fps(episode_dir)
+    # Unwrap arm joints
+    joint_states[:, :6] = np.unwrap(joint_states[:, :6], axis=0)
 
-    # --- 1c. Unwrap + optional downsampling BEFORE FK ---
-    # Smoothing was removed on purpose; see processing/resampling.py for the
-    # measurements behind that decision.
+    # --- 1c. Optional downsampling BEFORE FK ---
+    # Only active if explicitly enabled in config (resample.enabled: true)
     rs = config.resample_config
-    joint_states, force_raw, keep_idx = resample_episode(
-        joint_states, force_raw,
-        target_fps=rs["target_fps"],
-        src_fps=src_fps,
-        enabled=rs.get("enabled", True),
-    )
-    num_frames = len(joint_states)
-    if recorded_action is not None:
-        recorded_action = recorded_action[keep_idx]
+    keep_idx = None
+    if rs.get("enabled", False):
+        src_fps = measure_fps(episode_dir)
+        joint_states, force_raw, keep_idx = resample_episode(
+            joint_states, force_raw,
+            target_fps=rs["target_fps"],
+            src_fps=src_fps,
+            state_smooth=rs.get("state_smoothing"),
+            force_smooth=rs.get("force_smoothing"),
+            enabled=True,
+        )
+        num_frames = len(joint_states)
+        if recorded_action is not None:
+            recorded_action = recorded_action[keep_idx]
 
     # --- 1d. Trim the approach away (optional) ---
-    # Runs HERE, before any image/point-cloud loading, for two reasons:
-    #   * compute_actions uses _shift_next, so the cut has to happen first.
-    #     Trimming afterwards would leave frame 0 with an action copied from
-    #     the discarded approach.
-    #   * the trim needs ee z and the finger joints, i.e. FK + hand_state,
-    #     which is why those two moved up from section 3.
-    # Every other modality is indexed with keep_idx, so slicing keep_idx
-    # itself propagates the cut to RGB/depth/point clouds by construction -
-    # they cannot desynchronise.
     ee_pose = compute_ee_pose(joint_names, joint_states, chain)
     hand_state = compute_hand_state(joint_states, config.hand_config)
-
-    trim_state = build_state_vector(
-        ee_pose=ee_pose,
-        hand_state=hand_state,
-        joint_states=joint_states,
-        config=config.proprio_config,
-    )
-    # Length AFTER resampling - that is the frame of reference trim indices
-    # live in, so the stored provenance must use it too.
     resampled_frames = num_frames
 
-    trim = compute_trim(trim_state, config.trim_config)
-    if trim.skip:
-        cprint(f"  ⊘ dropped: {trim.reason}", "yellow")
-        return None
+    if config.trim_config.get("enabled"):
+        trim_state = build_state_vector(
+            ee_pose=ee_pose,
+            hand_state=hand_state,
+            joint_states=joint_states,
+            config=config.proprio_config,
+        )
+        trim = compute_trim(trim_state, config.trim_config)
+        if trim.skip:
+            cprint(f"  ⊘ dropped: {trim.reason}", "yellow")
+            return None
 
-    if trim.start > 0 or trim.end < num_frames:
-        sl = trim.slice
-        joint_states = joint_states[sl]
-        force_raw = force_raw[sl]
-        ee_pose = ee_pose[sl]
-        hand_state = hand_state[sl]
-        keep_idx = keep_idx[sl]
-        if recorded_action is not None:
-            recorded_action = recorded_action[sl]
-        num_frames = len(joint_states)
+        if trim.start > 0 or trim.end < num_frames:
+            sl = trim.slice
+            joint_states = joint_states[sl]
+            if force_raw is not None:
+                force_raw = force_raw[sl]
+            ee_pose = ee_pose[sl]
+            hand_state = hand_state[sl]
+            if recorded_action is not None:
+                recorded_action = recorded_action[sl]
+            if keep_idx is not None:
+                keep_idx = keep_idx[sl]
+            else:
+                keep_idx = sl
+            num_frames = len(joint_states)
 
     # --- 2. RGB (optional) ---
-    # NOTE: resample_episode() decimated state/force with keep_idx, so every
-    # other modality MUST be indexed with the same keep_idx or it silently
-    # desynchronises from the proprioception/action stream.
     if flags["front_rgb"]:
-        # Front gets its own rgb config block: the source is 16:9 (half-HD720),
-        # not the wrist's 4:3, so a shared resolution would distort one of them.
+        front_rgb = load_front_rgb(episode_dir)
+        if keep_idx is not None:
+            front_rgb = front_rgb[keep_idx]
         episode_data["front_rgb"] = preprocess_rgb(
-            load_front_rgb(episode_dir)[keep_idx],
+            front_rgb,
             config.rgb_config_for("front_rgb"),
         )
     if flags["front_depth"]:
-        # Same keep_idx and the same crop/resize geometry as front_rgb above,
-        # which is what keeps depth pixel-aligned with its RGB frame.
+        front_depth = load_front_depth(episode_dir)
+        if keep_idx is not None:
+            front_depth = front_depth[keep_idx]
         episode_data["front_depth"] = preprocess_depth(
-            load_front_depth(episode_dir)[keep_idx],
+            front_depth,
             config.depth_config,
         )
     if flags["wrist_rgb"]:
+        wrist_rgb = load_wrist_rgb(episode_dir)
+        if keep_idx is not None:
+            wrist_rgb = wrist_rgb[keep_idx]
         episode_data["wrist_rgb"] = preprocess_rgb(
-            load_wrist_rgb(episode_dir)[keep_idx],
+            wrist_rgb,
             config.rgb_config_for("wrist_rgb"),
         )
 
     # --- 3. Point Clouds ---
-    front_pc = load_front_pc(episode_dir)[keep_idx] if flags["front_pc"] else None
-    wrist_pc = load_wrist_pc(episode_dir)[keep_idx] if flags["wrist_pc"] else None
+    front_pc = load_front_pc(episode_dir) if flags["front_pc"] else None
+    wrist_pc = load_wrist_pc(episode_dir) if flags["wrist_pc"] else None
+    if front_pc is not None and keep_idx is not None:
+        front_pc = front_pc[keep_idx]
+    if wrist_pc is not None and keep_idx is not None:
+        wrist_pc = wrist_pc[keep_idx]
+
     point_cloud = merge_point_clouds(front_pc=front_pc,
                                      wrist_pc=wrist_pc,
                                      chain=chain,
@@ -206,7 +211,10 @@ def process_episode(episode_dir: Path, config: DatasetConfig,
         progress_signal = compute_progress(
             num_frames=num_frames,
             ee_pose=ee_pose,
-            finger_sensor=hand_state[:, 3]
+            finger_sensor=hand_state,
+            progress_dict=config.progress_config,
+            joint_states=joint_states,
+            hand_state=hand_state,
         )
         
         if progress_signal is None:

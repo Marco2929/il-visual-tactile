@@ -3,36 +3,6 @@
 import numpy as np
 from typing import Dict
 
-from .proprioception import TESOLLO_HAND_DOF, pinch_hand_indices
-
-# Commanded tool0 pose (xyz + quat xyzw) recorded on /teleop/target_pose.
-RECORDED_ARM_DIM = 7
-
-
-def reduce_recorded_action(recorded_action: np.ndarray,
-                           hand_config: Dict) -> np.ndarray:
-    """Apply the pinch reduction to the recorded command's hand block.
-
-    The recorded action is always 7 + 20: the hand controller commands every
-    joint, regardless of how many the policy predicts. compute_hand_state()
-    reduces the OBSERVATION to the pinch DoF, so the action must be reduced
-    with the SAME index map, or state and action describe different hands.
-    """
-    if not hand_config.get("pinch", False):
-        return recorded_action
-
-    hand = recorded_action[:, RECORDED_ARM_DIM:]
-    if hand.shape[1] != TESOLLO_HAND_DOF:
-        raise ValueError(
-            f"pinch: true expects a {TESOLLO_HAND_DOF}-DoF recorded hand "
-            f"action (finger-major rj_dg_<1-5>_<1-4>), got {hand.shape[1]}."
-        )
-
-    keep = pinch_hand_indices()
-    return np.concatenate(
-        [recorded_action[:, :RECORDED_ARM_DIM], hand[:, keep]], axis=1
-    ).astype(np.float32)
-
 from .proprioception import (
     TESOLLO_HAND_DOF, pinch_hand_indices, tesollo_joint_name,
 )

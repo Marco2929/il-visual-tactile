@@ -360,6 +360,7 @@ class RealDexEnv(Node):
         self.point_cloud_array = []
         self.robot_state_array = []
         self.wrist_rgb_array = []
+        self.wrist_history_deque = deque(maxlen=13)
 
         self.pc_processor = PointCloudProcessor()
         self.bridge = CvBridge()
@@ -581,6 +582,10 @@ class RealDexEnv(Node):
                     self.point_cloud_array.append(point_cloud)
                     self.robot_state_array.append(cartesian_state_phys)
                     self.wrist_rgb_array.append(wrist_rgb)
+                    if len(self.wrist_history_deque) == 0:
+                        self.wrist_history_deque.extend([wrist_rgb] * 13)
+                    else:
+                        self.wrist_history_deque.append(wrist_rgb)
 
                     if len(self.point_cloud_array) > self.n_obs_steps:
                         self.point_cloud_array.pop(0)
@@ -608,6 +613,16 @@ class RealDexEnv(Node):
     def wait_for_obs(self, timeout: float = 1.0) -> bool:
         return self.new_obs_event.wait(timeout=timeout)
 
+    def reset(self):
+        """Reset observation and progress buffers before each episode."""
+        with self._obs_lock:
+            self.point_cloud_array.clear()
+            self.robot_state_array.clear()
+            self.wrist_rgb_array.clear()
+            self.wrist_history_deque.clear()
+        self.new_obs_event.clear()
+        self.progress.reset()
+
     def snapshot_obs(self):
         """Non-blocking: return latest observation as GPU tensors."""
         with self._obs_lock:
@@ -626,6 +641,14 @@ class RealDexEnv(Node):
             wrist_np = np.stack(
                 self.wrist_rgb_array[-self.n_obs_steps:], axis=0)[np.newaxis, ...]
 
+            if len(self.wrist_history_deque) > 0:
+                hist_list = list(self.wrist_history_deque)
+                while len(hist_list) < 13:
+                    hist_list.insert(0, hist_list[0])
+                wrist_hist_np = np.stack(hist_list, axis=0)[np.newaxis, ...]
+            else:
+                wrist_hist_np = None
+
         self.new_obs_event.clear()
 
         pc_tensor_cpu = torch.from_numpy(pc_np)
@@ -641,11 +664,14 @@ class RealDexEnv(Node):
             self.static_state_tensor.copy_(state_tensor_cpu, non_blocking=True)
             self.static_wrist_tensor.copy_(wrist_tensor_cpu, non_blocking=True)
 
-        return {
+        res = {
             'point_cloud': self.static_pc_tensor,
             'agent_pos': self.static_state_tensor,
             'wrist_rgb': self.static_wrist_tensor,
         }
+        if wrist_hist_np is not None:
+            res['wrist_history'] = torch.from_numpy(wrist_hist_np).to(self.device)
+        return res
 
 
 def sport_mode(action_chunk: np.ndarray, speedup: float = 1.2) -> np.ndarray:
@@ -762,6 +788,12 @@ def run_policy(
         # actually returns, before the robot moves. Raises if
         # use_progress=True on a checkpoint with no progress head.
         env.progress.validate(warmup_result)
+
+        # Reset rollout state and progress debouncer so warmup frames do not pollute the run
+        env.reset()
+        if hasattr(policy, 'reset'):
+            policy.reset()
+
         print("[INFO] Warmup complete. Starting DRTC inference loop.")
 
         # --- Telemetry ---

@@ -290,7 +290,14 @@ python data/record_utils/visualize/visualize_pointcloud.py \
 # A LeRobot dataset episode
 lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 \
   --root /root/.cache/huggingface/lerobot/Marco2929/box_opening_baseline --mode local
+
+# Progress label viewer (interaktiv mit Kamerabildern und Grasp-Signalen)
+export DISPLAY=:1
+python data/record_utils/label_viewer.py --review
+python data/record_utils/label_viewer.py --only folien_unten_b_sauele/episode_041_success
 ```
+
+*Steuerung:* `Pfeiltasten` (Frame +/-1), `Shift + Pfeile` (+/-10), `a`/`d` (nächstes/vorheriges Event), `n`/`p` (Episode), `q` (Beenden).
 
 ---
 
@@ -322,6 +329,55 @@ prints the best one:
 ```bash
 python third_party/ManiFlow_Policy/ManiFlow/scripts/sweep_checkpoints.py \
   --ckpt-dir /ros2_ws/data/outputs/<run>/checkpoints --n-batches 5
+```
+
+### Progress estimation head (DINOv3)
+
+Trained completely independently of the policy on offline cached DINOv3 wrist features.
+
+#### 1. Generate or update progress labels (optional)
+
+```bash
+python third_party/ManiFlow_Policy/ManiFlow/scripts/generate_progress_labels.py \
+  --zarr_path /ros2_ws/data/zarr_datasets/foil_lifting_baseline_cleaned.zarr
+```
+
+#### 2. Cache raw DINOv3 wrist patch tokens (one-time offline run)
+
+```bash
+python third_party/ManiFlow_Policy/ManiFlow/scripts/cache_wrist_dinov3.py \
+  --zarr_path /ros2_ws/data/zarr_datasets/foil_lifting_baseline_cleaned.zarr \
+  --key_out wrist_dinov3_tokens \
+  --batch_size 64
+```
+
+#### 3. Train the progress head
+
+```bash
+python third_party/ManiFlow_Policy/ManiFlow/scripts/train_progress_head.py \
+  --zarr_path /ros2_ws/data/zarr_datasets/foil_lifting_baseline_cleaned.zarr \
+  --token_key wrist_dinov3_tokens \
+  --save_dir checkpoints/progress_head \
+  --epochs 30 --lr 1e-3
+```
+
+Generates `best_progress_head.pt` and `val_predictions.png` in `--save_dir`.
+
+#### 4. Configure policy & deploy
+
+Set the checkpoint in `maniflow_multimodal_policy.yaml`:
+
+```yaml
+policy:
+  progress_checkpoint: "checkpoints/progress_head/best_progress_head.pt"
+```
+
+Deploy with progress monitoring / threshold:
+
+```bash
+python third_party/ManiFlow_Policy/ManiFlow/deploy.py \
+  --use-progress \
+  --progress-threshold 0.90
 ```
 
 

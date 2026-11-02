@@ -436,11 +436,32 @@ class DatasetConfig:
 def load_config(config_path: str) -> DatasetConfig:
     """Load YAML config from disk and return typed wrapper."""
     path = Path(config_path)
+    if not path.exists() and path.with_suffix(".yaml").exists():
+        path = path.with_suffix(".yaml")
+    elif not path.exists() and path.with_suffix(".yml").exists():
+        path = path.with_suffix(".yml")
+
     if not path.exists():
         raise FileNotFoundError(f"Config not found: {path}")
 
     with open(path, 'r') as f:
         raw = yaml.safe_load(f)
 
-    # TODO: Add schema validation (pydantic or jsonschema)
-    return DatasetConfig(raw=raw)
+    cfg = DatasetConfig(raw=raw)
+
+    # Set FOLDER_NAME and EPISODES_SUBDIR from config if not already set in the
+    # environment, so camera_info and other tools align with the dataset being built.
+    import os
+    if "FOLDER_NAME" not in os.environ and cfg.cache_sources:
+        first_folder = cfg.cache_sources[0]["dir"]
+        os.environ["FOLDER_NAME"] = first_folder
+        if "EPISODES_SUBDIR" not in os.environ:
+            for base in ["/ros2_ws/data/episodes", str(path.resolve().parents[1] / "episodes")]:
+                if os.path.exists(os.path.join(base, "external", first_folder)):
+                    os.environ["EPISODES_SUBDIR"] = "external"
+                    break
+                elif os.path.exists(os.path.join(base, first_folder)):
+                    os.environ["EPISODES_SUBDIR"] = ""
+                    break
+
+    return cfg

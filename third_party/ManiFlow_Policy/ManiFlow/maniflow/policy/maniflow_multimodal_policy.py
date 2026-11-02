@@ -75,6 +75,7 @@ class ManiFlowMultimodalPolicy(BasePolicy):
             sample_dt_mode_consistency="uniform", 
             sample_target_t_mode="relative", # relative, absolute
             proprio_dropout_prob=0.1,
+            progress_checkpoint=None,
             **kwargs):
         super().__init__()
 
@@ -290,7 +291,35 @@ class ManiFlowMultimodalPolicy(BasePolicy):
         cprint(f"  - sample_dt_mode_consistency: {self.sample_dt_mode_consistency}", "yellow")
         cprint(f"  - sample_target_t_mode: {self.sample_target_t_mode}", "yellow")
 
+        # ====== Spatio-Temporal Progress Head (Inference Only) ======
+        self.progress_head = None
+        self._wrist_frame_deque = []  # Ring buffer for deployment inference
+        if progress_checkpoint is not None:
+            self._load_progress_head(progress_checkpoint)
+
         print_params(self)
+
+    def reset(self):
+        """Reset rollout state before each episode."""
+        self._wrist_frame_deque.clear()
+
+    def _load_progress_head(self, checkpoint_path: str):
+        import os
+        from maniflow.model.progress.progress_head_st import ProgressHeadST
+        if not os.path.exists(checkpoint_path):
+            cprint(f"[Policy] Warning: progress_checkpoint not found at {checkpoint_path}", "red")
+            return
+        wrist_key = 'wrist_rgb' if 'wrist_rgb' in self.rgb_keys else (self.rgb_keys[0] if self.rgb_keys else 'wrist_rgb')
+        feat_dim = getattr(self.wrist_encoder, 'key_feature_dim_map', {}).get(wrist_key, 384)
+        patch_grid = getattr(self.wrist_encoder, 'patch_grids', {}).get(wrist_key, (16, 16))
+        head = ProgressHeadST(feature_dim=feat_dim, patch_grid=patch_grid)
+        ckpt = torch.load(checkpoint_path, map_location='cpu')
+        state_dict = ckpt['model_state_dict'] if isinstance(ckpt, dict) and 'model_state_dict' in ckpt else ckpt
+        head.load_state_dict(state_dict)
+        head.to(self.device).eval()
+        head.requires_grad_(False)
+        self.progress_head = head
+        cprint(f"[Policy] Loaded ProgressHeadST from {checkpoint_path}", "green")
 
     def _encode_obs(self, nobs, batch_size):
         """Encode observations, returning separate PC, state, and (optional) spatial PE.
@@ -354,7 +383,7 @@ class ManiFlowMultimodalPolicy(BasePolicy):
 
         return vis_cond, state_cond, pc_pe
         
-    def _encode_wrist(self, nobs, batch_size):
+    def _encode_wrist(self, nobs, batch_size, return_raw=False):
         """Encode all RGB cameras into one token group (B, N, wrist_dim).
 
         The RGB encoder produces its own token group, appended to the DiTX
@@ -380,6 +409,8 @@ class ManiFlowMultimodalPolicy(BasePolicy):
             if img.shape[-1] <= 4 and img.shape[2] > 4:
                 img = img.permute(0, 1, 4, 2, 3)
             obs[key] = img
+        if return_raw:
+            return self.wrist_encoder(obs, return_raw_keys=['wrist_rgb'])
         return self.wrist_encoder(obs)
 
     # ========= inference  ============
@@ -460,8 +491,13 @@ class ManiFlowMultimodalPolicy(BasePolicy):
         vis_cond, state_cond, pc_pe = self._encode_obs(nobs, B)
 
         # Add wrist-RGB conditioning (own token group, no spatial fusion)
+        raw_wrist_tokens = None
         if self.wrist_conditioned:
-            wrist_cond = self._encode_wrist(nobs, B)
+            if self.progress_head is not None and 'wrist_rgb' in self.rgb_keys:
+                wrist_cond, raw_dict = self._encode_wrist(nobs, B, return_raw=True)
+                raw_wrist_tokens = raw_dict.get('wrist_rgb', None) if raw_dict is not None else None
+            else:
+                wrist_cond = self._encode_wrist(nobs, B)
 
         # empty data for action
         cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
@@ -498,6 +534,50 @@ class ManiFlowMultimodalPolicy(BasePolicy):
             'action': action_full,
             'action_pred': action_pred,
         }
+
+        if self.progress_head is not None and 'wrist_rgb' in self.rgb_keys and 'wrist_rgb' in obs_dict:
+            # 1. Newest frame t raw tokens: (B, 1, N_p, D)
+            if raw_wrist_tokens is not None:
+                token_t = raw_wrist_tokens[:, -1:, :, :]
+            else:
+                curr_frame = obs_dict['wrist_rgb'][:, -1:] if obs_dict['wrist_rgb'].ndim == 5 else obs_dict['wrist_rgb'].unsqueeze(1)
+                token_t = self.wrist_encoder.extract_patch_tokens('wrist_rgb', curr_frame)
+
+            # 2. Get 3 historical frames [-5, -9, -13] (t-4, t-8, t-12)
+            if 'wrist_history' in obs_dict:
+                wh = obs_dict['wrist_history']
+                if wh.ndim == 4:
+                    wh = wh.unsqueeze(0)
+                L = wh.shape[1]
+                idx_3 = [max(0, L - 1 - 4), max(0, L - 1 - 8), max(0, L - 1 - 12)]
+                hist_3_frames = wh[:, idx_3, ...]
+            else:
+                curr_frame = obs_dict['wrist_rgb'][:, -1] if obs_dict['wrist_rgb'].ndim == 5 else obs_dict['wrist_rgb']
+                if len(self._wrist_frame_deque) == 0:
+                    # Immediately pad with 13 references to Frame 0 on first step after reset
+                    self._wrist_frame_deque = [curr_frame.detach().clone() for _ in range(13)]
+                else:
+                    self._wrist_frame_deque.append(curr_frame.detach().clone())
+                    if len(self._wrist_frame_deque) > 13:
+                        self._wrist_frame_deque.pop(0)
+
+                hist_3_frames = torch.stack([
+                    self._wrist_frame_deque[-5],
+                    self._wrist_frame_deque[-9],
+                    self._wrist_frame_deque[-13]
+                ], dim=1)
+
+            # 3. Batched DINOv3 pass for only the 3 historical frames: (B, 3, N_p, D)
+            hist_tokens = self.wrist_encoder.extract_patch_tokens('wrist_rgb', hist_3_frames)
+
+            # 4. Concatenate: [t, t-4, t-8, t-12] -> (B, 4, N_p, D)
+            F_4 = torch.cat([token_t, hist_tokens], dim=1)
+
+            # 5. Predict progress
+            with torch.no_grad():
+                progress_pred = self.progress_head(F_4)
+            result['progress_score'] = progress_pred.squeeze(-1)
+            result['progress'] = progress_pred.squeeze(-1)
 
         return result
 

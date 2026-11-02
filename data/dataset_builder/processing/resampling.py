@@ -17,6 +17,8 @@ def measure_fps(episode_dir):
 
 
 def _smooth(x, cfg, fps):
+    if not cfg:
+        return x
     method, n = cfg.get("method", "none"), x.shape[0]
     if method == "none" or n < 5:
         return x
@@ -48,7 +50,7 @@ def compute_keep_idx(n_src, target_fps, src_fps, enabled):
 
 
 def resample_episode(state, force, target_fps, src_fps,
-                     state_smooth, force_smooth, enabled=True):
+                     state_smooth=None, force_smooth=None, enabled=True):
     """
     state: (N, 12) joint positions (6 arm + 6 hand)
     force: (N, 6) or None  (currently inactive -> None allowed)

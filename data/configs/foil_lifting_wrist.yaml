@@ -38,29 +38,6 @@ kinematics:
 #   total      259
 cache:
   base_dirs:
-    # ── Older tesollo collections, capped to 35% ──
-    # A different scene from the folien_* ones below while carrying the SAME
-    # task. At full weight their 259 episodes would outnumber the 357 new
-    # ones enough to dominate the mixture and teach the policy that scene's
-    # layout rather than the task, so they are capped instead of dropped -
-    # they still contribute grasp and pose variety, just not a majority of
-    # the gradient. 0.35 -> ~91 kept, against 357 new = ~20% old / 80% new.
-    #
-    # The fraction is taken PER SCENE and is deterministic in
-    # (episodes.subsample_seed, collection, scene), so re-extracting one
-    # episode does not reshuffle which of the others were kept.
-    - dir: "foil_lifting_collection_tesollo_bottom"
-      position: "bottom"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_middle"
-      position: "middle"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_top_left"
-      position: "top_left"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_top_right"
-      position: "top_right"
-      fraction: 0.35
     # ── New `folien_*` collections (357 episodes, all success) ──
     # No `fraction` = keep all.
     # Same task as above, but a DIFFERENT scene: the parts sit in a real
@@ -174,6 +151,9 @@ actions:
 # ─── Progress Signal ──────────────────────────────
 progress:
   enabled: true
+  variant: "conservative"    # "conservative" (y_grasp=0.40, y_retry=0.20) or "legacy80"
+  peel_param: "frames"       # "frames" (time ramp) or "height" (relative z-travel)
+
 
 # ─── Post-Processing Hooks ────────────────────────
 post_processing:
@@ -187,8 +167,8 @@ output:
   # New path for the pinch rebuild (state/action 27 -> 15). Writing over
   # _3 would destroy the full-hand dataset, and the two are not
   # checkpoint-compatible, so A/B needs both on disk.
-  zarr_path: "foil_lifting_wrist_tesollo.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_wrist_tesollo"
+  zarr_path: "foil_lifting_box.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_box"
   compression: "zstd"
   chunk_size: 100
   # Image streams to persist in the zarr. Previously ALL rgb keys were

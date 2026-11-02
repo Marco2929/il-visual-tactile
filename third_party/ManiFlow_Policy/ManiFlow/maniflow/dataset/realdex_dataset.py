@@ -32,9 +32,12 @@ class RealDexDataset(BaseDataset):
             use_noise_augmentation=False,
             pc_xyz_noise_std=0.002,
             agent_pos_noise_std=0.0002,
+            use_progress=False,
+            **kwargs,
             ):
         super().__init__()
         self.task_name = task_name
+        self.use_progress = use_progress
         self.use_noise_augmentation = use_noise_augmentation
         self.pc_xyz_noise_std = pc_xyz_noise_std
         self.agent_pos_noise_std = agent_pos_noise_std

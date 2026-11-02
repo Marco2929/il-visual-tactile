@@ -139,6 +139,12 @@ class ProgressTracker:
         self.done_pub = node.create_publisher(
             Bool, '/policy_done', latched_qos())
 
+    def reset(self):
+        """Reset debounce counter and latch state before each episode."""
+        self._consecutive = 0
+        self._latched = False
+        self._last_value = None
+
     # ------------------------------------------------------------------
     # Startup validation
     # ------------------------------------------------------------------

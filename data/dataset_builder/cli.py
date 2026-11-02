@@ -2,7 +2,38 @@
 
 import argparse
 import os
+import sys
+from pathlib import Path
 from termcolor import cprint
+
+HOME_DIR = "/ros2_ws/data"
+
+# Pre-parse --config or --yaml early before importing pipeline or writers so that the config
+# establishes the environment (e.g. FOLDER_NAME, EPISODES_SUBDIR) first.
+def _preconfigure_environment():
+    for flag in ("--config", "--yaml"):
+        if flag in sys.argv:
+            try:
+                idx = sys.argv.index(flag)
+                if idx + 1 < len(sys.argv):
+                    cfg_arg = sys.argv[idx + 1]
+                    cfg_path = Path(cfg_arg)
+                    if not cfg_path.is_absolute():
+                        for base in (Path(HOME_DIR) / "configs", Path(__file__).resolve().parents[1] / "configs"):
+                            for cand in (base / cfg_arg, (base / cfg_arg).with_suffix(".yaml"), (base / cfg_arg).with_suffix(".yml")):
+                                if cand.exists():
+                                    cfg_path = cand
+                                    break
+                            if cfg_path.exists():
+                                break
+                    if cfg_path.exists():
+                        from config import load_config
+                        load_config(str(cfg_path))
+                        break
+            except Exception:
+                pass
+
+_preconfigure_environment()
 
 from config import load_config
 from discovery import discover_sources
@@ -10,9 +41,6 @@ from pipeline import process_episode
 from subsample import subsample_episodes
 from processing.proprioception import setup_kinematics
 from writer_manager import WriterManager
-
-
-HOME_DIR = "/ros2_ws/data"
 
 
 def run(args):
@@ -126,7 +154,7 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate dataset from raw episodes.")
-    parser.add_argument("--config", required=True, help="Config filename in configs/")
+    parser.add_argument("--config", "--yaml", dest="config", required=True, help="Config filename in configs/")
     args = parser.parse_args()
     run(args)
 

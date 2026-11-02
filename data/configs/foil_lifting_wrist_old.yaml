@@ -1,0 +1,192 @@
+meta:
+  name: "foil_lifting_wrist"
+  task: "Pinch the foil and lift it"
+  # Numeric ids written per episode into the zarr under meta/task_id and
+  # meta/robot_id. `task` above stays the human/language-conditioning
+  # string; this is the stable integer a multi-task policy embeds, so the
+  # instruction wording can be reworded without repartitioning the data.
+  #
+  # task_id 0 = pinch-and-lift foil. Shared with
+  # foil_lifting_wrist_recorded_action.yaml ON PURPOSE: that dataset is the
+  # same task recorded from the same episodes, differing only in how the
+  # action is derived (recorded command vs next state). Giving it a second
+  # id would claim the robot is doing something different, which it is not.
+  task_id: 0
+  # robot_id 10 = UR10e + Tesollo DG-5F.
+  robot_id: 10
+  fps: 20
+
+# ─── Kinematics ───────────────────────────────────
+kinematics:
+  urdf_path: "/ros2_ws/src/moveit_ur_hand_config/urdf/tesollo_hand_ur10e_flange_workcell.urdf"
+  end_link: "tool0"
+
+# ─── Cache Sources ─────────────────────────────────
+# Four collections recorded with the pallet at different positions. They are
+# merged into ONE dataset on purpose: the policy should lift the foil
+# regardless of pallet position, which is exactly the generalisation the
+# position variation was recorded for. The `position` label is carried through
+# to the dataset metadata so per-position splits/analyses stay possible
+# (e.g. train on front+middle, validate on top_right).
+# Episode counts after removing the aborted short recordings
+# (see data/record_utils/delete_short_episodes.py):
+#   bottom     108
+#   middle      49   (7 removed)
+#   top_left    50   (2 removed)
+#   top_right   52   (3 removed)
+#   ---------------
+#   total      259
+cache:
+  base_dirs:
+    # ── Older tesollo collections, capped to 35% ──
+    # A different scene from the folien_* ones below while carrying the SAME
+    # task. At full weight their 259 episodes would outnumber the 357 new
+    # ones enough to dominate the mixture and teach the policy that scene's
+    # layout rather than the task, so they are capped instead of dropped -
+    # they still contribute grasp and pose variety, just not a majority of
+    # the gradient. 0.35 -> ~91 kept, against 357 new = ~20% old / 80% new.
+    #
+    # The fraction is taken PER SCENE and is deterministic in
+    # (episodes.subsample_seed, collection, scene), so re-extracting one
+    # episode does not reshuffle which of the others were kept.
+    - dir: "foil_lifting_collection_tesollo_bottom"
+    - dir: "foil_lifting_collection_tesollo_middle"
+    - dir: "foil_lifting_collection_tesollo_top_left"
+    - dir: "foil_lifting_collection_tesollo_top_right"
+    # ── New `folien_*` collections (357 episodes, all success) ──
+    # No `fraction` = keep all.
+    # Same task as above, but a DIFFERENT scene: the parts sit in a real
+    # transport box at three heights, and the foil is lifted off a named
+    # part at a named slot and layer. These ship a labels.json per episode,
+    # so their scene/part/slot/layer metadata comes from the recording tool
+    # instead of the `position` label used for the older collections - no
+    # position key here on purpose, it would be a worse duplicate of it.
+    #
+    # Naming is `folien_<boxhoehe>_<bauteil>`; note the two inherited typos
+    # in the directory names (`sauele`/`saeule`), kept verbatim because the
+    # directories on disk are the authority.
+    - dir: "folien_oben_a_saeule"       # 53 episodes
+    - dir: "folien_oben_b_saeule"       # 55
+    - dir: "folien_oben_heckleuchte"    # 24
+    - dir: "folien_mitte_a_saeule"      # 42
+    - dir: "folien_mitte_b_saeule"      # 41
+    - dir: "folien_mitte_heckleuchte"   # 20
+    - dir: "folien_unten_a_sauele"      # 53  (sic: sauele)
+    - dir: "folien_unten_b_sauele"      # 47  (sic: sauele)
+    - dir: "folien_unten_heckleuchte"   # 23
+  front_rgb: true
+  front_depth: false
+  wrist_rgb: true
+  front_pc: true
+  wrist_pc: false
+
+# ─── Episode Limits ───────────────────────────────
+episodes:
+  max_episodes: null  # null = all
+  require_success: true
+
+  # Per-collection keep-fractions live inline on `cache.base_dirs` above,
+  # next to the directory they apply to.
+  #
+  # Applied to any collection without its own `fraction`.
+  # null = keep all, which is what the folien_* collections want.
+  default_fraction: null
+
+  # Part of the dataset's identity: changing it redraws the subsample and
+  # produces a different dataset from the same sources.
+  subsample_seed: 0
+
+# ─── Point Cloud Configuration ────────────────────
+point_cloud:
+  mode: "front_only"
+  merge_strategy: "fps"
+  final_num_points: 1024
+
+# ─── RGB Preprocessing ────────────────────────────
+# Stored as uint8 (T, H, W, 3), RGB, UNNORMALIZED.
+# The image encoder does /255 (+ model-specific norm) itself.
+#
+# Backbone is DINOv3 ViT-S/16, so every edge must divide by 16.
+#   wrist  480x640 (4:3)  -> 192x256 -> 12x16 = 192 tokens
+#   front  360x640 (16:9) -> 192x320 -> 12x20 = 240 tokens
+# Both keep their native aspect, so center_crop is a no-op and nothing is
+# distorted. The front source is the isotropically halved HD720 frame written
+# by record_extractor/extract_episodes.py.
+rgb:
+  enabled: true
+  resolution: [192, 256]    # wrist default
+  center_crop: true         # no-op here, aspect already matches
+  interpolation: "area"     # best quality for downscaling
+  encoder_downsample_ratio: 16
+  front_rgb:
+    resolution: [192, 320]
+
+# ─── Depth Preprocessing ──────────────────────────
+# Stored as float32 (T, H, W, 2) = [normalized_depth, validity].
+# NOT currently an observation key of the policy - written to zarr so it can
+# be attached later without rebuilding. Resolution tracks front_rgb so the two
+# stay pixel-aligned.
+depth:
+  enabled: false
+  resolution: [192, 320]
+  center_crop: true
+  encoder_downsample_ratio: 16
+  depth_range: null         # null = camera_info.FRONT_DEPTH_RANGE_M
+
+# ─── Proprioception ───────────────────────────────
+# State = ee_pose (7) + hand. With pinch: true the hand block is 8 instead
+# of 20, so state_dim goes 27 -> 15. Actions are derived from the SAME
+# hand_state, so action_dim follows automatically.
+proprioception:
+  state_components:
+    - type: "ee_pose"
+      joints: "arm"
+    - type: "hand"
+    - type: "force"
+  hand:
+    # These collections are Tesollo DG-5F recordings (20 hand DoF), which is
+    # what the raw state.npy actually contains - it is 26 wide = 6 arm + 20
+    # hand. The previous "inspire" value only suppressed the mismatch warning.
+    hardware: "tesollo"
+    # Keep only thumb + index (rj_dg_1_*, rj_dg_2_*) = 8 DoF. The task is a
+    # pinch; fingers 3-5 contribute coupled residual motion only (measured
+    # summed travel over 12 episodes: f1=74.7 f2=170.3 f3=56.5 f4=42.9
+    # f5=45.0 deg). Dropping them removes 12 input dims that the policy would
+    # otherwise have to learn to ignore.
+    pinch: true
+    force:
+      enabled: false
+      mode: "raw"
+
+# ─── Actions ──────────────────────────────────────
+actions:
+  type: "next_state"
+  derived_from: "ee_pose"
+
+# ─── Progress Signal ──────────────────────────────
+progress:
+  enabled: true
+  variant: "conservative"    # "conservative" (y_grasp=0.40, y_retry=0.20) or "legacy80"
+  peel_param: "frames"       # "frames" (time ramp) or "height" (relative z-travel)
+
+
+# ─── Post-Processing Hooks ────────────────────────
+post_processing:
+  repeat_final_state:
+    enabled: false
+    num_repeats: 10
+
+# ─── Output ───────────────────────────────────────
+output:
+  format: "both"
+  # New path for the pinch rebuild (state/action 27 -> 15). Writing over
+  # _3 would destroy the full-hand dataset, and the two are not
+  # checkpoint-compatible, so A/B needs both on disk.
+  zarr_path: "foil_lifting_box_progress.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_box_progress"
+  compression: "zstd"
+  chunk_size: 100
+  # Image streams to persist in the zarr. Previously ALL rgb keys were
+  # silently dropped by the writer, so wrist_rgb never made it to disk.
+  image_keys: ["wrist_rgb", "front_rgb"]
+  image_chunk_size: 8

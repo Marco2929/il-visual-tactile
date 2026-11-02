@@ -392,7 +392,7 @@ class DINOv3ObsEncoder(ModuleAttrMixin):
             img = self.color_jitter(img)
         return img
 
-    def _extract(self, key, img):
+    def _extract(self, key, img, return_raw=False):
         """(B*T, C, H, W) -> (B*T, N, out_dim) for one camera.
 
         N = gh*gw patch tokens; no pooling. Adds the per-camera embedding and
@@ -444,18 +444,19 @@ class DINOv3ObsEncoder(ModuleAttrMixin):
         # batch axis only -> tells it WHERE in that camera's raster.
         cam = self.cam_emb[self.key_group_index[key]]
         grid_pe = self._grid_pe(key, projected.device, projected.dtype)
-        return projected + cam + grid_pe
+        out = projected + cam + grid_pe
+        if return_raw:
+            return out, patch_tokens.detach()
+        return out
 
-    def forward(self, obs_dict):
+    def forward(self, obs_dict, return_raw_keys=None):
         """Encode all rgb keys into (B, sum_k(T * N_k), out_dim).
 
         Input per key: (B, T, C, H, W), uint8 or float. Values in [0, 255] are
         scaled to [0, 1] automatically.
 
-        Channel layout is CHW BY CONVENTION, asserted rather than sniffed. The
-        old `if img.shape[-1] == 3` heuristic is unusable here: it cannot tell
-        a 3-channel-last image from a 3-pixel-wide one, and it silently fails
-        for any non-3-channel input.
+        If return_raw_keys is a list of keys, returns (tokens, raw_tokens_dict)
+        where raw_tokens_dict[key] has shape (B, T, N_p, feature_dim) detached.
         """
         if not self._logged_data_config:
             cprint(f"[DINOv3ObsEncoder] normalization from "
@@ -467,6 +468,7 @@ class DINOv3ObsEncoder(ModuleAttrMixin):
             self._logged_data_config = True
 
         embeddings = []
+        raw_dict = {} if return_raw_keys is not None else None
         for key in self.rgb_keys:
             img = obs_dict[key]
             expected = self.key_shape_map[key]
@@ -506,14 +508,79 @@ class DINOv3ObsEncoder(ModuleAttrMixin):
 
             img = (img - self.image_mean) / self.image_std
 
-            emb = self._extract(key, img)
+            want_raw = (return_raw_keys is not None and key in return_raw_keys)
+            if want_raw:
+                emb, raw_tokens = self._extract(key, img, return_raw=True)
+                raw_dict[key] = raw_tokens.reshape(B, T, raw_tokens.shape[1], raw_tokens.shape[2])
+            else:
+                emb = self._extract(key, img)
             # (B*T, N, out_dim) -> (B, T*N, out_dim). Time and patch axes are
             # flattened together; the head treats the result as a flat token
             # set, so only the group order below has to stay stable.
             embeddings.append(emb.reshape(B, -1, self.out_dim))
 
         # Concatenate along the token axis in sorted key order.
-        return torch.cat(embeddings, dim=1)
+        cat_emb = torch.cat(embeddings, dim=1)
+        if return_raw_keys is not None:
+            return cat_emb, raw_dict
+        return cat_emb
+
+    @torch.no_grad()
+    def extract_patch_tokens(self, key: str, img: torch.Tensor) -> torch.Tensor:
+        """Extract raw frozen, detached patch tokens F without projection/cam_emb/grid_pe.
+
+        Args:
+            key: camera key (e.g. 'wrist_rgb')
+            img: (B, T, C, H, W) or (B, C, H, W) or channels-last (B, T, H, W, C) / (B, H, W, C).
+                 uint8 [0, 255] or float [0, 1].
+        Returns:
+            F: (B, T, N_p, D) detached patch tokens (or (B, N_p, D) if 4D input).
+        """
+        if key not in self.key_model_map:
+            raise KeyError(f"Camera key '{key}' not in known keys: {list(self.key_model_map.keys())}")
+
+        is_5d = (img.ndim == 5)
+        if not is_5d and img.ndim != 4:
+            raise ValueError(f"Expected 4D or 5D image tensor, got {tuple(img.shape)}")
+
+        # Handle channels-last (B, T, H, W, C) -> (B, T, C, H, W)
+        if img.shape[-1] <= 4 and (img.shape[2] > 4 if is_5d else img.shape[1] > 4):
+            if is_5d:
+                img = img.permute(0, 1, 4, 2, 3)
+            else:
+                img = img.permute(0, 3, 1, 2)
+
+        expected = self.key_shape_map[key]
+        if is_5d:
+            B, T = img.shape[:2]
+            img = img.reshape(B * T, *img.shape[2:])
+        else:
+            B = img.shape[0]
+            T = 1
+
+        img = img.to(self.device)
+        if not torch.is_floating_point(img):
+            img = img.float()
+        if img.max() > 1.0:
+            img = img / 255.0
+
+        if img.shape[1:] != tuple(expected):
+            img = F.interpolate(
+                img, size=(expected[1], expected[2]),
+                mode='bilinear', align_corners=False)
+
+        img = (img - self.image_mean) / self.image_std
+
+        model = self.key_model_map[key]
+        tokens = model.forward_features(img)
+        patch_tokens = tokens[:, self.num_prefix_tokens:, :].detach()
+
+        if is_5d:
+            N_p = patch_tokens.shape[1]
+            D = patch_tokens.shape[2]
+            patch_tokens = patch_tokens.reshape(B, T, N_p, D)
+
+        return patch_tokens
 
     def count_parameters(self):
         """(trainable, frozen) parameter counts."""

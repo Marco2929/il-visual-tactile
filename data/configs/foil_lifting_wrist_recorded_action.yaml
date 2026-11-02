@@ -40,23 +40,6 @@ kinematics:
 #   total      259
 cache:
   base_dirs:
-    # ── Older tesollo collections, capped to 35% ──
-    # Must stay IDENTICAL to foil_lifting_wrist.yaml, fractions included:
-    # this config is the A/B twin that differs only in `actions:`, so any
-    # divergence in the source list or the subsample would confound the
-    # comparison.
-    - dir: "foil_lifting_collection_tesollo_bottom"
-      position: "bottom"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_middle"
-      position: "middle"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_top_left"
-      position: "top_left"
-      fraction: 0.35
-    - dir: "foil_lifting_collection_tesollo_top_right"
-      position: "top_right"
-      fraction: 0.35
     # ── New `folien_*` collections (357 episodes, all success) ──
     # No `fraction` = keep all.
     # Must stay IDENTICAL to foil_lifting_wrist.yaml: this config is the
@@ -178,6 +161,9 @@ actions:
 # ─── Progress Signal ──────────────────────────────
 progress:
   enabled: true
+  variant: "conservative"    # "conservative" (y_grasp=0.40, y_retry=0.20) or "legacy80"
+  peel_param: "frames"       # "frames" (time ramp) or "height" (relative z-travel)
+
 
 # ─── Post-Processing Hooks ────────────────────────
 post_processing:
@@ -194,8 +180,8 @@ output:
   # Separate path: this dataset is NOT checkpoint-compatible in meaning with
   # the next_state one (same shape, different action semantics), so writing
   # over it would make the A/B unreproducible.
-  zarr_path: "foil_lifting_wrist_tesollo_recorded_action.zarr"
-  lerobot_repo_id: "Marco2929/foil_lifting_wrist_tesollo_recorded_action"
+  zarr_path: "foil_lifting_box_recorded_action.zarr"
+  lerobot_repo_id: "Marco2929/foil_lifting_box_recorded_action"
   compression: "zstd"
   chunk_size: 100
   # Image streams to persist in the zarr. Previously ALL rgb keys were
