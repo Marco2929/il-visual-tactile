@@ -37,10 +37,10 @@ Z_C = "#17a673"
 MARK = "#d62728"
 GREY = "#9aa0a6"
 
-# Commanded closure, executed closure, tracking error, commanded z, closure
-# marker on z, XY path, XY closure marker. Kept as a constant because the
-# visibility bookkeeping depends on it.
-TRACES_PER_ROLLOUT = 7
+# Commanded closure, executed closure, tracking error, predicted progress,
+# gate 0.90, alert 0.80, commanded z, closure marker on z, XY path, XY closure marker.
+# Kept as a constant because the visibility bookkeeping depends on it.
+TRACES_PER_ROLLOUT = 10
 
 
 # ------------------------------------------------------------- overview ---
@@ -205,6 +205,11 @@ def _rollout_caption(s, flagged):
     flag = (f" &nbsp;<span style='color:#c0392b'>[FLAGGED: "
             f"{html.escape(flagged[s['name']])}]</span>"
             if s["name"] in flagged else "")
+    prog_str = ""
+    if s.get("max_prog") is not None:
+        alert = " <span style='color:#d95f02;font-weight:bold'>[&ge;80%]</span>" if s.get("reached_80") else ""
+        prog_str = f" &nbsp;·&nbsp; progress: max <b>{s['max_prog']:.1%}</b>{alert}, final <b>{s['final_prog']:.1%}</b>"
+
     return (
         f"<b>{s['name']}</b> &nbsp;|&nbsp; "
         f"<span style='color:#444'>{html.escape(s['notes']) or '(no notes)'}"
@@ -218,20 +223,28 @@ def _rollout_caption(s, flagged):
         f"reopening {s['reopen']:.1f} deg &nbsp;·&nbsp; "
         f"z at closure <b>{s['z_at_close']:+.4f}</b> m, "
         f"rise after {s['z_rise']:+.3f} m &nbsp;·&nbsp; "
-        f"lag {s['lag']:+.2f}s</span>")
+        f"lag {s['lag']:+.2f}s{prog_str}</span>")
 
 
 def rollout_figure(rollouts, flagged):
     stats = [r.stats() for r in rollouts]
 
     fig = make_subplots(
-        rows=2, cols=2,
-        specs=[[{"colspan": 2}, None], [{}, {}]],
-        subplot_titles=("grasp closure: commanded vs executed (deg)",
-                        "commanded EE height z (m)",
-                        "commanded path, top view (m)"),
-        vertical_spacing=0.16, horizontal_spacing=0.10,
-        row_heights=[0.52, 0.48])
+        rows=3, cols=2,
+        specs=[
+            [{"colspan": 2}, None],
+            [{"colspan": 2}, None],
+            [{}, {}],
+        ],
+        subplot_titles=(
+            "grasp closure: commanded vs executed (deg)",
+            "predicted progress (ProgressHeadST, DINOv3)",
+            "commanded EE height z (m)",
+            "commanded path, top view (m)",
+        ),
+        vertical_spacing=0.10, horizontal_spacing=0.10,
+        row_heights=[0.38, 0.30, 0.32],
+    )
 
     for r, s in zip(rollouts, stats):
         vis = r is rollouts[0]
@@ -250,10 +263,7 @@ def rollout_figure(rollouts, flagged):
             hovertemplate="t=%{x:.2f}s  %{y:.1f} deg"
                           "<extra>executed</extra>"), row=1, col=1)
 
-        # The tracking error as its own filled trace. The deficit is a single
-        # number taken at the peak; this shows whether the gap is a constant
-        # offset or opens up only during the fast closing phase - which is
-        # what distinguishes a calibration error from a rate limit.
+        # The tracking error as its own filled trace.
         tt, ee = decimate(r.cmd_t, r.track_err)
         fig.add_trace(go.Scatter(
             x=tt, y=ee, mode="lines", name="executed - commanded",
@@ -263,12 +273,35 @@ def rollout_figure(rollouts, flagged):
             hovertemplate="t=%{x:.2f}s  %{y:+.1f} deg"
                           "<extra>tracking error</extra>"), row=1, col=1)
 
+        # Progress traces (Row 2)
+        if r.has_progress and len(r.prog_t) > 0:
+            tp, pp = decimate(r.prog_t, r.prog_val)
+        else:
+            tp, pp = np.zeros(0), np.zeros(0)
+
+        fig.add_trace(go.Scatter(
+            x=tp, y=pp, mode="lines", name="progress", visible=vis,
+            line=dict(color="#17a673", width=2.2), legendgroup="prog",
+            hovertemplate="t=%{x:.2f}s  prog=%{y:.1%}<extra>progress</extra>"),
+            row=2, col=1)
+
+        x_span = [float(r.cmd_t[0]), float(r.cmd_t[-1])] if len(r.cmd_t) > 1 else [0.0, 1.0]
+        fig.add_trace(go.Scatter(
+            x=x_span, y=[0.90, 0.90], mode="lines", name="gate 0.90", visible=vis,
+            line=dict(color="#2ca02c", width=1.5, dash="dot"), legendgroup="prog_gate",
+            hoverinfo="skip"), row=2, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=x_span, y=[0.80, 0.80], mode="lines", name="alert 0.80", visible=vis,
+            line=dict(color="#d95f02", width=1.5, dash="dash"), legendgroup="prog_thresh",
+            hoverinfo="skip"), row=2, col=1)
+
         tz, zz = decimate(r.cmd_t, r.cmd_pose[:, 2])
         fig.add_trace(go.Scatter(
             x=tz, y=zz, mode="lines", name="commanded z", visible=vis,
             line=dict(color=Z_C, width=2), legendgroup="z",
             hovertemplate="t=%{x:.2f}s  z=%{y:.4f} m<extra>z</extra>"),
-            row=2, col=1)
+            row=3, col=1)
 
         # Marks the instant of peak commanded closure, so the grasp height
         # can be read off directly instead of eyeballed.
@@ -279,7 +312,7 @@ def rollout_figure(rollouts, flagged):
                         line=dict(width=3, color=MARK)),
             hovertemplate=f"closure at t={s['t_cmd_close']:.2f}s<br>"
                           f"z={s['z_at_close']:+.4f} m<extra></extra>"),
-            row=2, col=1)
+            row=3, col=1)
 
         # Top view: a grasp aimed next to the foil is visible here rather
         # than inferred from three separate position traces.
@@ -289,7 +322,7 @@ def rollout_figure(rollouts, flagged):
             name="xy path", visible=vis, legendgroup="xy",
             line=dict(color=CMD, width=1.6),
             hovertemplate="x=%{x:.4f}  y=%{y:.4f} m<extra>path</extra>"),
-            row=2, col=2)
+            row=3, col=2)
         fig.add_trace(go.Scatter(
             x=[r.cmd_pose[kc, 0]], y=[r.cmd_pose[kc, 1]], mode="markers",
             name="closure xy", visible=vis, showlegend=False,
@@ -297,7 +330,7 @@ def rollout_figure(rollouts, flagged):
             marker=dict(size=13, color=MARK, symbol="x-thin",
                         line=dict(width=3, color=MARK)),
             hovertemplate="closure at x=%{x:.4f}, y=%{y:.4f} m"
-                          "<extra></extra>"), row=2, col=2)
+                          "<extra></extra>"), row=3, col=2)
 
     # Dropdown and slider drive the same update, because picking rollout 23
     # of 28 by dragging is guesswork while scanning neighbours by dragging is
@@ -326,7 +359,7 @@ def rollout_figure(rollouts, flagged):
                       currentvalue=dict(prefix="rollout ",
                                         font=dict(size=14)),
                       x=0.02, len=0.96)],
-        height=880, template="plotly_white", hovermode="x unified",
+        height=1020, template="plotly_white", hovermode="x unified",
         margin=dict(t=130, b=130, l=60, r=20),
         legend=dict(orientation="h", y=1.10, x=0),
     )
@@ -334,10 +367,12 @@ def rollout_figure(rollouts, flagged):
     fig.update_xaxes(title_text="time (s)", row=1, col=1)
     fig.update_yaxes(title_text="closure (deg)", row=1, col=1)
     fig.update_xaxes(title_text="time (s)", row=2, col=1)
-    fig.update_yaxes(title_text="z (m)", row=2, col=1)
-    fig.update_xaxes(title_text="x (m)", row=2, col=2)
-    fig.update_yaxes(title_text="y (m)", row=2, col=2,
-                     scaleanchor="x2", scaleratio=1)
+    fig.update_yaxes(title_text="progress [0, 1]", range=[-0.05, 1.05], row=2, col=1)
+    fig.update_xaxes(title_text="time (s)", row=3, col=1)
+    fig.update_yaxes(title_text="z (m)", row=3, col=1)
+    fig.update_xaxes(title_text="x (m)", row=3, col=2)
+    fig.update_yaxes(title_text="y (m)", row=3, col=2,
+                     scaleanchor="x3", scaleratio=1)
 
     # Shared axis ranges across rollouts: with autoscale the curves look
     # identical while the scale silently changes, which defeats stepping
@@ -353,7 +388,7 @@ def rollout_figure(rollouts, flagged):
                                 + [r.track_err for r in rollouts]),
                      row=1, col=1)
     fig.update_yaxes(range=span([r.cmd_pose[:, 2] for r in rollouts]),
-                     row=2, col=1)
+                     row=3, col=1)
     return fig
 
 
@@ -363,6 +398,8 @@ COLUMNS = [
     ("notes", "notes", "{}"),
     ("dur", "dur (s)", "{:.0f}"),
     ("steps", "steps", "{:d}"),
+    ("max_prog", "max prog", "{:.1%}"),
+    ("final_prog", "final prog", "{:.1%}"),
     ("peak_cmd", "cmd (deg)", "{:.1f}"),
     ("peak_exec", "exec (deg)", "{:.1f}"),
     ("deficit", "deficit (deg)", "{:.1f}"),

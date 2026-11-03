@@ -3,7 +3,7 @@
 
 import yaml
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pathlib import Path
 
 
@@ -347,6 +347,17 @@ class DatasetConfig:
     @property
     def post_processing_config(self) -> Dict:
         return self.raw.get("post_processing", {})
+
+    @property
+    def lerobot_repo_id(self) -> Optional[str]:
+        return self.output_config.get("lerobot_repo_id")
+
+    @property
+    def lerobot_name(self) -> str:
+        repo_id = self.lerobot_repo_id
+        if repo_id:
+            return repo_id.split("/")[-1]
+        return self.name
 
     @property
     def output_config(self) -> Dict:

@@ -10,6 +10,7 @@ import copy
 import os
 import random
 import sys
+import yaml
 
 import numpy as np
 import torch
@@ -206,45 +207,124 @@ def plot_validation_episodes(
 
 def main():
     parser = argparse.ArgumentParser(description="Train Spatio-Temporal ProgressHeadST on cached features.")
-    parser.add_argument("--zarr_path", type=str, required=True, help="Path to Zarr dataset containing cached features.")
-    parser.add_argument("--token_key", type=str, default="wrist_dinov3_tokens", help="Key for cached token array.")
-    parser.add_argument("--progress_key", type=str, default="progress", help="Key for PCHIP progress target.")
-    parser.add_argument("--val_ratio", type=float, default=0.1, help="Fraction of episodes held out for validation.")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for train/val split.")
-    parser.add_argument("--epochs", type=int, default=30, help="Number of training epochs.")
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate.")
-    parser.add_argument("--weight_decay", type=float, default=0.05, help="AdamW weight decay.")
-    parser.add_argument("--noise_ratio", type=float, default=0.02, help="Relative Gaussian feature noise std ratio.")
-    parser.add_argument("--patch_dropout", type=float, default=0.3, help="Patch token masking ratio.")
-    parser.add_argument("--save_dir", type=str, default="checkpoints/progress_head", help="Directory to save checkpoints.")
-    parser.add_argument("--num_workers", type=int, default=4, help="DataLoader num_workers.")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--config", type=str, default=None, help="Path to YAML training configuration file.")
+    parser.add_argument("--zarr_path", type=str, default=None, help="Path to Zarr dataset containing cached features.")
+    parser.add_argument("--token_key", type=str, default=None, help="Key for cached token array.")
+    parser.add_argument("--progress_key", type=str, default=None, help="Key for PCHIP progress target.")
+    parser.add_argument("--val_ratio", type=float, default=None, help="Fraction of episodes held out for validation.")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for train/val split.")
+    parser.add_argument("--epochs", type=int, default=None, help="Number of training epochs.")
+    parser.add_argument("--batch_size", type=int, default=None, help="Batch size.")
+    parser.add_argument("--lr", type=float, default=None, help="Learning rate.")
+    parser.add_argument("--weight_decay", type=float, default=None, help="AdamW weight decay.")
+    parser.add_argument("--noise_ratio", type=float, default=None, help="Relative Gaussian feature noise std ratio.")
+    parser.add_argument("--patch_dropout", type=float, default=None, help="Patch token masking ratio.")
+    parser.add_argument("--save_dir", type=str, default=None, help="Directory to save checkpoints.")
+    parser.add_argument("--num_workers", type=int, default=None, help="DataLoader num_workers.")
+    parser.add_argument("--device", type=str, default=None)
+    parser.add_argument("--save_every", type=int, default=None, help="Save periodic checkpoint every N epochs (default: 10).")
+    parser.add_argument("--wandb", dest="wandb", action="store_true", default=None, help="Enable Weights & Biases logging (default: True).")
+    parser.add_argument("--no-wandb", dest="wandb", action="store_false", help="Disable Weights & Biases logging.")
+    parser.add_argument("--wandb_project", type=str, default=None, help="W&B project name.")
     args = parser.parse_args()
 
+    # Default config path if none passed
+    default_cfg_path = os.path.join(repo_root, "maniflow", "config", "progress_head.yaml")
+    cfg_path = args.config if args.config else (default_cfg_path if os.path.exists(default_cfg_path) else None)
+
+    cfg = {}
+    if cfg_path and os.path.exists(cfg_path):
+        print(f"[Train] Loading config from: {cfg_path}")
+        with open(cfg_path, "r") as f:
+            cfg = yaml.safe_load(f) or {}
+
+    data_cfg = cfg.get("data", {})
+    train_cfg = cfg.get("training", {})
+    model_cfg = cfg.get("model", {})
+    out_cfg = cfg.get("output", {})
+    log_cfg = cfg.get("logging", {})
+
+    zarr_path = args.zarr_path or data_cfg.get("zarr_path")
+    if not zarr_path:
+        raise ValueError("zarr_path must be specified either via --zarr_path or in YAML under data.zarr_path")
+
+    token_key = args.token_key or data_cfg.get("token_key", "wrist_dinov3_tokens")
+    progress_key = args.progress_key or data_cfg.get("progress_key", "progress")
+    val_ratio = args.val_ratio if args.val_ratio is not None else data_cfg.get("val_ratio", 0.1)
+    seed = args.seed if args.seed is not None else data_cfg.get("seed", 42)
+    num_workers = args.num_workers if args.num_workers is not None else data_cfg.get("num_workers", 4)
+
+    epochs = args.epochs if args.epochs is not None else train_cfg.get("epochs", 30)
+    batch_size = args.batch_size if args.batch_size is not None else train_cfg.get("batch_size", 128)
+    lr = args.lr if args.lr is not None else train_cfg.get("lr", 1e-3)
+    weight_decay = args.weight_decay if args.weight_decay is not None else train_cfg.get("weight_decay", 0.05)
+    noise_ratio = args.noise_ratio if args.noise_ratio is not None else train_cfg.get("noise_ratio", 0.02)
+    patch_dropout = args.patch_dropout if args.patch_dropout is not None else train_cfg.get("patch_dropout", 0.3)
+    device_str = args.device or train_cfg.get("device", "cuda" if torch.cuda.is_available() else "cpu")
+    save_dir = args.save_dir or out_cfg.get("save_dir", "/ros2_ws/data/outputs/progress")
+    save_every = args.save_every if args.save_every is not None else train_cfg.get("save_every", 10)
+
+    # W&B setup (active by default)
+    use_wandb = args.wandb if args.wandb is not None else log_cfg.get("use_wandb", True)
+    wandb_project = args.wandb_project or log_cfg.get("project", "progress-head")
+    wandb_name = log_cfg.get("name", None)
+
+    wandb_run = None
+    if use_wandb:
+        try:
+            import wandb
+            wandb_run = wandb.init(
+                project=wandb_project,
+                name=wandb_name,
+                config={
+                    "zarr_path": zarr_path,
+                    "epochs": epochs,
+                    "batch_size": batch_size,
+                    "lr": lr,
+                    "weight_decay": weight_decay,
+                    "noise_ratio": noise_ratio,
+                    "patch_dropout": patch_dropout,
+                    "val_ratio": val_ratio,
+                    "seed": seed,
+                }
+            )
+            print(f"[Train] Initialized W&B run: {wandb_run.name} (Project: {wandb_project})")
+        except Exception as e:
+            print(f"Warning: Failed to initialize W&B ({e}). Continuing without W&B.")
+            wandb_run = None
+
     # Set seeds
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
-    device = torch.device(args.device)
-    os.makedirs(args.save_dir, exist_ok=True)
+    device = torch.device(device_str)
+    os.makedirs(save_dir, exist_ok=True)
 
-    print(f"[Train] Loading Zarr from: {args.zarr_path}")
-    root = zarr.open(args.zarr_path, mode='r')
+    print(f"[Train] Loading Zarr from: {zarr_path}")
+    root = zarr.open(zarr_path, mode='r')
     group = root['data'] if 'data' in root else root
 
-    if args.token_key not in group:
-        raise KeyError(f"Tokens '{args.token_key}' not found in {args.zarr_path}. Run cache_wrist_dinov3.py first.")
-    if args.progress_key not in group:
-        raise KeyError(f"Progress labels '{args.progress_key}' not found in {args.zarr_path}.")
+    if token_key not in group:
+        raise KeyError(f"Tokens '{token_key}' not found in {zarr_path}. Run cache_wrist_dinov3.py first.")
+    if progress_key not in group:
+        raise KeyError(f"Progress labels '{progress_key}' not found in {zarr_path}.")
 
-    tokens_arr = group[args.token_key]
-    progress_arr = group[args.progress_key]
+    tokens_arr = group[token_key]
+    progress_arr = group[progress_key]
     episode_ends = root['meta/episode_ends'][:] if 'meta/episode_ends' in root else group['meta/episode_ends'][:]
 
+    in_memory = data_cfg.get("in_memory", True)
+    if in_memory:
+        import time
+        t_load = time.time()
+        print(f"[Train] Preloading {tokens_arr.shape} ({tokens_arr.nbytes / 1e9:.1f} GB) tokens into RAM for instant DataLoader access...")
+        tokens_arr = tokens_arr[:]
+        progress_arr = progress_arr[:]
+        print(f"[Train] Preloading complete in {time.time() - t_load:.1f}s! In-memory RAM cache active.")
+
     n_episodes = len(episode_ends)
-    val_mask = get_val_mask(n_episodes, args.val_ratio, seed=args.seed)
+    val_mask = get_val_mask(n_episodes, val_ratio, seed=seed)
     train_mask = ~val_mask
 
     train_ds = CachedProgressDataset(tokens_arr, progress_arr, episode_ends, train_mask, is_train=True)
@@ -255,17 +335,17 @@ def main():
 
     train_loader = DataLoader(
         train_ds,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         pin_memory=(device.type == 'cuda'),
         drop_last=True,
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
         pin_memory=(device.type == 'cuda'),
     )
 
@@ -273,28 +353,30 @@ def main():
     print(f"[Train] Creating ProgressHeadST with N_p={N_p}, D={D}...")
     model = ProgressHeadST(
         feature_dim=D,
-        patch_dropout=args.patch_dropout,
-        noise_ratio=args.noise_ratio,
-        loss_type="smooth_l1",
-        beta=0.05,
+        patch_dropout=patch_dropout,
+        noise_ratio=noise_ratio,
+        num_queries=model_cfg.get("num_queries", 2),
+        dropout=model_cfg.get("dropout", 0.2),
+        loss_type=model_cfg.get("loss_type", "smooth_l1"),
+        beta=model_cfg.get("beta", 0.05),
     ).to(device)
 
     params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"[Train] Model parameter count: {params:,}")
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr * 0.05)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=lr * 0.05)
 
     best_val_loss = float('inf')
     best_fpr_09 = float('inf')
-    best_path = os.path.join(args.save_dir, "best_progress_head.pt")
+    best_path = os.path.join(save_dir, "best_progress_head.pt")
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(1, epochs + 1):
         model.train()
         train_loss = 0.0
         train_mae = 0.0
 
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{args.epochs}")
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}")
         for tokens, targets in pbar:
             tokens = tokens.to(device)
             targets = targets.to(device)
@@ -322,6 +404,16 @@ def main():
               f"Train Loss={train_loss:.4f}, MAE={train_mae:.4f} | "
               f"Val Loss={val_loss:.4f}, MAE={val_mae:.4f}, FPR(>=0.9 on GT<0.7)={fpr_09*100:.2f}%")
 
+        if wandb_run is not None:
+            wandb_run.log({
+                "epoch": epoch,
+                "train/loss": train_loss,
+                "train/mae": train_mae,
+                "val/loss": val_loss,
+                "val/mae": val_mae,
+                "val/fpr_09": fpr_09,
+            })
+
         # Save best model based on val_loss
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -338,8 +430,38 @@ def main():
             }, best_path)
             print(f"  --> Saved new best checkpoint to {best_path} (Val Loss: {val_loss:.4f}, FPR_09: {fpr_09*100:.2f}%)")
 
+        # Periodic checkpoint every save_every epochs
+        if save_every and epoch % save_every == 0:
+            epoch_ckpt_path = os.path.join(save_dir, f"epoch_{epoch:03d}.pt")
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'val_loss': val_loss,
+                'val_mae': val_mae,
+                'val_fpr_09': fpr_09,
+                'feature_dim': D,
+                'num_patches': N_p,
+            }, epoch_ckpt_path)
+            print(f"  --> Saved periodic checkpoint to {epoch_ckpt_path}")
+
+            # Also generate and log periodic validation plot
+            epoch_plot_path = os.path.join(save_dir, f"val_predictions_epoch_{epoch:03d}.png")
+            plot_validation_episodes(
+                model=model,
+                tokens_arr=tokens_arr,
+                progress_arr=progress_arr,
+                episode_ends=episode_ends,
+                val_mask=val_mask,
+                save_path=epoch_plot_path,
+                device=device,
+                num_episodes=4,
+            )
+            if wandb_run is not None:
+                wandb_run.log({f"val/predictions_epoch_{epoch:03d}": wandb.Image(epoch_plot_path)})
+
     # Save latest
-    latest_path = os.path.join(args.save_dir, "latest_progress_head.pt")
+    latest_path = os.path.join(save_dir, "latest_progress_head.pt")
     torch.save(model.state_dict(), latest_path)
 
     # Load best checkpoint to generate validation plot
@@ -347,7 +469,7 @@ def main():
         best_ckpt = torch.load(best_path, map_location=device)
         model.load_state_dict(best_ckpt['model_state_dict'])
 
-    val_plot_path = os.path.join(args.save_dir, "val_predictions.png")
+    val_plot_path = os.path.join(save_dir, "val_predictions.png")
     plot_validation_episodes(
         model=model,
         tokens_arr=tokens_arr,
@@ -358,6 +480,12 @@ def main():
         device=device,
         num_episodes=4,
     )
+
+    if wandb_run is not None:
+        if os.path.exists(val_plot_path):
+            import wandb
+            wandb_run.log({"val/predictions_plot": wandb.Image(val_plot_path)})
+        wandb_run.finish()
 
     print(f"\n[Train] Finished! Best Val Loss: {best_val_loss:.4f} with FPR_09={best_fpr_09*100:.2f}%. Saved to {best_path}")
 

@@ -1,0 +1,428 @@
+total_episodes_to_delete: 52
+by_collection:
+  folien_oben_a_saeule:
+  - 43
+  - 47
+  - 49
+  folien_oben_b_saeule:
+  - 0
+  - 9
+  - 10
+  - 23
+  - 45
+  - 46
+  - 49
+  folien_oben_heckleuchte:
+  - 10
+  - 11
+  - 12
+  - 15
+  - 20
+  - 22
+  folien_unten_a_sauele:
+  - 13
+  - 24
+  - 29
+  folien_unten_b_sauele:
+  - 8
+  - 10
+  - 11
+  - 16
+  - 22
+  - 25
+  - 29
+  - 30
+  - 35
+  - 41
+  - 44
+  folien_unten_heckleuchte:
+  - 0
+  - 3
+  - 6
+  - 17
+  - 20
+  folien_mitte_a_saeule:
+  - 23
+  - 27
+  - 28
+  - 29
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  folien_mitte_b_saeule:
+  - 0
+  - 1
+  - 2
+  - 8
+  - 17
+  folien_mitte_heckleuchte:
+  - 5
+  - 6
+episodes:
+- collection: folien_oben_a_saeule
+  episode: episode_043_success
+  viewer_index: 43
+  frames: 150
+  max_tilt_deg: 60.1
+  max_force_n: 30.1
+  reason: 'User: 60.1 deg Tilt / Kollisionsverdacht'
+- collection: folien_oben_a_saeule
+  episode: episode_047_success
+  viewer_index: 47
+  frames: 194
+  max_tilt_deg: 27.0
+  max_force_n: 30.4
+  reason: 'User: markiert'
+- collection: folien_oben_a_saeule
+  episode: episode_049_success
+  viewer_index: 49
+  frames: 20
+  max_tilt_deg: 5.8
+  max_force_n: 30.1
+  reason: Kurzabbruch (20 Frames)
+- collection: folien_oben_b_saeule
+  episode: episode_000_success
+  viewer_index: 53
+  frames: 8
+  max_tilt_deg: 0.6
+  max_force_n: 30.3
+  reason: Kurzabbruch (8 Frames)
+- collection: folien_oben_b_saeule
+  episode: episode_009_success
+  viewer_index: 62
+  frames: 148
+  max_tilt_deg: 31.4
+  max_force_n: 27.6
+  reason: 'User: 31.4 deg Tilt'
+- collection: folien_oben_b_saeule
+  episode: episode_010_success
+  viewer_index: 63
+  frames: 135
+  max_tilt_deg: 49.8
+  max_force_n: 27.2
+  reason: 'User: 49.8 deg Tilt'
+- collection: folien_oben_b_saeule
+  episode: episode_023_success
+  viewer_index: 76
+  frames: 120
+  max_tilt_deg: 49.2
+  max_force_n: 26.8
+  reason: 'User: 49.2 deg Tilt'
+- collection: folien_oben_b_saeule
+  episode: episode_045_success
+  viewer_index: 98
+  frames: 3
+  max_tilt_deg: 1.7
+  max_force_n: 26.6
+  reason: Kurzabbruch (3 Frames)
+- collection: folien_oben_b_saeule
+  episode: episode_046_success
+  viewer_index: 99
+  frames: 229
+  max_tilt_deg: 38.5
+  max_force_n: 27.5
+  reason: 'User: markiert im LeRobot Viewer (99)'
+- collection: folien_oben_b_saeule
+  episode: episode_049_success
+  viewer_index: 102
+  frames: 122
+  max_tilt_deg: 53.3
+  max_force_n: 29.1
+  reason: 'User: Hand schloss nicht (LeRobot 205)'
+- collection: folien_oben_heckleuchte
+  episode: episode_010_success
+  viewer_index: null
+  frames: 55
+  max_tilt_deg: 20.6
+  max_force_n: 26.8
+  reason: Kurzabbruch (55 Frames)
+- collection: folien_oben_heckleuchte
+  episode: episode_011_success
+  viewer_index: 119
+  frames: 116
+  max_tilt_deg: 48.2
+  max_force_n: 26.6
+  reason: 'User: markiert im LeRobot Viewer (119)'
+- collection: folien_oben_heckleuchte
+  episode: episode_012_success
+  viewer_index: 120
+  frames: 144
+  max_tilt_deg: 51.5
+  max_force_n: 26.5
+  reason: 'User: markiert im LeRobot Viewer (120)'
+- collection: folien_oben_heckleuchte
+  episode: episode_015_success
+  viewer_index: 123
+  frames: 118
+  max_tilt_deg: 35.2
+  max_force_n: 26.0
+  reason: 'User: markiert im LeRobot Viewer (123)'
+- collection: folien_oben_heckleuchte
+  episode: episode_020_success
+  viewer_index: null
+  frames: 5
+  max_tilt_deg: 6.7
+  max_force_n: 25.7
+  reason: Kurzabbruch (5 Frames)
+- collection: folien_oben_heckleuchte
+  episode: episode_022_success
+  viewer_index: null
+  frames: 10
+  max_tilt_deg: 0.6
+  max_force_n: 25.8
+  reason: Kurzabbruch (10 Frames)
+- collection: folien_mitte_a_saeule
+  episode: episode_023_success
+  viewer_index: 155
+  frames: 183
+  max_tilt_deg: 38.7
+  max_force_n: 29.2
+  reason: 'User: markiert im LeRobot Viewer (155)'
+- collection: folien_mitte_a_saeule
+  episode: episode_027_success
+  viewer_index: 159
+  frames: 173
+  max_tilt_deg: 46.5
+  max_force_n: 30.0
+  reason: 'User: markiert im LeRobot Viewer (159)'
+- collection: folien_mitte_a_saeule
+  episode: episode_028_success
+  viewer_index: 160
+  frames: 176
+  max_tilt_deg: 37.6
+  max_force_n: 30.0
+  reason: 'User: markiert im LeRobot Viewer (160)'
+- collection: folien_mitte_a_saeule
+  episode: episode_029_success
+  viewer_index: 161
+  frames: 197
+  max_tilt_deg: 22.6
+  max_force_n: 30.0
+  reason: 'User: markiert im LeRobot Viewer (161)'
+- collection: folien_mitte_a_saeule
+  episode: episode_036_success
+  viewer_index: 168
+  frames: 209
+  max_tilt_deg: 45.7
+  max_force_n: 28.6
+  reason: 'User: markiert im LeRobot Viewer (168)'
+- collection: folien_mitte_a_saeule
+  episode: episode_037_success
+  viewer_index: 169
+  frames: 203
+  max_tilt_deg: 32.4
+  max_force_n: 27.9
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 169)
+- collection: folien_mitte_a_saeule
+  episode: episode_038_success
+  viewer_index: 170
+  frames: 303
+  max_tilt_deg: 34.4
+  max_force_n: 28.0
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 170)
+- collection: folien_mitte_a_saeule
+  episode: episode_039_success
+  viewer_index: 171
+  frames: 178
+  max_tilt_deg: 43.3
+  max_force_n: 28.0
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 171)
+- collection: folien_mitte_a_saeule
+  episode: episode_040_success
+  viewer_index: 172
+  frames: 186
+  max_tilt_deg: 43.5
+  max_force_n: 30.6
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 172)
+- collection: folien_mitte_a_saeule
+  episode: episode_041_success
+  viewer_index: 173
+  frames: 179
+  max_tilt_deg: 37.5
+  max_force_n: 30.5
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 173)
+- collection: folien_mitte_b_saeule
+  episode: episode_000_success
+  viewer_index: 174
+  frames: 169
+  max_tilt_deg: 56.7
+  max_force_n: 28.6
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 174)
+- collection: folien_mitte_b_saeule
+  episode: episode_001_success
+  viewer_index: 175
+  frames: 161
+  max_tilt_deg: 38.5
+  max_force_n: 28.5
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 175)
+- collection: folien_mitte_b_saeule
+  episode: episode_002_success
+  viewer_index: 176
+  frames: 176
+  max_tilt_deg: 29.0
+  max_force_n: 28.1
+  reason: Kamera verdreht / Finger am Bildrand (Viewer 176)
+- collection: folien_mitte_b_saeule
+  episode: episode_008_success
+  viewer_index: 182
+  frames: 187
+  max_tilt_deg: 47.2
+  max_force_n: 28.5
+  reason: 'User: markiert im LeRobot Viewer (182)'
+- collection: folien_mitte_b_saeule
+  episode: episode_017_success
+  viewer_index: 191
+  frames: 202
+  max_tilt_deg: 36.5
+  max_force_n: 28.5
+  reason: 'User: markiert im LeRobot Viewer (191)'
+- collection: folien_mitte_heckleuchte
+  episode: episode_005_success
+  viewer_index: 220
+  frames: 158
+  max_tilt_deg: 44.0
+  max_force_n: 26.7
+  reason: 'User: markiert im LeRobot Viewer (220)'
+- collection: folien_mitte_heckleuchte
+  episode: episode_006_success
+  viewer_index: 221
+  frames: 251
+  max_tilt_deg: 40.2
+  max_force_n: 26.8
+  reason: 'User: markiert im LeRobot Viewer (221)'
+- collection: folien_unten_a_sauele
+  episode: episode_013_success
+  viewer_index: 248
+  frames: 339
+  max_tilt_deg: 56.5
+  max_force_n: 27.1
+  reason: 'User: 43.7 deg Tilt (LeRobot 248)'
+- collection: folien_unten_a_sauele
+  episode: episode_024_success
+  viewer_index: 259
+  frames: 292
+  max_tilt_deg: 43.4
+  max_force_n: 75.4
+  reason: 'User: 75.4 N Bodenkollision, 41.0 deg Tilt (LeRobot 259)'
+- collection: folien_unten_a_sauele
+  episode: episode_029_success
+  viewer_index: 264
+  frames: 182
+  max_tilt_deg: 52.2
+  max_force_n: 27.9
+  reason: 'User: markiert im LeRobot Viewer (264)'
+- collection: folien_unten_b_sauele
+  episode: episode_008_success
+  viewer_index: null
+  frames: 5
+  max_tilt_deg: 2.7
+  max_force_n: 27.3
+  reason: Kurzabbruch (5 Frames)
+- collection: folien_unten_b_sauele
+  episode: episode_010_success
+  viewer_index: 298
+  frames: 211
+  max_tilt_deg: 36.0
+  max_force_n: 27.8
+  reason: 'User: markiert im LeRobot Viewer (298)'
+- collection: folien_unten_b_sauele
+  episode: episode_011_success
+  viewer_index: 299
+  frames: 85
+  max_tilt_deg: 23.0
+  max_force_n: 27.6
+  reason: 'User: Abbruch, Hand blieb offen (LeRobot 299)'
+- collection: folien_unten_b_sauele
+  episode: episode_016_success
+  viewer_index: 304
+  frames: 231
+  max_tilt_deg: 37.3
+  max_force_n: 27.3
+  reason: 'User: Folie verfehlt (LeRobot 304)'
+- collection: folien_unten_b_sauele
+  episode: episode_022_success
+  viewer_index: 310
+  frames: 197
+  max_tilt_deg: 36.1
+  max_force_n: 27.0
+  reason: 'User: markiert im LeRobot Viewer (310)'
+- collection: folien_unten_b_sauele
+  episode: episode_025_success
+  viewer_index: null
+  frames: 8
+  max_tilt_deg: 2.9
+  max_force_n: 27.0
+  reason: Kurzabbruch (8 Frames)
+- collection: folien_unten_b_sauele
+  episode: episode_029_success
+  viewer_index: null
+  frames: 26
+  max_tilt_deg: 10.4
+  max_force_n: 27.2
+  reason: Kurzabbruch (26 Frames)
+- collection: folien_unten_b_sauele
+  episode: episode_030_success
+  viewer_index: 318
+  frames: 406
+  max_tilt_deg: 40.8
+  max_force_n: 44.4
+  reason: 'User: 44.4 N Kraftspitze / Kollision (LeRobot 318)'
+- collection: folien_unten_b_sauele
+  episode: episode_035_success
+  viewer_index: null
+  frames: 3
+  max_tilt_deg: 0.3
+  max_force_n: 27.3
+  reason: Kurzabbruch (3 Frames)
+- collection: folien_unten_b_sauele
+  episode: episode_041_success
+  viewer_index: 329
+  frames: 274
+  max_tilt_deg: 45.5
+  max_force_n: 29.5
+  reason: 'User: 41.9 deg Tilt (LeRobot 329)'
+- collection: folien_unten_b_sauele
+  episode: episode_044_success
+  viewer_index: 332
+  frames: 179
+  max_tilt_deg: 31.5
+  max_force_n: 31.9
+  reason: 'User: markiert im LeRobot Viewer (332)'
+- collection: folien_unten_heckleuchte
+  episode: episode_000_success
+  viewer_index: null
+  frames: 8
+  max_tilt_deg: 3.2
+  max_force_n: 28.7
+  reason: Kurzabbruch (8 Frames)
+- collection: folien_unten_heckleuchte
+  episode: episode_003_success
+  viewer_index: 338
+  frames: 148
+  max_tilt_deg: 41.2
+  max_force_n: 29.5
+  reason: 'User: markiert im LeRobot Viewer (338)'
+- collection: folien_unten_heckleuchte
+  episode: episode_006_success
+  viewer_index: 341
+  frames: 311
+  max_tilt_deg: 44.4
+  max_force_n: 29.7
+  reason: 'User: 39.7 deg Tilt (LeRobot 341)'
+- collection: folien_unten_heckleuchte
+  episode: episode_017_success
+  viewer_index: 352
+  frames: 144
+  max_tilt_deg: 25.3
+  max_force_n: 28.8
+  reason: 'User: markiert im LeRobot Viewer (352)'
+- collection: folien_unten_heckleuchte
+  episode: episode_020_success
+  viewer_index: 355
+  frames: 177
+  max_tilt_deg: 53.7
+  max_force_n: 28.5
+  reason: 'User: markiert im LeRobot Viewer (355)'

@@ -22,7 +22,7 @@ class EpisodeManager:
             home_dir, "zarr_datasets", config.output_config["zarr_path"]
         )
         self.lerobot_path = os.path.join(
-            home_dir, "lerobot_datasets", config.name
+            home_dir, "lerobot_datasets", config.lerobot_name
         )
 
     # ──────────────────────────────────────────────

@@ -43,10 +43,8 @@ env_runner: null
 
 dataset:
   _target_: maniflow.dataset.realdex_dataset.RealDexDataset
-  # Built by data/configs/foil_lifting_wrist.yaml. Not checkpoint-compatible
-  # with the earlier foil_lifting_wrist_3.zarr: that one carries the full
-  # 20-DoF hand (state/action 27) and 4096-point clouds.
-  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  # Built by data/configs/foil_lifting_wrist.yaml (306 cleaned box episodes).
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_box.zarr
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}

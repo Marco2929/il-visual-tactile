@@ -64,7 +64,12 @@ def log_rollout(r: Rollout, ns: str = "", with_pc: bool = True,
         f"- z rise after closure: {st['z_rise']:+.3f} m\n"
         + (f"- pinch width at closure: "
            f"**{exe_w[int(np.argmax(r.exec_close))]:.1f} mm** "
-           f"(open hand ~208 mm)\n" if exe_w is not None else ""),
+           f"(open hand ~208 mm)\n" if exe_w is not None else "")
+        + (f"\n## progress head\n\n"
+           f"- max progress: **{st['max_prog']:.1%}** "
+           f"({'⚠️ EXCEEDED 80%' if st['reached_80'] else 'stayed <80%'})\n"
+           f"- final progress: **{st['final_prog']:.1%}**\n"
+           if st.get('max_prog') is not None else ""),
         media_type=rr.MediaType.MARKDOWN), static=True)
 
     # --- commanded, on the executor's clock (step / 20 Hz) ---
@@ -151,6 +156,14 @@ def log_rollout(r: Rollout, ns: str = "", with_pc: bool = True,
                 rr.set_time("rollout_time", duration=float(t))
                 rr.log(p("wrist/image"), rr.Image(img))
 
+    # --- progress head (DINOv3 Spatio-Temporal) ---
+    if r.has_progress:
+        for t, prog in zip(r.prog_t, r.prog_val):
+            rr.set_time("rollout_time", duration=float(t))
+            rr.log(p("progress/predicted"), rr.Scalars(float(prog)))
+            rr.log(p("progress/threshold_80"), rr.Scalars(0.80))
+            rr.log(p("progress/gate_90"), rr.Scalars(0.90))
+
 
 def _panels(prefix="", name=None):
     return rrb.Horizontal(
@@ -170,6 +183,9 @@ def _panels(prefix="", name=None):
             # one axis, same timeline.
             rrb.TimeSeriesView(origin=f"{prefix}/closure",
                                name="closure: commanded vs executed"),
+            # Progress head prediction signal with 80% and 90% threshold lines
+            rrb.TimeSeriesView(origin=f"{prefix}/progress",
+                               name="progress head (DINOv3)"),
             # Its own view, not merged into closure: millimetres and degrees
             # on one axis would make both unreadable.
             rrb.TimeSeriesView(origin=f"{prefix}/pinch",

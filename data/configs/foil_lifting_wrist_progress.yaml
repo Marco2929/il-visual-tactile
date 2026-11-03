@@ -1,6 +1,8 @@
 meta:
-  name: "foil_lifting_wrist"
+  name: "foil_lifting_box_progress"
   task: "Pinch the foil and lift it"
+  cell: "bosch"
+  pc: "monty5-pc"
   # Numeric ids written per episode into the zarr under meta/task_id and
   # meta/robot_id. `task` above stays the human/language-conditioning
   # string; this is the stable integer a multi-task policy embeds, so the

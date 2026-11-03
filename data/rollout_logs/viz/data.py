@@ -142,6 +142,23 @@ class Rollout:
         self.has_pc = "pc" in z
         self._z = z
 
+        # Progress prediction (from Spatio-Temporal ProgressHeadST if evaluated)
+        prog_file = self.path / "progress.npz"
+        if prog_file.exists():
+            try:
+                pz = np.load(prog_file)
+                self.prog_t = pz["t"]
+                self.prog_val = pz["progress"]
+                self.has_progress = len(self.prog_val) > 0
+            except Exception:
+                self.has_progress = False
+                self.prog_t = np.zeros(0)
+                self.prog_val = np.zeros(0)
+        else:
+            self.has_progress = False
+            self.prog_t = np.zeros(0)
+            self.prog_val = np.zeros(0)
+
     @staticmethod
     def _step_clock(steps, z):
         """Map absolute step index -> seconds on the gate clock.
@@ -216,6 +233,9 @@ class Rollout:
             "z_max": float(self.cmd_pose[:, 2].max()),
             "z_rise": float(self.cmd_pose[-1, 2] - self.cmd_pose[kc, 2]),
             "pc_frames": int(len(self.pc_t)),
+            "max_prog": float(np.max(self.prog_val)) if self.has_progress and len(self.prog_val) > 0 else None,
+            "final_prog": float(self.prog_val[-1]) if self.has_progress and len(self.prog_val) > 0 else None,
+            "reached_80": bool(np.any(self.prog_val >= 0.80)) if self.has_progress and len(self.prog_val) > 0 else False,
         }
 
 

@@ -3,8 +3,10 @@
 # next state. Everything else is held fixed on purpose, so a checkpoint
 # trained on this dataset is a clean A/B against the next_state one.
 meta:
-  name: "foil_lifting_wrist_recorded_action"
+  name: "foil_lifting_box_recorded_action"
   task: "Pinch the foil and lift it"
+  cell: "bosch"
+  pc: "monty5-pc"
   # Written per episode into the zarr under meta/task_id and meta/robot_id.
   #
   # task_id 0, the SAME id as foil_lifting_wrist.yaml, is deliberate: this
@@ -157,6 +159,7 @@ proprioception:
 # rather than silently falling back.
 actions:
   type: "recorded"
+  unoffset_teleop: true
 
 # ─── Progress Signal ──────────────────────────────
 progress:

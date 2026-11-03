@@ -72,7 +72,7 @@ def main():
     gh = args.height // 16
     gw = args.width // 16
     expected_patches = gh * gw
-    feature_dim = encoder.key_feature_dim_map[args.key_in]
+    feature_dim = encoder.feature_dim if hasattr(encoder, "feature_dim") else encoder.key_feature_dim_map[args.key_in]
     print(f"[Cache] Grid: {gh}x{gw} = {expected_patches} patches, feature_dim = {feature_dim}")
 
     chunk_frames = min(args.batch_size * 2, 256)

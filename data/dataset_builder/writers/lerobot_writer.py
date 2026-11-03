@@ -41,11 +41,12 @@ class LeRobotWriter:
         # the recording itself. Overridable from the task YAML's meta block.
         meta_cfg = getattr(config, "meta_config", None) or {}
         self.cell = meta_cfg.get("cell", "bosch")
-        self.recording_pc = meta_cfg.get("pc", "")
+        self.recording_pc = meta_cfg.get("pc", "monty5-pc")
 
-        # Determine local path
+        # Determine local path and dataset name from lerobot_repo_id (or fallback to config.name)
+        self.dataset_name = config.lerobot_name
         self.local_dir = os.path.join(
-            "/ros2_ws/data", "lerobot_datasets", config.name
+            "/ros2_ws/data", "lerobot_datasets", self.dataset_name
         )
 
         if not append and os.path.exists(self.local_dir):
@@ -166,7 +167,7 @@ class LeRobotWriter:
                 record,
                 episode_index=episode_index,
                 source=source,
-                dataset=self.config.name,
+                dataset=self.dataset_name,
                 task=self.task,
                 n_frames=n_frames,
                 fps=self.fps,
@@ -280,7 +281,9 @@ class LeRobotWriter:
                         "thumb_1", "thumb_2", "index_1", "middle_1", "ring_1", "little_1"
                     ])
                 elif hand_hw == "tesollo":
-                    dim_names.extend([f"tesollo_joint_{i}" for i in range(20)])
+                    pinch = proprio_cfg.get("hand", {}).get("pinch", False)
+                    n_joints = 8 if pinch else 20
+                    dim_names.extend([f"tesollo_joint_{i}" for i in range(n_joints)])
             elif c_type == "force":
                 force_enabled = proprio_cfg.get("hand", {}).get("force", {}).get("enabled", False)
                 if force_enabled:

@@ -1,7 +1,8 @@
 # dataset_builder/processing/actions.py
 
 import numpy as np
-from typing import Dict
+from typing import Dict, Tuple
+from scipy.spatial.transform import Rotation as R
 
 from .proprioception import (
     TESOLLO_HAND_DOF, pinch_hand_indices, tesollo_joint_name,
@@ -9,6 +10,70 @@ from .proprioception import (
 
 # Commanded tool0 pose (xyz + quat xyzw) recorded on /teleop/target_pose.
 RECORDED_ARM_DIM = 7
+
+
+def get_teleop_tcp_offset_matrices(hand: str = "normal",
+                                   offset_z: float = 0.15,
+                                   offset_pitch_deg: float = 15.0) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute T_offset_tool and its inverse between teleop TCP and tool0.
+
+    Matches the constant offsets in teleop_ur.py:
+        T_offset: Z +150mm, Y rotation +15° in tracker frame
+        R_fix: tracker-to-tool permutation
+    """
+    if hand in ("normal", "reverse"):
+        R_fix = np.array([
+            [ 0,  1,  0,  0],   # tool X = +tracker Y
+            [ 0,  0, -1,  0],   # tool Y = -tracker Z
+            [-1,  0,  0,  0],   # tool Z = -tracker X
+            [ 0,  0,  0,  1]
+        ], dtype=np.float64)
+    else:
+        raise ValueError(f"Unknown hand: {hand}")
+
+    R_fix_inv = np.linalg.inv(R_fix)
+
+    T_offset = np.eye(4, dtype=np.float64)
+    T_offset[:3, :3] = R.from_euler("y", offset_pitch_deg, degrees=True).as_matrix()
+    T_offset[2, 3] = offset_z
+
+    T_offset_ros = R_fix @ T_offset @ R_fix_inv
+    T_offset_ros_inv = np.linalg.inv(T_offset_ros)
+    return T_offset_ros, T_offset_ros_inv
+
+
+def unoffset_teleop_action(arm_action: np.ndarray,
+                            hand: str = "normal",
+                            offset_z: float = 0.15,
+                            offset_pitch_deg: float = 15.0) -> np.ndarray:
+    """Transform commanded teleop TCP pose back to tool0 pose.
+
+    teleop_ur.py publishes /teleop/target_pose with a TCP offset:
+        T_offset: Z +150mm, Y rotation +15° in tracker frame
+        R_fix: tracker-to-tool permutation
+    The Cartesian controller at deploy time (cartesian_motion_controller)
+    targets tool0 directly via /target_frame without tool-frame correction.
+
+    This function computes T_tool0 = T_target @ inv(T_offset_ros)
+    so that the recorded actions match the tool0 frame expected by the
+    deployment controller.
+    """
+    _, T_offset_ros_inv = get_teleop_tcp_offset_matrices(
+        hand=hand, offset_z=offset_z, offset_pitch_deg=offset_pitch_deg
+    )
+
+    R_inv = T_offset_ros_inv[:3, :3]
+    p_inv = T_offset_ros_inv[:3, 3]
+
+    pos = arm_action[:, :3]
+    quat = arm_action[:, 3:7]  # xyzw
+    rot = R.from_quat(quat)
+
+    p_tool0 = pos + rot.apply(p_inv)
+    rot_tool0 = rot * R.from_matrix(R_inv)
+    quat_tool0 = rot_tool0.as_quat()
+
+    return np.concatenate([p_tool0, quat_tool0], axis=1).astype(np.float32)
 
 
 def reduce_recorded_action(recorded_action: np.ndarray,
@@ -49,12 +114,14 @@ def compute_actions(ee_pose: np.ndarray,
     Config:
         type: "recorded" | "next_state"
         derived_from: "ee_pose" | "joint_states"   (next_state only)
+        unoffset_teleop: bool | dict (default True for "recorded")
 
     type: "recorded" (preferred)
         Uses the command captured during teleoperation: the commanded tool0
         pose from /teleop/target_pose plus the commanded hand joints from the
-        hand controller's joint_trajectory. This is what the operator ASKED
-        for, and the same quantity the deploy-time executor consumes.
+        hand controller's joint_trajectory. If unoffset_teleop is True,
+        transforms the teleop TCP pose back to tool0 to match the deployment
+        controller.
 
     type: "next_state"
         Legacy. action[t] = state[t+1], i.e. the action is inferred from where
@@ -79,6 +146,27 @@ def compute_actions(ee_pose: np.ndarray,
                 "type='next_state' (which bakes the controller's tracking "
                 "lag into the action)."
             )
+
+        unoffset_cfg = config.get("unoffset_teleop", True)
+        if unoffset_cfg:
+            offset_z = 0.15
+            offset_pitch = 15.0
+            hand = "normal"
+            if isinstance(unoffset_cfg, dict):
+                offset_z = unoffset_cfg.get("offset_z", 0.15)
+                offset_pitch = unoffset_cfg.get("offset_pitch_deg", 15.0)
+                hand = unoffset_cfg.get("hand", "normal")
+
+            arm_corr = unoffset_teleop_action(
+                recorded_action[:, :RECORDED_ARM_DIM],
+                hand=hand,
+                offset_z=offset_z,
+                offset_pitch_deg=offset_pitch,
+            )
+            recorded_action = np.concatenate(
+                [arm_corr, recorded_action[:, RECORDED_ARM_DIM:]], axis=1
+            )
+
         # No _shift_next here. The recorded command at frame t IS the target
         # for frame t; shifting it would re-introduce exactly the one-frame
         # offset that next_state has to apply because its source is a
