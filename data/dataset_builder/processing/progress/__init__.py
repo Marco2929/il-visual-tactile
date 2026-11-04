@@ -31,6 +31,7 @@ def compute_progress(
     hand_state: Optional[np.ndarray] = None,
     joint_states: Optional[np.ndarray] = None,
     z: Optional[np.ndarray] = None,
+    is_success: Optional[bool] = None,
 ) -> np.ndarray:
     """Compute progress signal for one episode in the dataset builder pipeline.
 
@@ -90,6 +91,7 @@ def compute_progress(
         if k in ("peel_param", "y_grasp", "y_contact", "y_retry", "gamma", "theta", "retreat_frac")
     }
     curve_params = get_curve_params(variant=variant, **curve_overrides)
+    success_flag = is_success if is_success is not None else cfg.get("is_success", True)
 
     return build_progress_curve(
         num_frames=N,
@@ -99,6 +101,7 @@ def compute_progress(
         t_lock=seg["t_lock"],
         z=z_arr,
         params=curve_params,
+        is_success=success_flag,
     )
 
 

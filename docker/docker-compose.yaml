@@ -55,6 +55,7 @@ services:
       - ../third_party:/ros2_ws/third_party:rw
       - ../data:/ros2_ws/data:rw
       - /mnt/data/data:/ros2_ws/data/episodes/external:rw
+      - ${HOME}/.ssh:/root/.ssh:ro
 
       - ../src/moveit_ur_hand_config:/ros2_ws/src/moveit_ur_hand_config:rw
       - ../src/cartesian_controllers:/ros2_ws/src/cartesian_controllers:rw

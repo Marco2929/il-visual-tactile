@@ -244,6 +244,10 @@ class LeRobotWriter:
             cprint("⚠️  No episodes to write to LeRobot", "yellow")
             return
 
+        # Flush LeRobot dataset writer and write parquet footers
+        if hasattr(self.dataset, "finalize"):
+            self.dataset.finalize()
+
         self._write_prehensio_index()
 
         if push:

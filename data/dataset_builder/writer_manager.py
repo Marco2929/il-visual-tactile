@@ -109,6 +109,16 @@ class WriterManager:
             except Exception as e:
                 cprint(f"❌ LeRobot finalize failed: {e}", "red")
 
+        if lerobot_ok and self.config.push_to_server_config.get("enabled", False):
+            try:
+                from uploader import upload_dataset
+                upload_dataset(
+                    local_dataset_dir=self.lerobot_writer.local_dir,
+                    config=self.config.push_to_server_config,
+                )
+            except Exception as e:
+                cprint(f"❌ Server upload failed: {e}", "red")
+
         self.manager.log_processed_episodes(
             new_episodes=new_episodes,
             zarr_ok=zarr_ok,

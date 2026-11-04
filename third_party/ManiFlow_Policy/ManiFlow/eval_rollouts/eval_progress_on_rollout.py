@@ -158,8 +158,9 @@ def evaluate_single_rollout(
     head: ProgressHeadST,
     device: torch.device,
     output_dir: str,
-    stride: int = 4,
+    stride: Optional[int] = None,
     max_frames: int = 0,
+    gate_z: bool = False,
 ) -> Optional[Dict]:
     """Evaluate progress predictions on a single rollout directory."""
     rollout_name = os.path.basename(os.path.normpath(rollout_dir))
@@ -177,18 +178,39 @@ def evaluate_single_rollout(
         return None
 
     times = np.array(times)
-    print(f"Loaded {len(frames)} wrist frames ({note})")
+    fps = float(len(times) - 1) / max(float(times[-1] - times[0]), 1e-4) if len(times) > 1 else 30.0
+    print(f"Loaded {len(frames)} wrist frames ({note}) | Measured FPS: {fps:.1f}")
+
+    # Determine time-matched stride (matching 200 ms spacing from 20 Hz training data: 4 steps * 50 ms = 200 ms)
+    if stride is not None and stride > 0:
+        eff_stride = stride
+    else:
+        eff_stride = max(1, int(round(fps * 0.20)))
+    print(f"Using temporal stride: {eff_stride} frames ({eff_stride / fps * 1000:.0f} ms per step, total window {3 * eff_stride / fps * 1000:.0f} ms)")
 
     # Extract tokens & predict progress
     tokens = extract_wrist_tokens(frames, encoder, device)
-    preds = predict_progress_sequence(tokens, head, device, stride=stride)
+    preds = predict_progress_sequence(tokens, head, device, stride=eff_stride)
 
     # Optional: load robot pose / height from rollout.npz
     npz_data = load_rollout_npz(rollout_dir)
     ee_z, tf_t = None, None
+    raw_preds = preds.copy()
     if npz_data and "tf_pose" in npz_data and "tf_t" in npz_data:
         tf_t = npz_data["tf_t"]
         ee_z = npz_data["tf_pose"][:, 2]  # z height
+
+        if gate_z and len(tf_t) > 0 and len(ee_z) > 0:
+            # Interpolate z onto wrist timestamps
+            z_on_times = np.interp(times, tf_t, ee_z)
+            min_z = float(np.min(ee_z))
+            # Find first time robot descends to near lowest table height (+3cm)
+            reach_table_mask = (z_on_times <= min_z + 0.03)
+            first_contact_idx = np.where(reach_table_mask)[0][0] if np.any(reach_table_mask) else len(times)
+            # Before first reaching the table, progress cannot exceed approach limit (0.30)
+            descent_mask = np.arange(len(preds)) < first_contact_idx
+            preds[descent_mask] = np.minimum(preds[descent_mask], 0.30)
+            print(f"  Applied kinematic descent gate: capped {np.sum(descent_mask)} pre-contact frames to max 0.30")
 
     # Metrics & 80% threshold tracking
     max_progress = float(np.max(preds))
@@ -221,7 +243,9 @@ def evaluate_single_rollout(
 
     # Color progress curve based on success/fail
     p_color = "#2ca02c" if is_success else "#d62728"
-    ax1.plot(times, preds, label="Predicted Progress (ProgressHeadST)", color=p_color, linewidth=2.2)
+    if gate_z and np.any(preds != raw_preds):
+        ax1.plot(times, raw_preds, label="Raw Ungated Vision Progress", color="#888888", linestyle=":", linewidth=1.5, alpha=0.7)
+    ax1.plot(times, preds, label=f"ProgressHeadST ({'Gated' if gate_z else 'Raw'})", color=p_color, linewidth=2.2)
     ax1.axhline(0.90, color="#1b9e77", linestyle=":", linewidth=1.5, label="Completion Gate (0.90)")
     ax1.axhline(0.80, color="#d95f02", linestyle="--", linewidth=1.5, label="User Alert Threshold (0.80)")
     ax1.axhline(0.70, color="#7570b3", linestyle=":", linewidth=1.0, label="Pinch Grasp Target (0.70)")
@@ -309,7 +333,8 @@ def main():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to best_progress_head.pt checkpoint.")
     parser.add_argument("--output_dir", type=str, default="eval_rollouts/plots", help="Directory to save evaluation plots.")
     parser.add_argument("--model_name", type=str, default="vit_small_patch16_dinov3.lvd1689m")
-    parser.add_argument("--stride", type=int, default=4, help="Frame stride for 4-frame window.")
+    parser.add_argument("--stride", type=int, default=0, help="Frame stride for 4-frame window. If 0 (default), auto-computed to match 200ms spacing (s=6 at 30Hz).")
+    parser.add_argument("--gate_z", action="store_true", help="Apply kinematic descent gate (cap progress at 0.30 before first table contact).")
     parser.add_argument("--max_frames", type=int, default=0, help="Max wrist frames to decode (0 = all).")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -365,8 +390,9 @@ def main():
             head=head,
             device=device,
             output_dir=args.output_dir,
-            stride=args.stride,
+            stride=args.stride if args.stride > 0 else None,
             max_frames=args.max_frames,
+            gate_z=args.gate_z,
         )
         if res:
             results.append(res)

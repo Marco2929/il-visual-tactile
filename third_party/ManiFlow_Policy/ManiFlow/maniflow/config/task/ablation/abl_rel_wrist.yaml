@@ -37,7 +37,7 @@ env_runner: null
 
 dataset:
   _target_: maniflow.dataset.relative_dataset.RelativeRealDexDataset
-  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_wrist_tesollo.zarr
+  zarr_path: /ros2_ws/data/zarr_datasets/foil_lifting_box_recorded_action.zarr
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}

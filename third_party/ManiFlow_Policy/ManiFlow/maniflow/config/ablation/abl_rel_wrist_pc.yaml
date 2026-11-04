@@ -2,30 +2,18 @@
 #
 # NOTE: the @package directive MUST be the first line (see abl_abs_wrist.yaml).
 #
-# ABLATION A (RELATIVE): wrist_rgb only, NO point cloud.
+# ABLATION B (RELATIVE): wrist_rgb + point_cloud.
 #
 # Launch:
-#   bash scripts/train_policy.sh ablation/abl_rel_wrist ablation/abl_rel_wrist 0A02 0 0
+#   bash scripts/train_policy.sh ablation/abl_rel_wrist_pc ablation/abl_rel_wrist_pc 0B02 0 0
 defaults:
   - /maniflow_multimodal_policy
-  - override /task: ablation/abl_rel_wrist
+  - override /task: ablation/abl_rel_wrist_pc
   - _self_
 
 policy:
-  pc_conditioned: false
+  pc_conditioned: true
   rgb_keys: ['wrist_rgb']
-
-  # 0.0 for every RELATIVE condition.
-  #
-  # Why the absolute columns need 0.8 and these need 0.0: with absolute
-  # targets, `action` is essentially the next `agent_pos`, so proprioception
-  # alone predicts the answer and the dropout is the only thing forcing the
-  # policy to look at the images. With chunk-relative targets that shortcut is
-  # gone STRUCTURALLY - the target is a delta from the chunk's base frame, and
-  # the base pose is subtracted out of the observation too, so absolute
-  # position carries no information about the answer. Dropping state here
-  # would only destroy legitimate signal (joint configuration, hand aperture)
-  # without removing any shortcut.
   proprio_dropout_prob: 0.0
 
 logging:
@@ -33,4 +21,4 @@ logging:
   tags:
     - ablation
     - relative
-    - wrist_only
+    - wrist_pc

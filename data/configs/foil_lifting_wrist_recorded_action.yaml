@@ -159,7 +159,6 @@ proprioception:
 # rather than silently falling back.
 actions:
   type: "recorded"
-  unoffset_teleop: true
 
 # ─── Progress Signal ──────────────────────────────
 progress:
@@ -191,3 +190,6 @@ output:
   # silently dropped by the writer, so wrist_rgb never made it to disk.
   image_keys: ["wrist_rgb", "front_rgb"]
   image_chunk_size: 8
+
+  # Push built LeRobot dataset to the visualization server (see configs/dataset_server.env)
+  push_to_server: false

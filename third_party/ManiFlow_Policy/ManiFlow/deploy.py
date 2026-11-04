@@ -65,6 +65,10 @@ from progress_utils import ProgressTracker, flush as flush_dds, latched_qos
 
 WRIST_RGB_TOPIC = os.environ.get(
     "WRIST_COLOR_TOPIC", "/cam_gemini/color/image_raw")
+ZED_COLOR_TOPIC = os.environ.get(
+    "ZED_COLOR_TOPIC", "/zed/zed_node/rgb/color/rect/image")
+ZED_DEPTH_TOPIC = os.environ.get(
+    "ZED_DEPTH_TOPIC", "/zed/zed_node/depth/depth_registered")
 
 
 # ---------------------------------------------------------------------------
@@ -260,9 +264,9 @@ class RobotCameraSync:
             JointState, '/joint_states', self._joint_cb, qos_fast)
 
         self.sub_color = message_filters.Subscriber(
-            node, Image, '/zed/zed_node/rgb/color/rect/image', qos_profile=qos_slow)
+            node, Image, ZED_COLOR_TOPIC, qos_profile=qos_slow)
         self.sub_depth = message_filters.Subscriber(
-            node, Image, '/zed/zed_node/depth/depth_registered', qos_profile=qos_slow)
+            node, Image, ZED_DEPTH_TOPIC, qos_profile=qos_slow)
         self.sub_wrist = message_filters.Subscriber(
             node, Image, WRIST_RGB_TOPIC, qos_profile=qos_slow)
 
@@ -973,7 +977,6 @@ if __name__ == "__main__":
         addition_info=1211,
         fps=20.0,
         sport_mode_active=False,
-        THINK OF THE OFFSET FROM TELEOP FOR CLAUDE LEAVE THIS ERROR SO I REALIZE
         # False: maniflow_multimodal_policy has no progress head, so
         # requesting one would (correctly) raise at startup now. Flip to
         # True once a checkpoint emits progress_score - leave

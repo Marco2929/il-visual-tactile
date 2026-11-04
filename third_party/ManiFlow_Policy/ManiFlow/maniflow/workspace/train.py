@@ -168,6 +168,10 @@ class TrainManiFlowDexWorkspace:
         model = self.model
         model.train()
 
+        # Point cloud Grad-CAM only applies when point cloud conditioning is enabled
+        if not getattr(model, 'pc_conditioned', True):
+            return None
+
         # --- Prepare inputs (single sample) ---
         obs_dict = {k: v[:1].clone().to(device) for k, v in batch['obs'].items()}
         gt_action = batch['action'][:1].clone().to(device)

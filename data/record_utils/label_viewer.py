@@ -27,6 +27,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import json
 import numpy as np
 
 # Switch to GUI backend if available
@@ -35,12 +36,19 @@ try:
 except Exception:
     pass
 
-# Ensure dataset_builder is in path
+# Ensure dataset_builder and rollout_logs are in path
 _RECORD_UTILS_DIR = pathlib.Path(__file__).resolve().parent
 _DATA_DIR = _RECORD_UTILS_DIR.parent
 _BUILDER_DIR = _DATA_DIR / "dataset_builder"
-if str(_BUILDER_DIR) not in sys.path:
-    sys.path.insert(0, str(_BUILDER_DIR))
+_ROLLOUT_LOGS_DIR = _DATA_DIR / "rollout_logs"
+for d in (_BUILDER_DIR, _ROLLOUT_LOGS_DIR):
+    if str(d) not in sys.path:
+        sys.path.insert(0, str(d))
+
+try:
+    import viz.wrist as wrist
+except ImportError:
+    wrist = None
 
 from processing.progress import (  # noqa: E402
     compute_progress,
@@ -58,6 +66,7 @@ for _k in list(plt.rcParams):
         plt.rcParams[_k] = []
 
 EXTERNAL = pathlib.Path("/ros2_ws/data/episodes/external")
+DEFAULT_ROLLOUT_ROOT = _ROLLOUT_LOGS_DIR / "foil_lifting_wrist_e40"
 CAMERAS = ("front_rgb", "wrist_rgb")
 
 REVIEW_EPISODES = [
@@ -72,6 +81,24 @@ REVIEW_EPISODES = [
     "folien_mitte_b_saeule/episode_027_success",
     "folien_mitte_a_saeule/episode_040_success",
 ]
+
+
+def find_rollouts(root):
+    """[(key, path)] for all rollout dirs holding rollout.npz."""
+    out = []
+    root = pathlib.Path(root).resolve()
+    if not root.exists():
+        return out
+    candidates = sorted(root.glob("**/rollout_*")) if not root.name.startswith("rollout_") else [root]
+    for r in candidates:
+        if r.is_dir() and (r / "rollout.npz").exists():
+            try:
+                rel = r.relative_to(root)
+                key = str(rel) if len(rel.parts) > 1 else r.name
+            except ValueError:
+                key = r.name
+            out.append((key, r))
+    return out
 
 
 def find_episodes(root, prefixes):
@@ -112,28 +139,70 @@ class Viewer:
     def load_episode(self):
         key, ep = self.episodes[self.ei]
         self.key, self.ep = key, ep
-        raw = np.load(ep / "state.npy").astype(np.float32)
-        self.n = len(raw)
+        self.is_rollout = (ep / "rollout.npz").exists()
+        self.rollout_frames = None
+
+        if self.is_rollout:
+            z_data = np.load(ep / "rollout.npz")
+            outcome = {}
+            if (ep / "outcome.json").exists():
+                try:
+                    outcome = json.loads((ep / "outcome.json").read_text())
+                except Exception:
+                    pass
+            self.is_success = outcome.get("success", outcome.get("verdict") in ("pass", "success"))
+            self.verdict = outcome.get("verdict", "unknown")
+            self.fail_mode = outcome.get("failure_mode", "")
+
+            # Load wrist camera frames
+            meta = {}
+            if (ep / "meta.json").exists():
+                try:
+                    meta = json.loads((ep / "meta.json").read_text())
+                except Exception:
+                    pass
+            started_unix = meta.get("started_unix", 0.0)
+
+            times, frames = [], []
+            if wrist is not None:
+                try:
+                    times, frames, _ = wrist.load_frames(ep, started_unix, max_frames=0)
+                except Exception as e:
+                    print(f"Warning loading wrist bag: {e}")
+
+            if frames:
+                self.rollout_frames = frames
+                self.n = len(frames)
+                js_t = z_data["js_t"]
+                js_pos = z_data["js_pos"]
+                resampled_js = np.zeros((self.n, js_pos.shape[1]), dtype=np.float32)
+                for j in range(js_pos.shape[1]):
+                    resampled_js[:, j] = np.interp(times, js_t, js_pos[:, j])
+                raw = resampled_js
+                if "tf_pose" in z_data and "tf_t" in z_data:
+                    tf_t = z_data["tf_t"]
+                    ee_z = z_data["tf_pose"][:, 2]
+                    self.z = np.interp(times, tf_t, ee_z)
+                else:
+                    self.z = raw[:, 2]
+            else:
+                raw = z_data["js_pos"]
+                self.n = len(raw)
+                self.z = raw[:, 2]
+        else:
+            self.is_success = True
+            self.verdict = "pass"
+            self.fail_mode = ""
+            raw = np.load(ep / "state.npy").astype(np.float32)
+            self.n = len(raw)
+            z = -(raw[:, 1].astype(np.float64) + raw[:, 2].astype(np.float64))
+            self.z = smooth(z, 5)
+
         sig = extract_grasp_signal(joint_states=raw)
         self.g = smooth(sig, 5)
         self.seg = segment_grasp_attempts(sig)
-        
-        # End-effector z proxy
-        z = -(raw[:, 1].astype(np.float64) + raw[:, 2].astype(np.float64))
-        self.z = smooth(z, 5)
 
-        self.curves = {}
-        if self.seg["has_grasp"]:
-            y = build_progress_curve(
-                num_frames=self.n,
-                attempts=self.seg["attempts"],
-                t_first=self.seg["t_first"],
-                t_last=self.seg["t_last"],
-                t_lock=self.seg["t_lock"],
-                z=self.z,
-                params=self.params,
-            )
-            self.curves[self.params.name] = y
+        self._compute_curves()
 
         ev = {0, self.n - 1}
         for a, b in self.seg["attempts"]:
@@ -145,6 +214,21 @@ class Viewer:
         self.i = 0
         self.draw_static()
         self.draw_frame()
+
+    def _compute_curves(self):
+        self.curves = {}
+        if self.seg["has_grasp"]:
+            y = build_progress_curve(
+                num_frames=self.n,
+                attempts=self.seg["attempts"],
+                t_first=self.seg["t_first"],
+                t_last=self.seg["t_last"],
+                t_lock=self.seg["t_lock"],
+                z=self.z,
+                params=self.params,
+                is_success=self.is_success,
+            )
+            self.curves[self.params.name] = y
 
     def draw_static(self):
         seg, n = self.seg, self.n
@@ -193,16 +277,34 @@ class Viewer:
 
     def draw_frame(self):
         i = self.i
-        for ax, cam in zip(self.ax_img, CAMERAS):
-            ax.clear()
-            ax.axis("off")
-            img = load_frame(self.ep, cam, i)
-            if img is None:
-                ax.text(0.5, 0.5, "%s/frame_%04d.png missing" % (cam, i),
-                        ha="center", transform=ax.transAxes)
-            else:
-                ax.imshow(img)
-            ax.set_title(cam, fontsize=9)
+        if self.is_rollout and self.rollout_frames:
+            self.ax_img[0].clear()
+            self.ax_img[0].axis("off")
+            self.ax_img[0].imshow(self.rollout_frames[i])
+            self.ax_img[0].set_title(f"wrist_rgb (f={i}/{self.n-1})", fontsize=9)
+
+            self.ax_img[1].clear()
+            self.ax_img[1].axis("off")
+            v_col = "#2ca02c" if self.is_success else "#d62728"
+            self.ax_img[1].text(0.05, 0.78, f"Outcome: {self.verdict.upper()}", fontsize=12, fontweight="bold", color=v_col)
+            if self.fail_mode:
+                self.ax_img[1].text(0.05, 0.60, f"Failure Mode: {self.fail_mode}", fontsize=10, color="#d62728")
+            self.ax_img[1].text(0.05, 0.44, f"EE Z: {self.z[i]:.4f} m", fontsize=10, color="#1f77b4")
+            thr = self.seg.get("threshold", 0)
+            self.ax_img[1].text(0.05, 0.28, f"Grasp: {self.g[i]:.2f}° (thr={thr:.2f}°)", fontsize=10)
+            self.ax_img[1].text(0.05, 0.10, "[v] = Toggle Success/Fail Curve   [q] = Quit", fontsize=9, color="#555555", style="italic")
+            self.ax_img[1].set_title("rollout metadata & controls", fontsize=9)
+        else:
+            for ax, cam in zip(self.ax_img, CAMERAS):
+                ax.clear()
+                ax.axis("off")
+                img = load_frame(self.ep, cam, i)
+                if img is None:
+                    ax.text(0.5, 0.5, "%s/frame_%04d.png missing" % (cam, i),
+                            ha="center", transform=ax.transAxes)
+                else:
+                    ax.imshow(img)
+                ax.set_title(cam, fontsize=9)
 
         for c in self.cursors:
             c.set_xdata([i, i])
@@ -213,11 +315,11 @@ class Viewer:
         for a, b in seg["attempts"]:
             if a <= i <= b:
                 if a >= seg["t_last"]:
-                    phase = "FINAL grip closing" if i < t_peel else "peel"
+                    phase = "FINAL grip closing" if i < t_peel else ("peel" if self.is_success else "fail/empty lift")
                 else:
                     phase = "failed attempt"
         if seg["has_grasp"] and i >= t_peel:
-            phase = "peel"
+            phase = "peel" if self.is_success else "fail/empty lift"
 
         val_str = "progress=%.3f" % (self.curves[self.params.name][i]) if self.curves else ""
         ev = "  <EVENT>" if i in self.events else ""
@@ -253,6 +355,12 @@ class Viewer:
             prv = [x for x in self.events if x < self.i]
             if prv:
                 self.goto(prv[-1])
+        elif k == "v":
+            self.is_success = not self.is_success
+            self.verdict = "pass" if self.is_success else "fail"
+            self._compute_curves()
+            self.draw_static()
+            self.draw_frame()
         elif k in ("n", "p"):
             self.ei = (self.ei + (1 if k == "n" else -1)) % len(self.episodes)
             self.load_episode()
@@ -269,19 +377,26 @@ def main():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=pathlib.Path, default=EXTERNAL)
+    ap.add_argument("--rollouts", nargs="?", const=str(DEFAULT_ROLLOUT_ROOT), default=None,
+                    help="directory containing rollout_* folders (e.g. data/rollout_logs/foil_lifting_wrist_e40)")
     ap.add_argument("--prefix", nargs="*", default=["folien_"])
     ap.add_argument("--only", nargs="*", default=None,
-                    help="collection/episode keys")
+                    help="collection/episode keys or rollout names")
     ap.add_argument("--review", action="store_true",
                     help="load the 10 reviewed episodes")
     args = ap.parse_args()
 
-    episodes = find_episodes(args.root, args.prefix)
-    if args.review:
-        ep_map = dict(episodes)
-        episodes = [(k, ep_map[k]) for k in REVIEW_EPISODES if k in ep_map]
-    elif args.only:
-        episodes = [(k, e) for k, e in episodes if k in set(args.only)]
+    if args.rollouts:
+        episodes = find_rollouts(args.rollouts)
+        if args.only:
+            episodes = [(k, e) for k, e in episodes if k in set(args.only)]
+    else:
+        episodes = find_episodes(args.root, args.prefix)
+        if args.review:
+            ep_map = dict(episodes)
+            episodes = [(k, ep_map[k]) for k in REVIEW_EPISODES if k in ep_map]
+        elif args.only:
+            episodes = [(k, e) for k, e in episodes if k in set(args.only)]
 
     if not episodes:
         raise SystemExit("no episodes selected")

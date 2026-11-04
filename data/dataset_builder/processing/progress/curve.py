@@ -77,13 +77,18 @@ def build_progress_curve(
     t_lock: Optional[int] = None,
     z: Optional[np.ndarray] = None,
     params: CurveParams = CONSERVATIVE,
+    is_success: bool = True,
 ) -> np.ndarray:
-    """Generate smooth, continuous, strictly monotonic progress curve."""
+    """Generate smooth, continuous progress curve.
+    
+    If is_success=True: peel phase ramps yg -> 1.0.
+    If is_success=False: failed/missed grasp drops yg -> 0.0 during lift.
+    """
     T = int(num_frames)
     if T <= 0:
         raise ValueError("empty episode")
     if not attempts:
-        return np.linspace(0.0, 1.0, T, dtype=np.float32)
+        return np.linspace(0.0, 1.0 if is_success else 0.0, T, dtype=np.float32)
 
     g0 = int(attempts[0][0])
     glast = int(attempts[-1][0])
@@ -136,7 +141,11 @@ def build_progress_curve(
     # (b) Peel ramp: foil is peeled, yg -> 1.0
     n_peel = T - t_end_pinch
     if n_peel > 0:
-        if params.peel_param == "height" and z is not None and len(z) == T:
+        if not is_success:
+            # Grasp missed/failed: drop cleanly to 0.0
+            p_drop = np.linspace(0.0, 1.0, n_peel)
+            y[t_end_pinch:] = yg * ((1.0 - p_drop) ** 2)
+        elif params.peel_param == "height" and z is not None and len(z) == T:
             seg = np.maximum.accumulate(np.asarray(z[t_end_pinch:], dtype=np.float64))
             lifted = seg - seg[0]
             travel = float(lifted[-1])
@@ -148,9 +157,9 @@ def build_progress_curve(
                 p_peel = np.linspace(0.0, 1.0, n_peel)
         else:
             p_peel = np.linspace(0.0, 1.0, n_peel)
-        y[t_end_pinch:] = yg + (1.0 - yg) * p_peel
+            y[t_end_pinch:] = yg + (1.0 - yg) * p_peel
 
     y = np.clip(y, 0.0, 1.0)
-    y[-1] = 1.0
+    y[-1] = 1.0 if is_success else 0.0
     return y.astype(np.float32)
 

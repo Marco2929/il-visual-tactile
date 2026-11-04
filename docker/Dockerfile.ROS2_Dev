@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     nmap \
     ethtool \
+    rsync \
+    openssh-client \
     python3-pymodbus \
     libvulkan1 \   
     mesa-vulkan-drivers\ 

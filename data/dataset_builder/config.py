@@ -364,6 +364,13 @@ class DatasetConfig:
         return self.raw["output"]
 
     @property
+    def push_to_server_config(self) -> Dict[str, Any]:
+        """Server upload configuration parsed from output.push_to_server."""
+        raw_push = self.output_config.get("push_to_server", False)
+        from uploader import resolve_push_config
+        return resolve_push_config(raw_push)
+
+    @property
     def rgb_config(self) -> Dict:
         """RGB preprocessing settings (resize/crop before writing to disk).
 
