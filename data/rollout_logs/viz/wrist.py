@@ -204,8 +204,21 @@ def _unpack_cdr_image(raw):
                 encoding=encoding, step=step, data=data)
 
 
+def _get_bag_count(bag):
+    """Read message_count from metadata.yaml if available."""
+    meta_path = bag / "metadata.yaml"
+    if meta_path.exists():
+        try:
+            import yaml
+            d = yaml.safe_load(meta_path.read_text())
+            return d.get("rosbag2_bagfile_information", {}).get("message_count")
+        except Exception:
+            pass
+    return None
+
+
 # ----------------------------------------------------------- readers -----
-def _iter_rosbag2_py(bag, topic):
+def _iter_rosbag2_py(bag, topic, keep_set=None):
     import rosbag2_py
     from rclpy.serialization import deserialize_message
     from sensor_msgs.msg import Image
@@ -215,31 +228,46 @@ def _iter_rosbag2_py(bag, topic):
         rosbag2_py.StorageOptions(uri=str(bag), storage_id="mcap"),
         rosbag2_py.ConverterOptions("", ""))
     reader.set_filter(rosbag2_py.StorageFilter(topics=[topic]))
+    idx = 0
     while reader.has_next():
         _, raw, t_ns = reader.read_next()
+        if keep_set is not None and idx not in keep_set:
+            idx += 1
+            continue
+        idx += 1
         raw = _maybe_decompress(raw)
         m = deserialize_message(raw, Image)
         yield t_ns, dict(height=m.height, width=m.width,
                          encoding=m.encoding, step=m.step, data=bytes(m.data))
 
 
-def _iter_mcap_ros2(bag, topic):
+def _iter_mcap_ros2(bag, topic, keep_set=None):
     from mcap_ros2.reader import read_ros2_messages
 
+    idx = 0
     for m in read_ros2_messages(str(next(bag.glob("*.mcap"))),
                                 topics=[topic]):
+        if keep_set is not None and idx not in keep_set:
+            idx += 1
+            continue
+        idx += 1
         msg = m.ros_msg
         yield m.log_time_ns, dict(height=msg.height, width=msg.width,
                                   encoding=msg.encoding, step=msg.step,
                                   data=bytes(msg.data))
 
 
-def _iter_mcap_raw(bag, topic):
+def _iter_mcap_raw(bag, topic, keep_set=None):
     from mcap.reader import make_reader
 
     with open(next(bag.glob("*.mcap")), "rb") as f:
+        idx = 0
         for schema, channel, message in make_reader(f).iter_messages(
                 topics=[topic]):
+            if keep_set is not None and idx not in keep_set:
+                idx += 1
+                continue
+            idx += 1
             img = _unpack_cdr_image(_maybe_decompress(message.data))
             if img is not None:
                 yield message.log_time, img
@@ -269,10 +297,21 @@ def load_frames(rollout_dir, started_unix, topic=WRIST_TOPIC,
     if bag is None:
         return [], [], "no wrist_bag in this rollout"
 
+    total_count = _get_bag_count(bag)
+    keep_set = None
+    if max_frames and total_count and total_count > max_frames:
+        keep_set = set(np.linspace(0, total_count - 1, max_frames).astype(int))
+
     errors = []
     for name, it in READERS:
         try:
-            entries = list(it(bag, topic))
+            # Pass keep_set if the iterator accepts it to skip decompressing unwanted frames
+            import inspect
+            sig = inspect.signature(it)
+            if "keep_set" in sig.parameters:
+                entries = list(it(bag, topic, keep_set=keep_set))
+            else:
+                entries = list(it(bag, topic))
         except ImportError as e:
             errors.append(f"{name}: not installed ({e.name})")
             continue
@@ -285,7 +324,7 @@ def load_frames(rollout_dir, started_unix, topic=WRIST_TOPIC,
             continue
 
         keep = range(len(entries))
-        if max_frames and len(entries) > max_frames:
+        if keep_set is None and max_frames and len(entries) > max_frames:
             keep = np.linspace(0, len(entries) - 1, max_frames).astype(int)
 
         times, frames = [], []
@@ -302,8 +341,9 @@ def load_frames(rollout_dir, started_unix, topic=WRIST_TOPIC,
             frames.append(img)
 
         if frames:
+            total_msg_str = f" of {total_count}" if total_count else f" of {len(entries)}"
             return (times, frames,
-                    f"{len(frames)} of {len(entries)} frames via {name}")
+                    f"{len(frames)}{total_msg_str} frames via {name}")
         errors.append(f"{name}: no frame decoded")
 
     return [], [], "; ".join(errors) or INSTALL_HINT

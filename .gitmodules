@@ -28,3 +28,7 @@
 [submodule "third_party/manip-as-in-sim-suite"]
 	path = third_party/manip-as-in-sim-suite
 	url = https://github.com/ByteDance-Seed/manip-as-in-sim-suite.git
+[submodule "third_party/ManiFlow_Policy"]
+	path = third_party/ManiFlow_Policy
+	url = git@github.com:Marco2929/il-deploy.git
+	branch = main

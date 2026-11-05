@@ -9,7 +9,14 @@ from typing import Optional
 
 import numpy as np
 
-from .curve import CurveParams, CONSERVATIVE, LEGACY80, get_curve_params, build_progress_curve
+from .curve import (
+    CurveParams,
+    CONSERVATIVE,
+    LEGACY80,
+    get_curve_params,
+    build_progress_curve,
+    build_pchip_progress_curve,
+)
 from .detector import (
     DEFAULT_CLOSED_FRAC,
     DEFAULT_MIN_CLOSED_FRAMES,
@@ -86,12 +93,21 @@ def compute_progress(
         z_arr = -(q[:, 1] + q[:, 2])
 
     variant = cfg.get("variant", "conservative")
+    success_flag = is_success if is_success is not None else cfg.get("is_success", True)
+
+    if str(variant).lower() in ("pchip", "initial_pchip", "pchip_initial"):
+        return build_pchip_progress_curve(
+            num_frames=N,
+            t_first=seg["t_first"],
+            z=z_arr,
+            is_success=success_flag,
+        )
+
     curve_overrides = {
         k: v for k, v in cfg.items()
         if k in ("peel_param", "y_grasp", "y_contact", "y_retry", "gamma", "theta", "retreat_frac")
     }
     curve_params = get_curve_params(variant=variant, **curve_overrides)
-    success_flag = is_success if is_success is not None else cfg.get("is_success", True)
 
     return build_progress_curve(
         num_frames=N,

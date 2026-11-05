@@ -1,0 +1,1 @@
+/home/mm/dev/il-visual-tactile/third_party/ManiFlow_Policy/scripts/sync_remote_runs.sh

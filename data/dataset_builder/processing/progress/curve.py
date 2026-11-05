@@ -142,9 +142,15 @@ def build_progress_curve(
     n_peel = T - t_end_pinch
     if n_peel > 0:
         if not is_success:
-            # Grasp missed/failed: drop cleanly to 0.0
-            p_drop = np.linspace(0.0, 1.0, n_peel)
-            y[t_end_pinch:] = yg * ((1.0 - p_drop) ** 2)
+            # Grasp missed/failed: drop cleanly and rapidly to 0.0 within ~20 frames,
+            # keeping progress flat at 0.0 during the remaining empty lift.
+            drop_len = min(n_peel, 20)
+            if drop_len > 0:
+                p_drop = np.linspace(0.0, 1.0, drop_len)
+                y[t_end_pinch : t_end_pinch + drop_len] = yg * ((1.0 - p_drop) ** 2)
+                y[t_end_pinch + drop_len :] = 0.0
+            else:
+                y[t_end_pinch:] = 0.0
         elif params.peel_param == "height" and z is not None and len(z) == T:
             seg = np.maximum.accumulate(np.asarray(z[t_end_pinch:], dtype=np.float64))
             lifted = seg - seg[0]
@@ -155,6 +161,7 @@ def build_progress_curve(
                 p_peel = 0.5 * p_h + 0.5 * p_f
             else:
                 p_peel = np.linspace(0.0, 1.0, n_peel)
+            y[t_end_pinch:] = yg + (1.0 - yg) * p_peel
         else:
             p_peel = np.linspace(0.0, 1.0, n_peel)
             y[t_end_pinch:] = yg + (1.0 - yg) * p_peel
@@ -162,4 +169,53 @@ def build_progress_curve(
     y = np.clip(y, 0.0, 1.0)
     y[-1] = 1.0 if is_success else 0.0
     return y.astype(np.float32)
+
+
+def build_pchip_progress_curve(
+    num_frames: int,
+    t_first: int,
+    z: Optional[np.ndarray] = None,
+    is_success: bool = True,
+) -> np.ndarray:
+    """The original 4-point cubic spline (PCHIP) progress curve.
+    
+    Reproduces the exact original logic from early dataset builder:
+      - x = [0, idx_grasp, idx_peak, idx_end]
+      - y = [0.0, 0.5, 0.8, 1.0] (or 0.0 on failure)
+    """
+    from scipy.interpolate import PchipInterpolator
+    T = int(num_frames)
+    if T <= 0:
+        return np.zeros(0, dtype=np.float32)
+    if t_first < 0 or t_first >= T:
+        return np.linspace(0.0, 1.0 if is_success else 0.0, T, dtype=np.float32)
+
+    idx_start = 0
+    idx_end = T - 1
+    idx_grasp = int(t_first)
+
+    # In original logic: idx_peak was the z-peak after grasp
+    if z is not None and len(z) == T and idx_grasp < T - 1:
+        idx_peak = idx_grasp + int(np.argmax(z[idx_grasp:]))
+    else:
+        idx_peak = (idx_grasp + idx_end) // 2
+
+    x_points = [idx_start, idx_grasp]
+    y_points = [0.0, 0.5]
+
+    if idx_grasp < idx_peak < idx_end:
+        x_points.append(idx_peak)
+        y_points.append(0.8)
+
+    x_points.append(idx_end)
+    y_points.append(1.0 if is_success else 0.0)
+
+    x_points, indices = np.unique(x_points, return_index=True)
+    y_points = np.array(y_points)[indices]
+
+    frames = np.arange(T)
+    interpolator = PchipInterpolator(x_points, y_points)
+    progress_signal = interpolator(frames)
+    return np.clip(progress_signal, 0.0, 1.0).astype(np.float32)
+
 

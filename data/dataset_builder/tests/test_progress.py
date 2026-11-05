@@ -72,11 +72,26 @@ def test_progress_variants_and_overrides():
     assert np.isclose(res_leg[50], 0.72, atol=1e-4)
 
 
+def test_failed_grasp_fast_drop():
+    # Attempt: 30..50, then failed/empty lift
+    sig = np.full(100, 3.0, dtype=np.float32)
+    sig[30:50] = 50.0
+    res = compute_progress(num_frames=100, finger_sensor=sig, is_success=False)
+    assert len(res) == 100
+    assert res[0] == 0.0
+    assert res[-1] == 0.0
+    # Peak reaches y_grasp
+    assert np.isclose(np.max(res), CONSERVATIVE.y_grasp, atol=0.01)
+    # Beyond 25 frames after t_lock, progress is 0.0 during empty lift
+    assert np.all(res[75:] == 0.0)
+
+
 if __name__ == "__main__":
     test_empty_episode()
     test_no_grasp_fallback()
     test_single_grasp_monotonic()
     test_retry_grasp_recovery()
     test_progress_variants_and_overrides()
+    test_failed_grasp_fast_drop()
     print("All progress tests passed successfully!")
 

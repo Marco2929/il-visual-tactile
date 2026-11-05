@@ -32,9 +32,10 @@ data/dataset_builder/cache/
 data/calibration/
 data/experiments/
 
-# Rollout-Logs (Rohdaten + Reports ignorieren, Skripte in viz/ behalten)
+# Rollout-Logs (Rohdaten + Reports ignorieren, Skripte in viz/ und investigations/ behalten)
 data/rollout_logs/*/
 !data/rollout_logs/viz/
+!data/rollout_logs/investigations/
 data/rollout_logs/reports/
 
 # Third-Party Caches & separate Repos
