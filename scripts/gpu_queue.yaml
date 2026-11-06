@@ -1,0 +1,175 @@
+settings:
+  poll_interval_sec: 30
+  log_dir: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs
+  local_code_dir: /home/mm/dev/il-visual-tactile/third_party/ManiFlow_Policy/ManiFlow
+  local_zarr_dir: /home/mm/dev/il-visual-tactile/data/zarr_datasets
+  local_outputs_dir: /home/mm/dev/il-visual-tactile/data/outputs
+workers:
+  local_pc:
+    display_name: Monty5 (Local)
+    enabled: true
+    type: docker
+    connection: local
+    target: ros2_dev
+    gpu_id: 0
+    schedule: always
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 50
+    code_dir: /ros2_ws/third_party/ManiFlow_Policy
+    venv_activate: /ros2_ws/venv/bin/activate
+    zarr_dir: /ros2_ws/data/zarr_datasets
+    output_dir: /ros2_ws/data/outputs
+  cell_pc:
+    display_name: Kitty3 (Bosch)
+    enabled: true
+    type: ssh
+    connection: ethernet
+    target: cell-pc
+    gpu_id: 0
+    schedule: always
+    weekend_always: true
+    min_free_vram_mb: 12000
+    max_gpu_util_pct: 25
+    code_dir: /home/adm-cell/maniflow_worker/ManiFlow_Policy
+    venv_activate: /home/adm-cell/venvs/lerobot/bin/activate
+    zarr_dir: /home/adm-cell/maniflow_worker/data/zarr_datasets
+    output_dir: /home/adm-cell/maniflow_worker/data/outputs
+    cleanup_remote_after_sync: true
+  monty3:
+    display_name: Monty3 (Gopal)
+    enabled: true
+    type: ssh
+    connection: ethernet
+    target: monty3
+    gpu_id: 0
+    schedule: 16:00-05:00
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 15
+    code_dir: /data/training_ws/ManiFlow_Policy
+    venv_activate: /data/venvs/lerobot/bin/activate
+    zarr_dir: /data/training_ws/data/zarr_datasets
+    output_dir: /data/training_ws/data/outputs
+    cleanup_remote_after_sync: true
+  monty:
+    display_name: Monty2 (Chitsi)
+    enabled: true
+    type: ssh
+    connection: wifi
+    target: monty-server
+    gpu_id: 0
+    schedule: 16:00-05:00
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 60
+    code_dir: /home/monty2/training_ws/ManiFlow_Policy
+    venv_activate: /home/monty2/training_ws/venv/bin/activate
+    zarr_dir: /home/monty2/training_ws/data/zarr_datasets
+    output_dir: /home/monty2/training_ws/data/outputs
+    cleanup_remote_after_sync: true
+jobs:
+- id: 0029_rel_wrist_height_delta_to4
+  alg: ablation/abl_rel_wrist_height_delta_to4
+  task: ablation/abl_rel_wrist_height_delta_to4
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: policy.state_history=true
+  seed: 0
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_112621_0029_rel_wrist_height_delta_to4_local_pc.log
+  worker: local_pc
+  started_at: '2026-11-06 13:29:51'
+  finished_at: '2026-11-06 13:28:50'
+- id: 0025_rel_wrist_height_delta
+  alg: ablation/abl_rel_wrist_height_delta
+  task: ablation/abl_rel_wrist_height_delta
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: policy.state_history=true
+  seed: 0
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_133051_0025_rel_wrist_height_delta_cell_pc.log
+  worker: cell_pc
+  started_at: '2026-11-06 13:30:52'
+  finished_at: '2026-11-06 14:33:52'
+- id: 0022_rel_wrist_pc_statehist
+  alg: ablation/abl_rel_wrist_pc
+  task: ablation/abl_rel_wrist_pc
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: policy.state_history=true
+  seed: 0
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_133152_0022_rel_wrist_pc_statehist_local_pc.log
+  worker: local_pc
+  started_at: '2026-11-06 13:31:52'
+  finished_at: '2026-11-06 15:36:11'
+- id: 0023_rel_wrist_only_statehist
+  alg: ablation/abl_rel_wrist
+  task: ablation/abl_rel_wrist
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: policy.state_history=true
+  seed: 0
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_143352_0023_rel_wrist_only_statehist_cell_pc.log
+  worker: cell_pc
+  started_at: '2026-11-06 14:33:53'
+  finished_at: '2026-11-06 15:35:40'
+- id: 0024_rel_wrist_front_statehist
+  alg: ablation/abl_rel_wrist_front
+  task: ablation/abl_rel_wrist_front
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: policy.state_history=true
+  seed: 0
+  status: running
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_165552_0024_rel_wrist_front_statehist_local_pc.log
+  worker: local_pc
+  started_at: '2026-11-06 16:55:52'
+- id: 0027_abs_wrist_height_delta
+  alg: ablation/abl_abs_wrist_height_delta
+  task: ablation/abl_abs_wrist_height_delta
+  dataset: foil_lifting_box_recorded_action.zarr
+  extra_args: ''
+  seed: 0
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_153611_0027_abs_wrist_height_delta_local_pc.log
+  worker: local_pc
+  started_at: '2026-11-06 15:36:11'
+  finished_at: '2026-11-06 16:48:42'
+- id: prg_0001_baseline_v2_clean
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --wandb_name prg_0001_baseline_v2_clean
+  seed: 42
+  status: failed
+  worker: cell_pc
+  started_at: '2026-11-06 17:07:50'
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_170748_prg_0001_baseline_v2_clean_cell_pc.log
+  finished_at: '2026-11-06 17:53:56'
+- id: prg_0002_smooth_w005
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --smooth_weight 0.05 --delta_max 0.03 --wandb_name prg_0002_smooth_w005
+  seed: 42
+  status: completed
+  worker: monty3
+  started_at: '2026-11-06 17:12:33'
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_170750_prg_0002_smooth_w005_monty3.log
+  finished_at: '2026-11-06 18:14:22'
+- id: prg_0003_smooth_w010
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --smooth_weight 0.10 --delta_max 0.02 --wandb_name prg_0003_smooth_w010
+  seed: 42
+  status: completed
+  worker: monty
+  started_at: '2026-11-06 17:53:26'
+  log_file: /home/mm/dev/il-visual-tactile/data/outputs/queue_logs/20261106_171233_prg_0003_smooth_w010_monty.log
+  finished_at: '2026-11-06 19:15:41'

@@ -65,7 +65,7 @@ def log_rollout(r: Rollout, ns: str = "", with_pc: bool = True,
         + (f"- pinch width at closure: "
            f"**{exe_w[int(np.argmax(r.exec_close))]:.1f} mm** "
            f"(open hand ~208 mm)\n" if exe_w is not None else "")
-        + (f"\n## progress head\n\n"
+        + (f"\n## progress head ({r.prog_split or 'unified'})\n\n"
            f"- max progress: **{st['max_prog']:.1%}** "
            f"({'⚠️ EXCEEDED 80%' if st['reached_80'] else 'stayed <80%'})\n"
            f"- final progress: **{st['final_prog']:.1%}**\n"
@@ -158,9 +158,11 @@ def log_rollout(r: Rollout, ns: str = "", with_pc: bool = True,
 
     # --- progress head (DINOv3 Spatio-Temporal) ---
     if r.has_progress:
-        for t, prog in zip(r.prog_t, r.prog_val):
+        for idx_p, (t, prog) in enumerate(zip(r.prog_t, r.prog_val)):
             rr.set_time("rollout_time", duration=float(t))
             rr.log(p("progress/predicted"), rr.Scalars(float(prog)))
+            if getattr(r, "prog_gt", None) is not None and idx_p < len(r.prog_gt):
+                rr.log(p("progress/ground_truth"), rr.Scalars(float(r.prog_gt[idx_p])))
             rr.log(p("progress/threshold_80"), rr.Scalars(0.80))
             rr.log(p("progress/gate_90"), rr.Scalars(0.90))
 

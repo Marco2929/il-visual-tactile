@@ -17,7 +17,6 @@ workflow, from bringing up hardware to training and deploying a policy.
 6. [Training](#6-training)
 7. [Deployment](#7-deployment)
 8. [Rollout logging and analysis](#8-rollout-logging-and-analysis)
-9. [Debugging](#9-debugging)
 
 ---
 
@@ -35,22 +34,11 @@ ros2 launch dg5f_driver dg5f_right_driver.launch.py \
 `fingertip_sensor:=true` enables the fingertip force/torque topics, which the
 recording scripts consume.
 
-### Inspire hand
+Send a test trajectory to verify the hand responds:
 
 ```bash
-ros2 run inspire_hand_modbus_ros2 hand_modbus_control_node
-ros2 run inspire_hand_modbus_ros2 inspire_hand_modbus_topic.py
-ros2 run inspire_hand_modbus_ros2 touch_data.py
-```
-
-Send a test pose to verify the hand responds:
-
-```bash
-ros2 topic pub --once /set_angle_data service_interfaces/msg/SetAngle1 \
-  "{finger_ids: [1, 2, 3, 4, 5, 6], angles: [1000, 1000, 1000, 1000, 1000, 000]}"
-```
-
-ros2 topic pub --once /dg5f_right/dg5f_right_controller/joint_trajectory   trajectory_msgs/msg/JointTrajectory "{
+ros2 topic pub --once /dg5f_right/dg5f_right_controller/joint_trajectory \
+  trajectory_msgs/msg/JointTrajectory "{
   joint_names: [
     rj_dg_1_1, rj_dg_1_2, rj_dg_1_3, rj_dg_1_4,
     rj_dg_2_1, rj_dg_2_2, rj_dg_2_3, rj_dg_2_4,
@@ -69,6 +57,22 @@ ros2 topic pub --once /dg5f_right/dg5f_right_controller/joint_trajectory   traje
                  0.0, 0.0, 0.0, 0.0,
                  0.0, 0.0, 0.0, 0.0],
     time_from_start: {sec: 2, nanosec: 500000000}}]}"
+```
+
+### Inspire hand
+
+```bash
+ros2 run inspire_hand_modbus_ros2 hand_modbus_control_node
+ros2 run inspire_hand_modbus_ros2 inspire_hand_modbus_topic.py
+ros2 run inspire_hand_modbus_ros2 touch_data.py
+```
+
+Send a test pose to verify the hand responds:
+
+```bash
+ros2 topic pub --once /set_angle_data service_interfaces/msg/SetAngle1 \
+  "{finger_ids: [1, 2, 3, 4, 5, 6], angles: [1000, 1000, 1000, 1000, 1000, 000]}"
+```
 
 ### SenseGlove (R1 glove + Tesollo mapper)
 
@@ -205,15 +209,15 @@ ros2 run il_main teleop_ur
 `teleop_ur` stays idle until it is enabled - the recorder publishes the enable
 signal, so during data collection it is armed automatically.
 
----
+### SenseGlove + Tesollo
 
-### Senseglove+Tesollo
-
+```bash
 cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py r1 --tag cyclone-latest --num-gloves 1
-
 cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py tesollo --tag cyclone-latest --hand right --glove-id 70 --delto-ip 192.168.56.102
-
 bash senseglove_guard/run_watchdog.sh
+```
+
+---
 
 ## 5. Recording and dataset preparation
 
@@ -291,21 +295,50 @@ python data/record_utils/visualize/visualize_pointcloud.py \
 lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 \
   --root /root/.cache/huggingface/lerobot/Marco2929/box_opening_baseline --mode local
 
-# Progress label viewer (interaktiv mit Kamerabildern und Grasp-Signalen)
+# Interactive progress label viewer (with camera feeds and grasp signals)
 export DISPLAY=:1
 python data/record_utils/label_viewer.py --review
 python data/record_utils/label_viewer.py --only folien_unten_b_sauele/episode_041_success
 ```
 
-*Steuerung:* `Pfeiltasten` (Frame +/-1), `Shift + Pfeile` (+/-10), `a`/`d` (nächstes/vorheriges Event), `n`/`p` (Episode), `q` (Beenden).
+*Controls:* `Arrow keys` (frame +/-1), `Shift + Arrows` (+/-10), `a`/`d` (next/previous event), `n`/`p` (episode), `q` (quit).
 
 ---
 
 ## 6. Training
 
-### ManiFlow policy
+### Multi-GPU Training Queue & Night-Window Dispatcher (Standard)
 
-Training runs for a long time, so start it inside a tmux session and detach with
+All multi-run training campaigns are managed by the always-on Multi-GPU Queue (`scripts/gpu_queue.py` + `scripts/gpu_queue.yaml`), which runs permanently as a `systemd --user` background service (`gpu-queue.service`):
+
+- **Local GPU (`local_pc`):** Dispatches inside the `ros2_dev` Docker container **24/7 (`schedule: "always"`)** whenever free VRAM and GPU utilization thresholds are met.
+- **Remote colleague GPUs (e.g. `monty`):** Dispatches over SSH **only during the night window (`schedule: "18:00-05:00"`) and on weekends**, after verifying via `nvidia-smi` that no one else is using the GPU. Automatically syncs code and missing `.zarr` datasets before training and pulls finished checkpoints back to `data/outputs/` via `rsync`.
+
+```bash
+# Live status of all GPUs, time windows, and queued/running jobs
+python3 scripts/gpu_queue.py status
+
+# Enqueue a new training run (picked up automatically within 30s)
+python3 scripts/gpu_queue.py add \
+  --id 0031_my_experiment \
+  --alg ablation/abl_rel_wrist_height_delta_to4 \
+  --task ablation/abl_rel_wrist_height_delta_to4 \
+  --dataset foil_lifting_box_recorded_action.zarr \
+  --extra-args "policy.state_history=true"
+
+# Reset a job (or 'all') back to pending
+python3 scripts/gpu_queue.py reset 0031_my_experiment
+
+# Manage the always-on background service
+systemctl --user status gpu-queue.service
+systemctl --user restart gpu-queue.service
+```
+
+To add another remote GPU machine, copy the `monty` worker block in [`scripts/gpu_queue.yaml`](scripts/gpu_queue.yaml) and set `target: <ssh-host>`.
+
+### Single manual ManiFlow policy run
+
+For a single manual run outside the queue, start it inside a tmux session and detach with
 `Ctrl+b d`:
 
 ```bash
@@ -451,9 +484,9 @@ ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: true}"    # start
 ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: false}"   # stop
 ```
 
-### Labeling the Success and behaviour
+### Labeling success and behaviour
 
-To label the success and exact behaviour qualitativily there's a seperate script that extracts the info from the ran policy:
+To label success and qualitative behaviour, a separate script extracts the info from the policy run:
 
 ```bash
 python3 data/rollout_logs/annotate_rollouts.py --ckpt "foil_lifting_relative_e40"
@@ -497,12 +530,4 @@ or raise the limit once:
 ```bash
 echo 'fs.inotify.max_user_instances=1024' | sudo tee /etc/sysctl.d/99-inotify.conf
 sudo sysctl --system
-```
-
-## 9. Debugging
-
-Live plotting of topics:
-
-```bash
-ros2 run plotjuggler plotjuggler
 ```

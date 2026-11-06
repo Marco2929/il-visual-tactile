@@ -147,17 +147,28 @@ class Rollout:
         if prog_file.exists():
             try:
                 pz = np.load(prog_file)
-                self.prog_t = pz["t"]
+                raw_t = pz["t"].astype(np.float64)
+                # Convert frame indices to seconds if needed so Rerun timeline aligns
+                dur_s = float(self.summary.get("duration_s", self.js_t[-1] if len(self.js_t) else 1.0))
+                if len(raw_t) > 1 and raw_t[-1] > dur_s * 2.5:
+                    raw_t = np.linspace(0.0, dur_s, len(raw_t))
+                self.prog_t = raw_t
                 self.prog_val = pz["progress"]
+                self.prog_gt = pz["gt_progress"] if "gt_progress" in pz else None
+                self.prog_split = str(pz["split"]) if "split" in pz else None
                 self.has_progress = len(self.prog_val) > 0
             except Exception:
                 self.has_progress = False
                 self.prog_t = np.zeros(0)
                 self.prog_val = np.zeros(0)
+                self.prog_gt = None
+                self.prog_split = None
         else:
             self.has_progress = False
             self.prog_t = np.zeros(0)
             self.prog_val = np.zeros(0)
+            self.prog_gt = None
+            self.prog_split = None
 
     @staticmethod
     def _step_clock(steps, z):

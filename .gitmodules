@@ -30,5 +30,5 @@
 	url = https://github.com/ByteDance-Seed/manip-as-in-sim-suite.git
 [submodule "third_party/ManiFlow_Policy"]
 	path = third_party/ManiFlow_Policy
-	url = git@github.com:Marco2929/il-deploy.git
+	url = git@github.com:Prehensio-GmbH/plastic-layer-policy.git
 	branch = main
