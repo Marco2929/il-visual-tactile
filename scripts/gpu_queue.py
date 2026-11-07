@@ -549,6 +549,162 @@ def postflight_sync_ssh(w_name: str, w_cfg: Dict[str, Any], job: Dict[str, Any],
     return True
 
 
+def is_ssh_disconnect_error(ret: int, log_path: Optional[Path], w_cfg: Dict[str, Any]) -> bool:
+    """Check if process exit was due to network disconnection or SSH failure."""
+    if w_cfg.get("type") != "ssh":
+        return False
+    if ret in (255, -signal.SIGPIPE, 124, 137):
+        return True
+
+    if log_path and log_path.exists():
+        try:
+            with open(log_path, "rb") as f:
+                f.seek(max(0, f.seek(0, os.SEEK_END) - 4096), os.SEEK_SET)
+                tail_txt = f.read().decode("utf-8", errors="ignore")
+            signals = [
+                "Timeout, server",
+                "Connection timed out",
+                "Connection closed by remote host",
+                "Broken pipe",
+                "No route to host",
+                "Network is unreachable",
+                "Host key verification failed",
+                "ssh: connect to host",
+            ]
+            if any(s.lower() in tail_txt.lower() for s in signals):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def inspect_remote_job_state(w_cfg: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+    """Inspect remote SSH worker to check if training process is alive and what checkpoints exist."""
+    target = w_cfg.get("target")
+    if not target:
+        return {"online": False, "process_alive": False, "checkpoints": []}
+
+    _, rel_dir = job_exp_and_rel_dir(job)
+    remote_run_dir = f"{w_cfg['output_dir']}/{rel_dir}"
+    job_id = job["id"]
+
+    probe_script = f"""
+    alive=0
+    if pgrep -f '{job_id}' >/dev/null 2>&1; then
+        alive=1
+    fi
+    echo "PROCESS_ALIVE=$alive"
+    echo "---CHECKPOINTS---"
+    if [ -d '{remote_run_dir}/checkpoints' ]; then
+        ls -1 '{remote_run_dir}/checkpoints/'*.ckpt 2>/dev/null || true
+    fi
+    if [ -f '{remote_run_dir}/best_progress_head.pt' ]; then
+        echo '{remote_run_dir}/best_progress_head.pt'
+    fi
+    if [ -f '{remote_run_dir}/latest.pt' ]; then
+        echo '{remote_run_dir}/latest.pt'
+    fi
+    """
+    try:
+        res = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", target, probe_script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if res.returncode != 0:
+            return {"online": False, "process_alive": False, "checkpoints": []}
+
+        lines = res.stdout.strip().splitlines()
+        alive = False
+        ckpts = []
+        in_ckpts = False
+        for l in lines:
+            l = l.strip()
+            if l.startswith("PROCESS_ALIVE="):
+                alive = (l.split("=")[1].strip() == "1")
+            elif l == "---CHECKPOINTS---":
+                in_ckpts = True
+            elif in_ckpts and l:
+                ckpts.append(l)
+
+        return {
+            "online": True,
+            "process_alive": alive,
+            "checkpoints": ckpts,
+            "remote_run_dir": remote_run_dir,
+        }
+    except Exception:
+        return {"online": False, "process_alive": False, "checkpoints": []}
+
+
+def handle_worker_reconnected(
+    w_name: str,
+    w_cfg: Dict[str, Any],
+    disc_info: Dict[str, Any],
+    cfg: Dict[str, Any],
+    settings: Dict[str, Any],
+) -> None:
+    """
+    Triggered as soon as a previously disconnected PC comes back online.
+    Inspects what happened to the job that was running mid-process when it disconnected,
+    reconciles/syncs checkpoints, and restores worker availability.
+    """
+    target = w_cfg.get("target")
+    interrupted_job_id = disc_info.get("job_id")
+    print(f"\n[{now_str()}] [RECONNECTED] Worker '{w_name}' ({target}) is BACK ONLINE after disconnecting mid-process!")
+    sys.stdout.flush()
+
+    jobs = cfg.get("jobs", [])
+    job_obj = next((j for j in jobs if j["id"] == interrupted_job_id), None)
+
+    if job_obj is not None:
+        remote_state = inspect_remote_job_state(w_cfg, job_obj)
+        ckpts = remote_state.get("checkpoints", [])
+        is_alive = remote_state.get("process_alive", False)
+
+        print(
+            f"[{now_str()}] [RECONNECT-INSPECT] Worker '{w_name}' mid-process inspection: "
+            f"process_alive={is_alive}, remote_checkpoints={len(ckpts)}"
+        )
+        sys.stdout.flush()
+
+        current_status = job_obj.get("status")
+        current_worker = job_obj.get("worker")
+
+        _, rel_dir = job_exp_and_rel_dir(job_obj)
+        remote_dir = f"{w_cfg['output_dir']}/{rel_dir}"
+
+        if (current_status == "completed" or current_status == "running") and current_worker != w_name:
+            # Job was already taken over and completed or actively running on another worker -> redundant!
+            print(
+                f"[{now_str()}] [RECONNECT-DISCARD] Job '{interrupted_job_id}' is already {current_status} on '{current_worker}'. "
+                f"Skipping redundant artifact sync (not saving anywhere)."
+            )
+            if is_alive:
+                print(f"[{now_str()}] [RECONNECT-STOP] Terminating redundant orphaned process on '{w_name}'...")
+                subprocess.run(["ssh", "-o", "BatchMode=yes", target, f"pkill -f '{interrupted_job_id}'"], capture_output=True)
+            # Clean up remote redundant directory
+            subprocess.run(["ssh", "-o", "BatchMode=yes", target, f"rm -rf '{remote_dir}'"], capture_output=True)
+
+        else:
+            if ckpts:
+                local_run_dir = Path(settings["local_outputs_dir"]) / rel_dir
+                local_run_dir.mkdir(parents=True, exist_ok=True)
+                print(f"[{now_str()}] [RECONNECT-SYNC] Syncing remote checkpoints from '{w_name}' to {local_run_dir}...")
+                subprocess.run(
+                    ["rsync", "-az", f"{target}:{remote_dir}/", f"{local_run_dir}/"],
+                    capture_output=True,
+                )
+                if settings.get("auto_eval_after_training", True):
+                    run_postflight_eval(job_obj, settings)
+                print(f"[{now_str()}] [RECONNECT-RECOVER] Restored {len(ckpts)} checkpoint(s) from '{w_name}'.")
+
+    cfg.setdefault("disconnected_workers", {}).pop(w_name, None)
+    print(f"[{now_str()}] [RECONNECT-READY] Worker '{w_name}' cache cleared. Worker is now READY for new tasks.\n")
+    sys.stdout.flush()
+
+
 def launch_job_process(
     w_name: str,
     w_cfg: Dict[str, Any],
@@ -853,6 +1009,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     pid_file = log_dir / "daemon.pid"
     pid_file.write_text(str(os.getpid()))
 
+    # Map worker_name -> (job_id, Popen, log_file_handle, log_path)
+    active: Dict[str, Tuple[str, subprocess.Popen, Any, Path]] = {}
+
     # Recover any orphaned 'running' jobs from managed workers back to 'pending'
     recovered = 0
     managed_workers = set(cfg.get("workers", {}).keys())
@@ -860,11 +1019,16 @@ def cmd_run(args: argparse.Namespace) -> None:
         if j.get("status") == "running" and j.get("worker") in managed_workers:
             w_name = j.get("worker")
             w_cfg = cfg.get("workers", {}).get(w_name, {})
-            # If docker worker, check if train.py is still actively running in container!
+            # If docker worker, check if training process for this job is still actively running in container!
             if w_cfg.get("type") == "docker":
-                res = subprocess.run(["docker", "exec", w_cfg["target"], "pgrep", "-f", "train.py"], capture_output=True)
+                res = subprocess.run(["docker", "exec", w_cfg["target"], "pgrep", "-f", f"python.*{j['id']}"], capture_output=True)
                 if res.returncode == 0:
-                    print(f"[{now_str()}] Job {j['id']} is still running in docker container {w_cfg['target']}. Keeping 'running'.")
+                    print(f"[{now_str()}] Job {j['id']} is actively running in docker container {w_cfg['target']}. Monitoring...")
+                    # Re-adopt into active tracking so completion is caught!
+                    log_p = Path(j.get("log_file", log_dir / f"{j['id']}.log"))
+                    log_f = open(log_p, "a", encoding="utf-8")
+                    attach_proc = subprocess.Popen(["docker", "exec", w_cfg["target"], "bash", "-c", f"while pgrep -f 'python.*{j['id']}' >/dev/null 2>&1; do sleep 3; done"], stdout=log_f, stderr=log_f)
+                    active[w_name] = (j["id"], attach_proc, log_f, log_p)
                     continue
             j["status"] = "pending"
             recovered += 1
@@ -872,8 +1036,6 @@ def cmd_run(args: argparse.Namespace) -> None:
         save_config(cfg, cfg_path)
         print(f"[{now_str()}] Recovered {recovered} interrupted job(s) back to 'pending'.")
 
-    # Map worker_name -> (job_id, Popen, log_file_handle, log_path)
-    active: Dict[str, Tuple[str, subprocess.Popen, Any, Path]] = {}
     idle_logged = False
 
     print(f"[{now_str()}] Starting Always-On Multi-GPU Queue Dispatcher (PID={os.getpid()}, poll={poll_sec}s)...")
@@ -887,13 +1049,47 @@ def cmd_run(args: argparse.Namespace) -> None:
             workers = cfg.get("workers", {})
             changed = False
 
-            # 1. Check active jobs for completion
+            # 1. Check active jobs for completion or worker disconnection
             for w_name, (job_id, proc, log_f, log_path) in list(active.items()):
                 ret = proc.poll()
                 if ret is not None:
-                    w_cfg = workers[w_name]
+                    w_cfg = workers.get(w_name, {})
                     job_obj = next((j for j in jobs if j["id"] == job_id), None)
                     ok = (ret == 0)
+
+                    # Check if failure was due to worker disconnection / SSH drop
+                    disconnected = False
+                    if not ok and is_ssh_disconnect_error(ret, log_path, w_cfg):
+                        disconnected = True
+
+                    if disconnected:
+                        disc_entry = {
+                            "worker": w_name,
+                            "job_id": job_id,
+                            "disconnected_at": now_str(),
+                            "exit_code": ret,
+                            "reason": f"ssh_disconnect (exit {ret})",
+                        }
+                        cfg.setdefault("disconnected_workers", {})[w_name] = disc_entry
+
+                        log_f.write(f"\n[{now_str()}] [FAILOVER] Worker '{w_name}' disconnected mid-process (exit code {ret})!\n")
+                        log_f.write(f"[{now_str()}] [FAILOVER] Cached '{w_name}' in disconnected registry. Re-queueing '{job_id}' for automatic failover to another healthy worker.\n")
+                        log_f.close()
+                        del active[w_name]
+
+                        if job_obj is not None:
+                            job_obj["status"] = "pending"
+                            job_obj["failover_from"] = w_name
+                            job_obj["failover_at"] = now_str()
+                            job_obj.pop("worker", None)
+                            job_obj.pop("finished_at", None)
+                            changed = True
+
+                        print(f"[{now_str()}] [FAILOVER] Worker '{w_name}' disconnected mid-process on job '{job_id}' (code {ret})!")
+                        print(f"[{now_str()}] [FAILOVER] Cached '{w_name}' in disconnected registry. Re-queueing '{job_id}' for auto-failover to another machine.")
+                        sys.stdout.flush()
+                        continue
+
                     if ok and w_cfg.get("type") == "ssh" and job_obj is not None:
                         ok = postflight_sync_ssh(w_name, w_cfg, job_obj, settings, log_f)
                     if ok and job_obj is not None and settings.get("auto_eval_after_training", True):
@@ -910,11 +1106,22 @@ def cmd_run(args: argparse.Namespace) -> None:
                     print(f"[{now_str()}] [DONE] {job_id} on {w_name} -> {'COMPLETED' if ok else 'FAILED'}")
                     sys.stdout.flush()
 
+            # 2. Check if previously disconnected workers have come back online
+            disc_workers = cfg.get("disconnected_workers", {})
+            for disc_name, disc_meta in list(disc_workers.items()):
+                w_cfg = workers.get(disc_name)
+                if not w_cfg or not w_cfg.get("enabled", True):
+                    continue
+                gpu_chk = query_worker_gpu(disc_name, w_cfg)
+                if gpu_chk.get("online"):
+                    handle_worker_reconnected(disc_name, w_cfg, disc_meta, cfg, settings)
+                    changed = True
+
             if changed:
                 save_config(cfg, cfg_path)
                 changed = False
 
-            # 2. Check if queue is currently idle (stay alive as standard background service)
+            # 3. Check if queue is currently idle (stay alive as standard background service)
             pending_jobs = [j for j in jobs if j.get("status", "pending") in ("pending", "queued")]
             if not pending_jobs and not active:
                 if not idle_logged:
@@ -925,7 +1132,7 @@ def cmd_run(args: argparse.Namespace) -> None:
                 continue
             idle_logged = False
 
-            # 3. Try to dispatch pending jobs to available workers with 4-tier priority:
+            # 4. Try to dispatch pending jobs to available workers with 4-tier priority:
             # Tier 1: Local PC (type == 'docker' or connection == 'local')
             # Tier 2: Remote PC with dataset already present (cache hit)
             # Tier 3: Remote PC without dataset via fast SSH / Ethernet
@@ -936,6 +1143,9 @@ def cmd_run(args: argparse.Namespace) -> None:
                 if not w_cfg.get("enabled", True):
                     continue
                 if w_name in active:
+                    continue
+                # Exclude disconnected workers currently cached
+                if w_name in cfg.get("disconnected_workers", {}):
                     continue
                 sched = w_cfg.get("schedule", "always")
                 if not is_in_schedule(sched, w_cfg.get("weekend_always", True), now):
@@ -966,9 +1176,21 @@ def cmd_run(args: argparse.Namespace) -> None:
 
                 proc, log_f, log_path = launch_job_process(best_w_name, best_w_cfg, next_job, settings)
                 if proc is None:
-                    next_job["status"] = "failed"
-                    next_job["worker"] = best_w_name
-                    next_job["log_file"] = str(log_path)
+                    if best_w_cfg.get("type") == "ssh" and not query_worker_gpu(best_w_name, best_w_cfg).get("online"):
+                        disc_entry = {
+                            "worker": best_w_name,
+                            "job_id": next_job["id"],
+                            "disconnected_at": now_str(),
+                            "reason": "preflight_ssh_unreachable",
+                        }
+                        cfg.setdefault("disconnected_workers", {})[best_w_name] = disc_entry
+                        print(f"[{now_str()}] [FAILOVER] Worker '{best_w_name}' unreachable during preflight. Caching as disconnected and re-dispatching {next_job['id']}...")
+                        next_job["status"] = "pending"
+                        next_job.pop("worker", None)
+                    else:
+                        next_job["status"] = "failed"
+                        next_job["worker"] = best_w_name
+                        next_job["log_file"] = str(log_path)
                     save_config(cfg, cfg_path)
                     print(f"[{now_str()}] [ERROR] Preflight failed for {next_job['id']} on {best_w_name}")
                     available_workers = [w for w in available_workers if w[0] != best_w_name]

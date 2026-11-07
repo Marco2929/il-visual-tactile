@@ -72,7 +72,9 @@ def collect_state(cfg_path: Path) -> Dict[str, Any]:
         gpu_name = "-"
 
         if enabled:
-            if not info.get("online"):
+            if w_name in cfg.get("disconnected_workers", {}):
+                state_label = "DISCONNECTED (Failover Active)"
+            elif not info.get("online"):
                 state_label = "OFFLINE"
             else:
                 gpu_name = info.get("gpu_name", "GPU")
@@ -172,6 +174,7 @@ def collect_state(cfg_path: Path) -> Dict[str, Any]:
             "fpr_09": det.get("fpr_09") if det else None,
             "best_mse": (ev.get("best_val_action_mse") if ev.get("job_type") != "progress_head" else ev.get("best_val_loss")) if ev else (det["best_mse"] if det else None),
             "eval": ev is not None,
+            "failover_from": job.get("failover_from"),
         })
 
     return {
@@ -182,6 +185,7 @@ def collect_state(cfg_path: Path) -> Dict[str, Any]:
         },
         "workers": workers_out,
         "jobs": jobs_out,
+        "disconnected_workers": cfg.get("disconnected_workers", {}),
         "evaluations": evals_out,
         "progress_evaluations": progress_evals_out,
     }
@@ -341,6 +345,8 @@ INDEX_HTML = """<!DOCTYPE html>
     </div>
   </header>
 
+  <div id="failover-alert-container"></div>
+
   <h2>GPU Workers</h2>
   <div id="workers-container" class="grid-workers"></div>
 
@@ -399,6 +405,8 @@ INDEX_HTML = """<!DOCTYPE html>
 <script>
 function statusBadge(st) {
   const s = (st || '').toLowerCase();
+  if (s.includes('failover') || s.includes('disconnect')) return `<span class="badge badge-yellow">${st.toUpperCase()}</span>`;
+  if (s.includes('reconnect')) return `<span class="badge badge-blue">${st.toUpperCase()}</span>`;
   if (s === 'completed' || s === 'ready') return `<span class="badge badge-green">${st.toUpperCase()}</span>`;
   if (s === 'running' || s.includes('training')) return `<span class="badge badge-blue">${st.toUpperCase()}</span>`;
   if (s === 'pending' || s.includes('wait')) return `<span class="badge badge-yellow">${st.toUpperCase()}</span>`;
@@ -419,6 +427,25 @@ async function refresh() {
     } else {
       db.className = 'badge badge-red';
       db.textContent = 'Daemon Stopped';
+    }
+
+    // Failover Alert Banner
+    const fac = document.getElementById('failover-alert-container');
+    const discKeys = Object.keys(data.disconnected_workers || {});
+    if (discKeys.length > 0) {
+      fac.innerHTML = `
+        <div style="background:rgba(210,153,34,0.15); border:1px solid rgba(210,153,34,0.5); border-radius:8px; padding:12px 16px; margin-bottom:18px; color:#e3b341; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <strong>⚠️ Auto-Failover Active:</strong> ${discKeys.map(k => {
+              const d = data.disconnected_workers[k];
+              return `Worker <strong>${k}</strong> disconnected mid-process during job <code>${d.job_id || '-'}</code>. Re-routed to healthy worker; auto-recovery will trigger when back online.`;
+            }).join(' | ')}
+          </div>
+          <span class="badge badge-yellow">AUTO-RECOVERY ARMED</span>
+        </div>
+      `;
+    } else {
+      fac.innerHTML = '';
     }
 
     // Render workers
@@ -482,7 +509,10 @@ async function refresh() {
       return `
         <tr>
           <td class="mono">${j.idx}</td>
-          <td class="mono" style="font-weight:600;">${j.id}</td>
+          <td class="mono" style="font-weight:600;">
+            ${j.id}
+            ${j.failover_from ? `<br><span class="badge badge-yellow" style="font-size:10px; margin-top:3px;">FAILOVER: ${j.failover_from}</span>` : ''}
+          </td>
           <td>${statusBadge(j.status)}</td>
           <td class="mono">${j.worker}</td>
           <td>
