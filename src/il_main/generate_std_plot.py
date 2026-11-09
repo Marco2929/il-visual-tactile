@@ -85,7 +85,7 @@ for b, g in zip(bars3, search_gains):
                  textcoords="offset points", ha='center', va='bottom', fontsize=8, fontweight='bold')
 
 plt.tight_layout()
-out_plot = "/home/mm/dev/il-visual-tactile/data/rollout_logs/investigations/modality_ablation/plots/prediction_std_multimodality_analysis.png"
+out_plot = "/home/mm/dev/il-visual-tactile/data/rollouts/analysis/investigations/modality_ablation/plots/prediction_std_multimodality_analysis.png"
 brain_plot = "/home/mm/.gemini/antigravity/brain/93b2b22b-696f-4543-8358-70a30cd58288/plots/prediction_std_multimodality_analysis.png"
 os.makedirs(os.path.dirname(out_plot), exist_ok=True)
 os.makedirs(os.path.dirname(brain_plot), exist_ok=True)

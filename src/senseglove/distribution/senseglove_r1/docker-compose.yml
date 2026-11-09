@@ -1,0 +1,28 @@
+services:
+  senseglove_r1:
+    image: ${SENSEGLOVE_IMAGE:-senseglove/robotics:latest}
+    container_name: senseglove_r1
+    network_mode: host
+    privileged: true
+    tty: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      # Must match senseglove_tesollo: r1 publishes the glove states that the
+      # tesollo mapper subscribes to, so both containers have to speak the same
+      # DDS implementation. Requires a cyclone-* image tag (see
+      # build_cyclone_image.sh); the stock image ships Fast DDS only.
+      - RMW_IMPLEMENTATION=${SENSEGLOVE_RMW:-rmw_cyclonedds_cpp}
+      - CYCLONEDDS_URI=file:///tmp/cyclonedds.xml
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      # Same discovery config as the other containers (loopback, no multicast).
+      # Path resolves from compose_runtime.yml, which start.py writes into
+      # src/senseglove/distribution/ - not from this file's own directory.
+      - ../../../docker/cyclonedds.xml:/tmp/cyclonedds.xml:ro
+      - ./finger_joint_range_limits.csv:/usr/local/lib/python3.12/dist-packages/SG_API/finger_joint_range_limits.csv:ro
+    command:
+      - bash
+      - -c
+      - ros2 launch r1_bringup r1.launch.py

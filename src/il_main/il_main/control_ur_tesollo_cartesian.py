@@ -41,7 +41,7 @@ import rclpy
 from builtin_interfaces.msg import Duration as DurationMsg
 from geometry_msgs.msg import PoseStamped
 from rclpy.node import Node
-from std_msgs.msg import Bool, Float64MultiArray
+from std_msgs.msg import Bool, Float64MultiArray, String
 from tf2_ros import Buffer, TransformListener
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
@@ -74,6 +74,10 @@ WORKSPACE = {
 # copies of the "execute every step exactly once" contract.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from control_ur_inspire_cartesian import ActionSchedule, ButterworthLowPass
+try:
+    from rollout_positions import get_start_pose, POSITIONEN, START_POSITIONS
+except ImportError:
+    from il_main.rollout_positions import get_start_pose, POSITIONEN, START_POSITIONS
 
 # ---------------------------------------------------------------------------
 # Action layout
@@ -201,6 +205,14 @@ class TesolloCartesianExecutor(Node):
             JointTrajectory, HAND_TRAJECTORY_TOPIC, 10)
         self.buffer_status_pub = self.create_publisher(
             Float64MultiArray, "/action_buffer_status", 10)
+        self.rollout_status_pub = self.create_publisher(
+            String, "/rollout_gate_status", 10)
+
+        # --- Rollout Start Position Approaching ---
+        self._approaching_start_pos = False
+        self._start_target_pose: Optional[np.ndarray] = None
+        self._current_pos_name: Optional[str] = None
+        self._current_pos_height: str = "mitte"
 
         # --- Subscribers ---
         self.create_subscription(
@@ -210,6 +222,8 @@ class TesolloCartesianExecutor(Node):
             Bool, "/policy_gate", self._policy_gate_cb, 10)
         self.create_subscription(
             Bool, "/policy_done", self._policy_done_cb, 10)
+        self.create_subscription(
+            String, "/rollout_gate_cmd", self._rollout_gate_cmd_cb, 10)
 
         self._exec_timer = self.create_timer(
             1.0 / CONTROL_HZ, self._execute_step)
@@ -271,6 +285,8 @@ class TesolloCartesianExecutor(Node):
 
     def _policy_gate_cb(self, msg: Bool):
         if msg.data and not self.policy_active:
+            self._approaching_start_pos = False
+            self._start_target_pose = None
             self.policy_active = True
             self.pose_smoother.reset()
             self.hand_smoother.reset()
@@ -295,15 +311,88 @@ class TesolloCartesianExecutor(Node):
             else:
                 self.get_logger().warn(
                     "TF unavailable; first arm action is unclamped.")
+            self._publish_rollout_status("active", "Direct policy_gate True")
 
-        elif not msg.data and self.policy_active:
+        elif not msg.data and (self.policy_active or self._approaching_start_pos):
             self._deactivate("Policy INACTIVE - holding last pose.")
 
     def _policy_done_cb(self, msg: Bool):
         if msg.data and self.policy_active:
             self._deactivate("Policy DONE - task complete.")
 
+    def _rollout_gate_cmd_cb(self, msg: String):
+        """Handle rollout gate commands: e.g. 'start P1', 'P1', 'start P2 --height unten', 'stop'."""
+        text = msg.data.strip()
+        self.get_logger().info(f"[RolloutGate] Received command: '{text}'")
+
+        if text.lower() in ("stop", "halt", "pause", "false", "0"):
+            self._approaching_start_pos = False
+            self._start_target_pose = None
+            self._deactivate("Policy INACTIVE via rollout_gate stop.")
+            return
+
+        pos_str = "P1"
+        height_str = "mitte"
+
+        if text.startswith("{"):
+            try:
+                import json
+                payload = json.loads(text)
+                if payload.get("cmd", "").lower() in ("stop", "halt"):
+                    self._approaching_start_pos = False
+                    self._start_target_pose = None
+                    self._deactivate("Policy INACTIVE via rollout_gate stop.")
+                    return
+                pos_str = payload.get("position", "P1")
+                height_str = payload.get("height", "mitte")
+            except Exception as e:
+                self.get_logger().error(f"Failed to parse JSON rollout command: {e}")
+                self._publish_rollout_status("error", str(e))
+                return
+        else:
+            parts = text.split()
+            if parts and parts[0].lower() == "start":
+                parts = parts[1:]
+            if parts:
+                pos_str = parts[0]
+            if len(parts) >= 3 and parts[1].lower() in ("--height", "-h"):
+                height_str = parts[2]
+            elif ":" in pos_str:
+                pos_str, height_str = pos_str.split(":", 1)
+
+        try:
+            target_pose = get_start_pose(pos_str, height=height_str)
+        except Exception as e:
+            self.get_logger().error(f"[RolloutGate] Error resolving position '{pos_str}': {e}")
+            self._publish_rollout_status("error", str(e))
+            return
+
+        pos_code = pos_str.upper() if pos_str.upper() in POSITIONEN else pos_str
+        pos_lbl = POSITIONEN.get(pos_code, pos_code)
+
+        self._start_target_pose = target_pose
+        self._current_pos_name = f"{pos_code} ({pos_lbl})"
+        self._current_pos_height = height_str
+        self._approaching_start_pos = True
+        self.policy_active = False
+        self.schedule.flush()
+        self.pose_smoother.reset()
+        self.hand_smoother.reset()
+        self._last_pose = self._read_current_pose()
+
+        self.get_logger().info(
+            f"[RolloutGate] Moving arm to {self._current_pos_name} @ height '{height_str}' "
+            f"(target: {np.round(target_pose[:3], 3).tolist()})...")
+        self._publish_rollout_status("moving", f"{pos_code}:{height_str}:start")
+
+    def _publish_rollout_status(self, status: str, detail: str = ""):
+        msg = String()
+        msg.data = f"{status}|{detail}"
+        self.rollout_status_pub.publish(msg)
+
     def _deactivate(self, reason: str):
+        self._approaching_start_pos = False
+        self._start_target_pose = None
         self.policy_active = False
         self.schedule.flush()
         self.pose_smoother.reset()
@@ -315,6 +404,7 @@ class TesolloCartesianExecutor(Node):
         # The hand is deliberately NOT sent anywhere on deactivation: it may be
         # holding the foil, and opening here would drop it.
         self.get_logger().info(reason)
+        self._publish_rollout_status("inactive", reason)
 
     # ------------------------------------------------------------------
     # Chunk intake
@@ -365,6 +455,35 @@ class TesolloCartesianExecutor(Node):
     # ------------------------------------------------------------------
 
     def _execute_step(self):
+        # 1. Approach defined rollout start position (P1..P5)
+        if self._approaching_start_pos and self._start_target_pose is not None:
+            if self._last_pose is None:
+                self._last_pose = self._read_current_pose()
+                if self._last_pose is None:
+                    return
+
+            gap = self._start_target_pose[:3] - self._last_pose[:3]
+            dist = float(np.linalg.norm(gap))
+
+            if dist < APPROACH_DONE_M:
+                # Target start position reached! Hand over to policy
+                self._approaching_start_pos = False
+                self.policy_active = True
+                self._approaching = True
+                self._last_pose = self._read_current_pose()
+                self.get_logger().info(
+                    f"[RolloutGate] Reached start position {self._current_pos_name} "
+                    f"({dist * 1000:.0f} mm residual). Policy ACTIVE!")
+                self._publish_rollout_status("active", f"{self._current_pos_name}")
+                return
+
+            limited = self._approach_limit(self._start_target_pose)
+            if self._validate_cartesian(limited):
+                self._publish_target_pose(limited)
+                self._last_pose = limited.copy()
+                self._publish_rollout_status("moving", f"{dist:.3f}")
+            return
+
         if not self.policy_active:
             # Keep the cartesian controller's internal target pinned to the
             # live pose, so re-enabling it cannot snap the arm back to a stale

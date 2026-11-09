@@ -1,3 +1,0 @@
-# pyproject.toml
-[project.scripts]
-build-dataset = "dataset_builder.cli:main"

@@ -6,7 +6,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT_PLOT = "data/rollout_logs/investigations/modality_ablation/plots/modality_phase_distribution.png"
+OUT_PLOT = "data/rollouts/analysis/investigations/modality_ablation/plots/modality_phase_distribution.png"
 ARTIFACT_PLOT = "/home/mm/.gemini/antigravity/brain/93b2b22b-696f-4543-8358-70a30cd58288/plots/modality_phase_distribution.png"
 
 # Phases

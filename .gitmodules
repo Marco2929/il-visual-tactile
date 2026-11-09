@@ -1,32 +1,25 @@
 [submodule "src/hands/delto_m_ros2"]
 	path = src/hands/delto_m_ros2
 	url = https://github.com/tesollodelto/delto_m_ros2
-[submodule "data/lerobot-dataset-visualizer"]
-	path = data/lerobot-dataset-visualizer
+[submodule "data/datasets/visualizer"]
+	path = data/datasets/visualizer
 	url = https://github.com/han-xudong/lerobot-dataset-visualizer.git
-[submodule "data/score_lerobot_episodes"]
-	path = data/score_lerobot_episodes
-	url = https://github.com/RoboticsData/score_lerobot_episodes.git
 [submodule "src/rembrandt_ros"]
-	path = src/rembrandt_ros
+	path = src/senseglove/rembrandt_ros
 	url = https://github.com/Adjuvo/senseglove_r1_ros.git
 [submodule "src/rembrandt-api"]
-	path = src/rembrandt-api
+	path = src/senseglove/rembrandt-api
 	url = https://github.com/Adjuvo/SenseGlove-R1-API.git
 [submodule "third_party/3D-Diffusion-Policy"]
-	path = third_party/3D-Diffusion-Policy
+	path = third_party/_archive/3D-Diffusion-Policy
 	url = https://github.com/YanjieZe/3D-Diffusion-Policy.git
-[submodule "third_party/FlowPolicy"]
-	path = third_party/FlowPolicy
 	url = https://github.com/zql-kk/FlowPolicy.git
 [submodule "third_party/R3D-Policy"]
-	path = third_party/R3D-Policy
+	path = third_party/_archive/R3D-Policy
 	url = https://github.com/Wushr-Lance/R3D-Policy.git
 [submodule "third_party/lerobot"]
-	path = third_party/lerobot
+	path = third_party/_archive/lerobot
 	url = https://github.com/huggingface/lerobot.git
-[submodule "third_party/manip-as-in-sim-suite"]
-	path = third_party/manip-as-in-sim-suite
 	url = https://github.com/ByteDance-Seed/manip-as-in-sim-suite.git
 [submodule "third_party/ManiFlow_Policy"]
 	path = third_party/ManiFlow_Policy

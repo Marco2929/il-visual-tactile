@@ -1,0 +1,5606 @@
+{
+  "summary": {
+    "by_prefix": {
+      "folien_mitte_a_saeule": {
+        "count": 32,
+        "mean_mm": -273.65797059610486,
+        "std_mm": 21.12499969686832,
+        "median_mm": -270.76755464076996,
+        "min_mm": -324.3550658226013,
+        "max_mm": -240.51815271377563,
+        "p10_mm": -300.1792311668396,
+        "p90_mm": -249.72675293684006
+      },
+      "folien_mitte_b_saeule": {
+        "count": 36,
+        "mean_mm": -327.52441055244867,
+        "std_mm": 24.3919623549952,
+        "median_mm": -328.0828297138214,
+        "min_mm": -382.4999999999999,
+        "max_mm": -270.62249183654785,
+        "p10_mm": -362.1758967638016,
+        "p90_mm": -298.5376566648483
+      },
+      "folien_mitte_heckleuchte": {
+        "count": 18,
+        "mean_mm": -174.3822404079967,
+        "std_mm": 13.501398598926153,
+        "median_mm": -172.34869301319122,
+        "min_mm": -206.26336336135864,
+        "max_mm": -155.73307871818542,
+        "p10_mm": -189.4763544201851,
+        "p90_mm": -156.8659022450447
+      },
+      "folien_oben_a_saeule": {
+        "count": 50,
+        "mean_mm": -152.75425925850868,
+        "std_mm": 27.3552021113589,
+        "median_mm": -151.39688551425934,
+        "min_mm": -201.50630176067352,
+        "max_mm": -96.88177704811096,
+        "p10_mm": -189.23271596431732,
+        "p90_mm": -117.40550920367241
+      },
+      "folien_oben_b_saeule": {
+        "count": 48,
+        "mean_mm": -131.8145620947083,
+        "std_mm": 23.121949293425047,
+        "median_mm": -125.31037256121635,
+        "min_mm": -177.28069424629211,
+        "max_mm": -89.31516110897064,
+        "p10_mm": -159.77187156677246,
+        "p90_mm": -102.24638655781746
+      },
+      "folien_oben_heckleuchte": {
+        "count": 18,
+        "mean_mm": 13.638511901566138,
+        "std_mm": 7.9311563528035585,
+        "median_mm": 15.261422842741013,
+        "min_mm": -0.47049944987520576,
+        "max_mm": 26.309384033083916,
+        "p10_mm": 0.5816719203721732,
+        "p90_mm": 25.086328759789467
+      },
+      "folien_unten_a_sauele": {
+        "count": 50,
+        "mean_mm": -396.782523393631,
+        "std_mm": 29.352685682147374,
+        "median_mm": -397.04540371894836,
+        "min_mm": -460.5417847633362,
+        "max_mm": -344.3332314491272,
+        "p10_mm": -435.26639342308044,
+        "p90_mm": -359.99476313591003
+      },
+      "folien_unten_b_sauele": {
+        "count": 36,
+        "mean_mm": -400.31687170267105,
+        "std_mm": 15.667359805829646,
+        "median_mm": -399.0044891834259,
+        "min_mm": -433.7814152240753,
+        "max_mm": -363.5936677455902,
+        "p10_mm": -421.7865616083145,
+        "p90_mm": -381.19374215602875
+      },
+      "folien_unten_heckleuchte": {
+        "count": 18,
+        "mean_mm": -253.51181791888342,
+        "std_mm": 13.5576878019894,
+        "median_mm": -254.7605037689209,
+        "min_mm": -278.9478003978729,
+        "max_mm": -219.69765424728394,
+        "p10_mm": -267.4214392900467,
+        "p90_mm": -238.85843008756638
+      }
+    },
+    "by_prefix_foil_layer": {
+      "folien_mitte_a_saeule_L1": {
+        "count": 15,
+        "mean_mm": -259.4238092501958,
+        "std_mm": 12.856283156581588,
+        "median_mm": -256.9088339805603,
+        "min_mm": -286.1788272857666,
+        "max_mm": -240.51815271377563,
+        "p10_mm": -278.709214925766,
+        "p90_mm": -245.98354399204254
+      },
+      "folien_mitte_a_saeule_L2": {
+        "count": 8,
+        "mean_mm": -271.8912102282047,
+        "std_mm": 15.38603703118282,
+        "median_mm": -272.43056893348694,
+        "min_mm": -290.6959056854248,
+        "max_mm": -252.0066797733307,
+        "p10_mm": -288.741859793663,
+        "p90_mm": -254.61409091949463
+      },
+      "folien_mitte_a_saeule_L3": {
+        "count": 9,
+        "mean_mm": -298.9520264996423,
+        "std_mm": 10.980554046792484,
+        "median_mm": -298.456609249115,
+        "min_mm": -324.3550658226013,
+        "max_mm": -285.336971282959,
+        "p10_mm": -309.58484411239624,
+        "p90_mm": -288.99688720703125
+      },
+      "folien_mitte_b_saeule_L1": {
+        "count": 16,
+        "mean_mm": -313.268207013607,
+        "std_mm": 17.987302459829348,
+        "median_mm": -312.7220422029495,
+        "min_mm": -338.23102712631226,
+        "max_mm": -270.62249183654785,
+        "p10_mm": -331.58841729164124,
+        "p90_mm": -290.1427447795868
+      },
+      "folien_mitte_b_saeule_L2": {
+        "count": 12,
+        "mean_mm": -328.25571795304614,
+        "std_mm": 18.167494415143498,
+        "median_mm": -328.0828297138214,
+        "min_mm": -363.28062415122986,
+        "max_mm": -295.5560088157654,
+        "p10_mm": -346.06730937957764,
+        "p90_mm": -305.4532289505005
+      },
+      "folien_mitte_b_saeule_L3": {
+        "count": 8,
+        "mean_mm": -354.93985652923584,
+        "std_mm": 19.398318787086737,
+        "median_mm": -356.1422824859619,
+        "min_mm": -382.4999999999999,
+        "max_mm": -324.535071849823,
+        "p10_mm": -378.44578838348383,
+        "p90_mm": -332.72117376327515
+      },
+      "folien_mitte_heckleuchte_L1": {
+        "count": 18,
+        "mean_mm": -174.3822404079967,
+        "std_mm": 13.501398598926153,
+        "median_mm": -172.34869301319122,
+        "min_mm": -206.26336336135864,
+        "max_mm": -155.73307871818542,
+        "p10_mm": -189.4763544201851,
+        "p90_mm": -156.8659022450447
+      },
+      "folien_oben_a_saeule_L1": {
+        "count": 19,
+        "mean_mm": -129.97868068908392,
+        "std_mm": 19.34104816747181,
+        "median_mm": -127.47609615325928,
+        "min_mm": -180.7543933391571,
+        "max_mm": -96.88177704811096,
+        "p10_mm": -153.65079045295715,
+        "p90_mm": -108.6057111620903
+      },
+      "folien_oben_a_saeule_L2": {
+        "count": 18,
+        "mean_mm": -152.45594994889365,
+        "std_mm": 16.352117460784967,
+        "median_mm": -150.4775658249855,
+        "min_mm": -189.20117616653442,
+        "max_mm": -126.78878009319305,
+        "p10_mm": -172.40279912948608,
+        "p90_mm": -133.0284908413887
+      },
+      "folien_oben_a_saeule_L3": {
+        "count": 13,
+        "mean_mm": -186.45468698098108,
+        "std_mm": 8.19519934687496,
+        "median_mm": -183.53018164634705,
+        "min_mm": -201.50630176067352,
+        "max_mm": -172.93228209018707,
+        "p10_mm": -198.56059849262238,
+        "p90_mm": -177.00953483581543
+      },
+      "folien_oben_b_saeule_L1": {
+        "count": 18,
+        "mean_mm": -108.52311510178778,
+        "std_mm": 10.027641017372453,
+        "median_mm": -109.26643013954163,
+        "min_mm": -126.23779475688934,
+        "max_mm": -89.31516110897064,
+        "p10_mm": -121.80539444088936,
+        "p90_mm": -94.42601948976517
+      },
+      "folien_oben_b_saeule_L2": {
+        "count": 15,
+        "mean_mm": -133.53356967369714,
+        "std_mm": 13.204794292834098,
+        "median_mm": -126.90868973731995,
+        "min_mm": -151.9022285938263,
+        "max_mm": -118.30952763557434,
+        "p10_mm": -151.82198882102966,
+        "p90_mm": -119.21493262052536
+      },
+      "folien_oben_b_saeule_L3": {
+        "count": 15,
+        "mean_mm": -158.04529090722403,
+        "std_mm": 8.589045751624164,
+        "median_mm": -156.70551359653473,
+        "min_mm": -177.28069424629211,
+        "max_mm": -146.62306010723114,
+        "p10_mm": -169.77580189704895,
+        "p90_mm": -148.0472981929779
+      },
+      "folien_oben_heckleuchte_L1": {
+        "count": 18,
+        "mean_mm": 13.638511901566138,
+        "std_mm": 7.9311563528035585,
+        "median_mm": 15.261422842741013,
+        "min_mm": -0.47049944987520576,
+        "max_mm": 26.309384033083916,
+        "p10_mm": 0.5816719203721732,
+        "p90_mm": 25.086328759789467
+      },
+      "folien_unten_a_sauele_L1": {
+        "count": 17,
+        "mean_mm": -368.3241781066446,
+        "std_mm": 13.278713695661587,
+        "median_mm": -367.89458990097046,
+        "min_mm": -395.3951597213745,
+        "max_mm": -344.3332314491272,
+        "p10_mm": -382.11652636528015,
+        "p90_mm": -349.1222620010376
+      },
+      "folien_unten_a_sauele_L2": {
+        "count": 18,
+        "mean_mm": -394.92416050699023,
+        "std_mm": 16.47803057601191,
+        "median_mm": -399.0045636892319,
+        "min_mm": -417.51402616500854,
+        "max_mm": -350.2197265625,
+        "p10_mm": -412.92700469493866,
+        "p90_mm": -379.4350415468216
+      },
+      "folien_unten_a_sauele_L3": {
+        "count": 15,
+        "mean_mm": -431.26535018285114,
+        "std_mm": 15.336182693210903,
+        "median_mm": -426.3441562652588,
+        "min_mm": -460.5417847633362,
+        "max_mm": -410.91078519821167,
+        "p10_mm": -453.4056544303894,
+        "p90_mm": -415.5384838581085
+      },
+      "folien_unten_b_sauele_L1": {
+        "count": 12,
+        "mean_mm": -387.3579452435176,
+        "std_mm": 11.567631460263184,
+        "median_mm": -387.67777383327484,
+        "min_mm": -405.1109254360199,
+        "max_mm": -363.5936677455902,
+        "p10_mm": -399.2633193731308,
+        "p90_mm": -374.00606870651245
+      },
+      "folien_unten_b_sauele_L2": {
+        "count": 15,
+        "mean_mm": -400.8374512195587,
+        "std_mm": 11.769665171468441,
+        "median_mm": -398.67857098579407,
+        "min_mm": -428.6329448223114,
+        "max_mm": -383.1332325935364,
+        "p10_mm": -416.7367696762085,
+        "p90_mm": -388.49727511405945
+      },
+      "folien_unten_b_sauele_L3": {
+        "count": 9,
+        "mean_mm": -416.7278077867296,
+        "std_mm": 8.882227446845262,
+        "median_mm": -418.7186360359192,
+        "min_mm": -433.7814152240753,
+        "max_mm": -404.24779057502747,
+        "p10_mm": -424.97320771217346,
+        "p90_mm": -406.68049454689026
+      },
+      "folien_unten_heckleuchte_L1": {
+        "count": 18,
+        "mean_mm": -253.51181791888342,
+        "std_mm": 13.5576878019894,
+        "median_mm": -254.7605037689209,
+        "min_mm": -278.9478003978729,
+        "max_mm": -219.69765424728394,
+        "p10_mm": -267.4214392900467,
+        "p90_mm": -238.85843008756638
+      }
+    },
+    "by_layer": {
+      "unten": {
+        "count": 104,
+        "mean_mm": -373.20909878382315,
+        "std_mm": 59.43302102852223,
+        "median_mm": -391.82746410369873,
+        "min_mm": -460.5417847633362,
+        "max_mm": -219.69765424728394,
+        "p10_mm": -423.196816444397,
+        "p90_mm": -259.59613025188446
+      },
+      "mitte": {
+        "count": 86,
+        "mean_mm": -275.4280717012494,
+        "std_mm": 61.05377848253523,
+        "median_mm": -289.348840713501,
+        "min_mm": -382.4999999999999,
+        "max_mm": -155.73307871818542,
+        "p10_mm": -338.4517580270767,
+        "p90_mm": -172.34869301319122
+      },
+      "oben": {
+        "count": 116,
+        "mean_mm": -118.26998904520036,
+        "std_mm": 61.983802402083874,
+        "median_mm": -132.65641778707504,
+        "min_mm": -201.50630176067352,
+        "max_mm": 26.309384033083916,
+        "p10_mm": -181.32798373699188,
+        "p90_mm": 10.986399836838245
+      }
+    },
+    "by_layer_l3": {
+      "unten": {
+        "count": 24,
+        "mean_mm": -425.8137717843056,
+        "std_mm": 15.037192023959156,
+        "median_mm": -421.63875699043274,
+        "min_mm": -460.5417847633362,
+        "max_mm": -404.24779057502747,
+        "p10_mm": -449.0143597126007,
+        "p90_mm": -410.2233648300171
+      },
+      "mitte": {
+        "count": 17,
+        "mean_mm": -325.2992406312157,
+        "std_mm": 31.96654629789313,
+        "median_mm": -324.3550658226013,
+        "min_mm": -382.4999999999999,
+        "max_mm": -285.336971282959,
+        "p10_mm": -371.8366801738739,
+        "p90_mm": -290.2865529060364
+      },
+      "oben": {
+        "count": 28,
+        "mean_mm": -171.2353676557541,
+        "std_mm": 16.47563582459536,
+        "median_mm": -172.9254201054573,
+        "min_mm": -201.50630176067352,
+        "max_mm": -146.62306010723114,
+        "p10_mm": -192.10336208343506,
+        "p90_mm": -150.67991316318512
+      }
+    },
+    "folien_unten_a_b": {
+      "count": 86,
+      "mean_mm": -398.2620180346245,
+      "std_mm": 24.631526920432258,
+      "median_mm": -398.68710935115814,
+      "min_mm": -460.5417847633362,
+      "max_mm": -344.3332314491272,
+      "p10_mm": -427.4885505437851,
+      "p90_mm": -367.0572191476822
+    },
+    "folien_mitte_a_b": {
+      "count": 68,
+      "mean_mm": -302.1754976318163,
+      "std_mm": 35.3253255323825,
+      "median_mm": -302.1637946367264,
+      "min_mm": -382.4999999999999,
+      "max_mm": -240.51815271377563,
+      "p10_mm": -343.71232986450195,
+      "p90_mm": -253.8779318332672
+    },
+    "folien_oben_a_b": {
+      "count": 98,
+      "mean_mm": -142.49808105583094,
+      "std_mm": 27.44482317767879,
+      "median_mm": -144.1267430782318,
+      "min_mm": -201.50630176067352,
+      "max_mm": -89.31516110897064,
+      "p10_mm": -182.29421973228455,
+      "p90_mm": -108.04496333003044
+    }
+  },
+  "episodes": [
+    {
+      "ep": 0,
+      "source": "folien_oben_a_saeule/episode_000_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1819845587015152,
+      "z_est_mm": -181.9845587015152,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.2252616137266159,
+        -1.1103979349136353
+      ],
+      "ee_grasp_z_mm": -48.86598885059357,
+      "dz_mm": 133.11856985092163
+    },
+    {
+      "ep": 1,
+      "source": "folien_oben_a_saeule/episode_001_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.17578652501106262,
+      "z_est_mm": -175.78652501106262,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.2979483902454376,
+        -1.105208396911621
+      ],
+      "ee_grasp_z_mm": -28.740668669342995,
+      "dz_mm": 147.04585634171963
+    },
+    {
+      "ep": 2,
+      "source": "folien_oben_a_saeule/episode_002_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.18353018164634705,
+      "z_est_mm": -183.53018164634705,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.34516599774360657,
+        -1.1019258499145508
+      ],
+      "ee_grasp_z_mm": -43.40015351772308,
+      "dz_mm": 140.13002812862396
+    },
+    {
+      "ep": 3,
+      "source": "folien_oben_a_saeule/episode_003_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.14684182405471802,
+      "z_est_mm": -146.84182405471802,
+      "inliers": 25,
+      "status": "ok",
+      "park_xy": [
+        -0.19299528002738953,
+        -1.0314780473709106
+      ],
+      "ee_grasp_z_mm": -24.681227281689644,
+      "dz_mm": 122.16059677302837
+    },
+    {
+      "ep": 4,
+      "source": "folien_oben_a_saeule/episode_004_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.16836883127689362,
+      "z_est_mm": -168.36883127689362,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.252225399017334,
+        -1.0619049072265625
+      ],
+      "ee_grasp_z_mm": -32.17226639389992,
+      "dz_mm": 136.1965648829937
+    },
+    {
+      "ep": 5,
+      "source": "folien_oben_a_saeule/episode_005_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.16235405206680298,
+      "z_est_mm": -162.35405206680298,
+      "inliers": 35,
+      "status": "ok",
+      "park_xy": [
+        -0.350901335477829,
+        -1.1148680448532104
+      ],
+      "ee_grasp_z_mm": -48.7256720662117,
+      "dz_mm": 113.62838000059128
+    },
+    {
+      "ep": 6,
+      "source": "folien_oben_a_saeule/episode_006_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11410094797611237,
+      "z_est_mm": -114.10094797611237,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.19617964327335358,
+        -1.097751259803772
+      ],
+      "ee_grasp_z_mm": -1.739543629810214,
+      "dz_mm": 112.36140434630215
+    },
+    {
+      "ep": 7,
+      "source": "folien_oben_a_saeule/episode_007_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11880107969045639,
+      "z_est_mm": -118.80107969045639,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.2060726284980774,
+        -1.068647027015686
+      ],
+      "ee_grasp_z_mm": -6.512450519949198,
+      "dz_mm": 112.28862917050719
+    },
+    {
+      "ep": 8,
+      "source": "folien_oben_a_saeule/episode_008_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11744999885559082,
+      "z_est_mm": -117.44999885559082,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.23789356648921967,
+        -1.0683568716049194
+      ],
+      "ee_grasp_z_mm": 6.598779931664467,
+      "dz_mm": 124.04877878725529
+    },
+    {
+      "ep": 9,
+      "source": "folien_oben_a_saeule/episode_009_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1301560401916504,
+      "z_est_mm": -130.1560401916504,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.25767990946769714,
+        -1.0667963027954102
+      ],
+      "ee_grasp_z_mm": 2.6528448797762394,
+      "dz_mm": 132.80888507142663
+    },
+    {
+      "ep": 10,
+      "source": "folien_oben_a_saeule/episode_010_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1283145695924759,
+      "z_est_mm": -128.3145695924759,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.2712663412094116,
+        -0.9878789186477661
+      ],
+      "ee_grasp_z_mm": 6.323979701846838,
+      "dz_mm": 134.63854929432273
+    },
+    {
+      "ep": 11,
+      "source": "folien_oben_a_saeule/episode_011_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.12747609615325928,
+      "z_est_mm": -127.47609615325928,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.26135215163230896,
+        -0.972031831741333
+      ],
+      "ee_grasp_z_mm": 21.721437573432922,
+      "dz_mm": 149.1975337266922
+    },
+    {
+      "ep": 12,
+      "source": "folien_oben_a_saeule/episode_012_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11700510233640671,
+      "z_est_mm": -117.00510233640671,
+      "inliers": 54,
+      "status": "ok",
+      "park_xy": [
+        -0.2816143035888672,
+        -0.9755576252937317
+      ],
+      "ee_grasp_z_mm": 10.44673565775156,
+      "dz_mm": 127.45183799415827
+    },
+    {
+      "ep": 13,
+      "source": "folien_oben_a_saeule/episode_013_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.125071182847023,
+      "z_est_mm": -125.07118284702301,
+      "inliers": 73,
+      "status": "ok",
+      "park_xy": [
+        -0.28438708186149597,
+        -0.9525181651115417
+      ],
+      "ee_grasp_z_mm": -5.07907010614872,
+      "dz_mm": 119.99211274087429
+    },
+    {
+      "ep": 14,
+      "source": "folien_oben_a_saeule/episode_014_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.12688857316970825,
+      "z_est_mm": -126.88857316970825,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.31460967659950256,
+        -0.9591003656387329
+      ],
+      "ee_grasp_z_mm": -15.491646714508533,
+      "dz_mm": 111.39692645519972
+    },
+    {
+      "ep": 15,
+      "source": "folien_oben_a_saeule/episode_015_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.17700007557868958,
+      "z_est_mm": -177.00007557868958,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.29784345626831055,
+        -0.9619747996330261
+      ],
+      "ee_grasp_z_mm": -16.928495839238167,
+      "dz_mm": 160.0715797394514
+    },
+    {
+      "ep": 16,
+      "source": "folien_oben_a_saeule/episode_016_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.14127525687217712,
+      "z_est_mm": -141.27525687217712,
+      "inliers": 58,
+      "status": "ok",
+      "park_xy": [
+        -0.17421412467956543,
+        -0.8906227946281433
+      ],
+      "ee_grasp_z_mm": -8.304975926876068,
+      "dz_mm": 132.97028094530106
+    },
+    {
+      "ep": 17,
+      "source": "folien_oben_a_saeule/episode_017_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12678878009319305,
+      "z_est_mm": -126.78878009319305,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.391305148601532,
+        -0.9833070039749146
+      ],
+      "ee_grasp_z_mm": -16.476143151521683,
+      "dz_mm": 110.31263694167137
+    },
+    {
+      "ep": 18,
+      "source": "folien_oben_a_saeule/episode_018_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.13516341149806976,
+      "z_est_mm": -135.16341149806976,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.2357429563999176,
+        -0.9199790954589844
+      ],
+      "ee_grasp_z_mm": 2.0049591548740864,
+      "dz_mm": 137.16837065294385
+    },
+    {
+      "ep": 19,
+      "source": "folien_oben_a_saeule/episode_019_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1335866004228592,
+      "z_est_mm": -133.5866004228592,
+      "inliers": 67,
+      "status": "ok",
+      "park_xy": [
+        -0.29702144861221313,
+        -0.9390935897827148
+      ],
+      "ee_grasp_z_mm": -3.9809304289519787,
+      "dz_mm": 129.6056699939072
+    },
+    {
+      "ep": 20,
+      "source": "folien_oben_a_saeule/episode_020_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.20150630176067352,
+      "z_est_mm": -201.50630176067352,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.009585238061845303,
+        -0.8909868001937866
+      ],
+      "ee_grasp_z_mm": -37.08877041935921,
+      "dz_mm": 164.41753134131432
+    },
+    {
+      "ep": 21,
+      "source": "folien_oben_a_saeule/episode_021_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1895165741443634,
+      "z_est_mm": -189.5165741443634,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.23202598094940186,
+        -0.9601911902427673
+      ],
+      "ee_grasp_z_mm": -38.905832916498184,
+      "dz_mm": 150.61074122786522
+    },
+    {
+      "ep": 22,
+      "source": "folien_oben_a_saeule/episode_022_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.18190157413482666,
+      "z_est_mm": -181.90157413482666,
+      "inliers": 24,
+      "status": "ok",
+      "park_xy": [
+        -0.2752552032470703,
+        -0.94256991147995
+      ],
+      "ee_grasp_z_mm": -30.392387881875038,
+      "dz_mm": 151.50918625295162
+    },
+    {
+      "ep": 23,
+      "source": "folien_oben_a_saeule/episode_023_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.18483638763427734,
+      "z_est_mm": -184.83638763427734,
+      "inliers": 40,
+      "status": "ok",
+      "park_xy": [
+        -0.4173981249332428,
+        -1.0296056270599365
+      ],
+      "ee_grasp_z_mm": -54.590120911598206,
+      "dz_mm": 130.24626672267914
+    },
+    {
+      "ep": 24,
+      "source": "folien_oben_a_saeule/episode_024_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.19054125249385834,
+      "z_est_mm": -190.54125249385834,
+      "inliers": 37,
+      "status": "ok",
+      "park_xy": [
+        -0.4959447979927063,
+        -0.9810377359390259
+      ],
+      "ee_grasp_z_mm": -51.98391154408455,
+      "dz_mm": 138.5573409497738
+    },
+    {
+      "ep": 25,
+      "source": "folien_oben_a_saeule/episode_025_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.17043253779411316,
+      "z_est_mm": -170.43253779411316,
+      "inliers": 59,
+      "status": "ok",
+      "park_xy": [
+        -0.28474876284599304,
+        -0.9377058148384094
+      ],
+      "ee_grasp_z_mm": -11.674240231513977,
+      "dz_mm": 158.75829756259918
+    },
+    {
+      "ep": 26,
+      "source": "folien_oben_a_saeule/episode_026_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15351366996765137,
+      "z_est_mm": -153.51366996765137,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.4358002543449402,
+        -0.9547533392906189
+      ],
+      "ee_grasp_z_mm": -15.4204610735178,
+      "dz_mm": 138.09320889413357
+    },
+    {
+      "ep": 27,
+      "source": "folien_oben_a_saeule/episode_027_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15437737107276917,
+      "z_est_mm": -154.37737107276917,
+      "inliers": 73,
+      "status": "ok",
+      "park_xy": [
+        -0.4096730053424835,
+        -0.9401566386222839
+      ],
+      "ee_grasp_z_mm": 1.5030185459181666,
+      "dz_mm": 155.88038961868733
+    },
+    {
+      "ep": 28,
+      "source": "folien_oben_a_saeule/episode_028_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1371634304523468,
+      "z_est_mm": -137.1634304523468,
+      "inliers": 65,
+      "status": "ok",
+      "park_xy": [
+        -0.3902698755264282,
+        -1.031960129737854
+      ],
+      "ee_grasp_z_mm": -15.974298119544983,
+      "dz_mm": 121.18913233280182
+    },
+    {
+      "ep": 29,
+      "source": "folien_oben_a_saeule/episode_029_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.14975088834762573,
+      "z_est_mm": -149.75088834762573,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.410506933927536,
+        -1.0199567079544067
+      ],
+      "ee_grasp_z_mm": -9.798232465982437,
+      "dz_mm": 139.9526558816433
+    },
+    {
+      "ep": 30,
+      "source": "folien_oben_a_saeule/episode_030_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.15502527356147766,
+      "z_est_mm": -155.02527356147766,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.3676323890686035,
+        -0.9708048105239868
+      ],
+      "ee_grasp_z_mm": 1.450664596632123,
+      "dz_mm": 156.47593815810978
+    },
+    {
+      "ep": 31,
+      "source": "folien_oben_a_saeule/episode_031_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.15330716967582703,
+      "z_est_mm": -153.30716967582703,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.45959776639938354,
+        -0.9704840779304504
+      ],
+      "ee_grasp_z_mm": -14.119777828454971,
+      "dz_mm": 139.18739184737206
+    },
+    {
+      "ep": 32,
+      "source": "folien_oben_a_saeule/episode_032_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1388009786605835,
+      "z_est_mm": -138.8009786605835,
+      "inliers": 68,
+      "status": "ok",
+      "park_xy": [
+        -0.5235826373100281,
+        -0.9839644432067871
+      ],
+      "ee_grasp_z_mm": 27.594955638051033,
+      "dz_mm": 166.39593429863453
+    },
+    {
+      "ep": 33,
+      "source": "folien_oben_a_saeule/episode_033_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1807543933391571,
+      "z_est_mm": -180.7543933391571,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.4502538740634918,
+        -0.9932100176811218
+      ],
+      "ee_grasp_z_mm": -15.403999015688896,
+      "dz_mm": 165.3503943234682
+    },
+    {
+      "ep": 34,
+      "source": "folien_oben_a_saeule/episode_034_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.13638484477996826,
+      "z_est_mm": -136.38484477996826,
+      "inliers": 82,
+      "status": "ok",
+      "park_xy": [
+        -0.5458897352218628,
+        -0.9943621158599854
+      ],
+      "ee_grasp_z_mm": -15.066892839968204,
+      "dz_mm": 121.31795194000006
+    },
+    {
+      "ep": 35,
+      "source": "folien_oben_a_saeule/episode_035_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.14791224896907806,
+      "z_est_mm": -147.91224896907806,
+      "inliers": 73,
+      "status": "ok",
+      "park_xy": [
+        -0.5655608773231506,
+        -0.9458375573158264
+      ],
+      "ee_grasp_z_mm": -25.17572231590748,
+      "dz_mm": 122.73652665317059
+    },
+    {
+      "ep": 36,
+      "source": "folien_oben_a_saeule/episode_036_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1454046219587326,
+      "z_est_mm": -145.4046219587326,
+      "inliers": 78,
+      "status": "ok",
+      "park_xy": [
+        -0.5955538749694824,
+        -0.9506861567497253
+      ],
+      "ee_grasp_z_mm": -30.505651608109474,
+      "dz_mm": 114.89897035062313
+    },
+    {
+      "ep": 37,
+      "source": "folien_oben_a_saeule/episode_037_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15304288268089294,
+      "z_est_mm": -153.04288268089294,
+      "inliers": 78,
+      "status": "ok",
+      "park_xy": [
+        -0.6473997235298157,
+        -0.9322721362113953
+      ],
+      "ee_grasp_z_mm": -3.5047451965510845,
+      "dz_mm": 149.53813748434186
+    },
+    {
+      "ep": 38,
+      "source": "folien_oben_a_saeule/episode_038_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.19926367700099945,
+      "z_est_mm": -199.26367700099945,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.623683750629425,
+        -0.9502381086349487
+      ],
+      "ee_grasp_z_mm": -59.357233345508575,
+      "dz_mm": 139.90644365549088
+    },
+    {
+      "ep": 39,
+      "source": "folien_oben_a_saeule/episode_039_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.18301676213741302,
+      "z_est_mm": -183.01676213741302,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.6443544626235962,
+        -0.9667167067527771
+      ],
+      "ee_grasp_z_mm": -50.38762465119362,
+      "dz_mm": 132.6291374862194
+    },
+    {
+      "ep": 40,
+      "source": "folien_oben_a_saeule/episode_040_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.19574828445911407,
+      "z_est_mm": -195.74828445911407,
+      "inliers": 43,
+      "status": "ok",
+      "park_xy": [
+        -0.5634179711341858,
+        -1.0423320531845093
+      ],
+      "ee_grasp_z_mm": -37.12848573923111,
+      "dz_mm": 158.61979871988297
+    },
+    {
+      "ep": 41,
+      "source": "folien_oben_a_saeule/episode_041_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.17293228209018707,
+      "z_est_mm": -172.93228209018707,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.5968001484870911,
+        -0.9661574363708496
+      ],
+      "ee_grasp_z_mm": -30.927978456020355,
+      "dz_mm": 142.00430363416672
+    },
+    {
+      "ep": 42,
+      "source": "folien_oben_a_saeule/episode_042_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.18334656953811646,
+      "z_est_mm": -183.34656953811646,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.6503403186798096,
+        -1.010221004486084
+      ],
+      "ee_grasp_z_mm": -46.94659635424614,
+      "dz_mm": 136.39997318387032
+    },
+    {
+      "ep": 43,
+      "source": "folien_oben_a_saeule/episode_044_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.14341658353805542,
+      "z_est_mm": -143.41658353805542,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.6339634656906128,
+        -0.9688668847084045
+      ],
+      "ee_grasp_z_mm": 4.459136165678501,
+      "dz_mm": 147.87571970373392
+    },
+    {
+      "ep": 44,
+      "source": "folien_oben_a_saeule/episode_045_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1317262351512909,
+      "z_est_mm": -131.7262351512909,
+      "inliers": 37,
+      "status": "ok",
+      "park_xy": [
+        -0.5722631216049194,
+        -0.9274789690971375
+      ],
+      "ee_grasp_z_mm": 14.574713073670864,
+      "dz_mm": 146.30094822496176
+    },
+    {
+      "ep": 45,
+      "source": "folien_oben_a_saeule/episode_046_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.18920117616653442,
+      "z_est_mm": -189.20117616653442,
+      "inliers": 18,
+      "status": "ok",
+      "park_xy": [
+        -0.29952389001846313,
+        -1.0641783475875854
+      ],
+      "ee_grasp_z_mm": -16.025422140955925,
+      "dz_mm": 173.1757540255785
+    },
+    {
+      "ep": 46,
+      "source": "folien_oben_a_saeule/episode_048_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1638009399175644,
+      "z_est_mm": -163.8009399175644,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.3943447172641754,
+        -1.0586416721343994
+      ],
+      "ee_grasp_z_mm": -12.669588439166546,
+      "dz_mm": 151.13135147839785
+    },
+    {
+      "ep": 47,
+      "source": "folien_oben_a_saeule/episode_050_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10734059661626816,
+      "z_est_mm": -107.34059661626816,
+      "inliers": 65,
+      "status": "ok",
+      "park_xy": [
+        -0.5556765198707581,
+        -1.0253986120224
+      ],
+      "ee_grasp_z_mm": 43.34248974919319,
+      "dz_mm": 150.68308636546135
+    },
+    {
+      "ep": 48,
+      "source": "folien_oben_a_saeule/episode_051_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10892198979854584,
+      "z_est_mm": -108.92198979854584,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.5924345850944519,
+        -0.9776902198791504
+      ],
+      "ee_grasp_z_mm": -3.9837160147726536,
+      "dz_mm": 104.93827378377318
+    },
+    {
+      "ep": 49,
+      "source": "folien_oben_a_saeule/episode_052_success",
+      "prefix": "folien_oben_a_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.09688177704811096,
+      "z_est_mm": -96.88177704811096,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.6209041476249695,
+        -0.9600570797920227
+      ],
+      "ee_grasp_z_mm": 14.770837500691414,
+      "dz_mm": 111.65261454880238
+    },
+    {
+      "ep": 50,
+      "source": "folien_oben_b_saeule/episode_001_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.17728069424629211,
+      "z_est_mm": -177.28069424629211,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.5132079124450684,
+        -0.9961432218551636
+      ],
+      "ee_grasp_z_mm": -16.809873282909393,
+      "dz_mm": 160.47082096338272
+    },
+    {
+      "ep": 51,
+      "source": "folien_oben_b_saeule/episode_002_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1603020280599594,
+      "z_est_mm": -160.3020280599594,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.5776559114456177,
+        -1.0387763977050781
+      ],
+      "ee_grasp_z_mm": -32.36224502325058,
+      "dz_mm": 127.93978303670883
+    },
+    {
+      "ep": 52,
+      "source": "folien_oben_b_saeule/episode_003_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1595446616411209,
+      "z_est_mm": -159.5446616411209,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.6229069232940674,
+        -1.0028375387191772
+      ],
+      "ee_grasp_z_mm": -31.42595663666725,
+      "dz_mm": 128.11870500445366
+    },
+    {
+      "ep": 53,
+      "source": "folien_oben_b_saeule/episode_004_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1415647268295288,
+      "z_est_mm": -141.5647268295288,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.6361057758331299,
+        -0.9493287205696106
+      ],
+      "ee_grasp_z_mm": -49.53407868742943,
+      "dz_mm": 92.03064814209938
+    },
+    {
+      "ep": 54,
+      "source": "folien_oben_b_saeule/episode_005_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12172158062458038,
+      "z_est_mm": -121.72158062458038,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.6009767055511475,
+        -0.9317577481269836
+      ],
+      "ee_grasp_z_mm": -5.314314272254705,
+      "dz_mm": 116.40726635232568
+    },
+    {
+      "ep": 55,
+      "source": "folien_oben_b_saeule/episode_006_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15187609195709229,
+      "z_est_mm": -151.87609195709229,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.46976086497306824,
+        -1.0666992664337158
+      ],
+      "ee_grasp_z_mm": 30.174516141414642,
+      "dz_mm": 182.05060809850693
+    },
+    {
+      "ep": 56,
+      "source": "folien_oben_b_saeule/episode_007_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.12164506316184998,
+      "z_est_mm": -121.64506316184998,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.4969641864299774,
+        -1.0420951843261719
+      ],
+      "ee_grasp_z_mm": 26.226600632071495,
+      "dz_mm": 147.87166379392147
+    },
+    {
+      "ep": 57,
+      "source": "folien_oben_b_saeule/episode_008_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11596422642469406,
+      "z_est_mm": -115.96422642469406,
+      "inliers": 65,
+      "status": "ok",
+      "park_xy": [
+        -0.535815417766571,
+        -1.055922031402588
+      ],
+      "ee_grasp_z_mm": 14.156925491988659,
+      "dz_mm": 130.12115191668272
+    },
+    {
+      "ep": 58,
+      "source": "folien_oben_b_saeule/episode_011_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.12623779475688934,
+      "z_est_mm": -126.23779475688934,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.15342257916927338,
+        -1.0441654920578003
+      ],
+      "ee_grasp_z_mm": 16.58126898109913,
+      "dz_mm": 142.81906373798847
+    },
+    {
+      "ep": 59,
+      "source": "folien_oben_b_saeule/episode_012_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11747046560049057,
+      "z_est_mm": -117.47046560049057,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.20002345740795135,
+        -1.0454577207565308
+      ],
+      "ee_grasp_z_mm": 16.72952063381672,
+      "dz_mm": 134.1999862343073
+    },
+    {
+      "ep": 60,
+      "source": "folien_oben_b_saeule/episode_013_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10232558101415634,
+      "z_est_mm": -102.32558101415634,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.24944540858268738,
+        -1.045623540878296
+      ],
+      "ee_grasp_z_mm": 13.5597363114357,
+      "dz_mm": 115.88531732559204
+    },
+    {
+      "ep": 61,
+      "source": "folien_oben_b_saeule/episode_014_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1519022285938263,
+      "z_est_mm": -151.9022285938263,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.24863119423389435,
+        -1.0431584119796753
+      ],
+      "ee_grasp_z_mm": -9.255576878786087,
+      "dz_mm": 142.6466517150402
+    },
+    {
+      "ep": 62,
+      "source": "folien_oben_b_saeule/episode_015_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15069043636322021,
+      "z_est_mm": -150.69043636322021,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.24112634360790253,
+        -1.0790199041366577
+      ],
+      "ee_grasp_z_mm": -8.529355749487877,
+      "dz_mm": 142.16108061373234
+    },
+    {
+      "ep": 63,
+      "source": "folien_oben_b_saeule/episode_016_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.15174083411693573,
+      "z_est_mm": -151.74083411693573,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.27962490916252136,
+        -1.0779894590377808
+      ],
+      "ee_grasp_z_mm": 5.805818364024162,
+      "dz_mm": 157.5466524809599
+    },
+    {
+      "ep": 64,
+      "source": "folien_oben_b_saeule/episode_017_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.15013548731803894,
+      "z_est_mm": -150.13548731803894,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.28631120920181274,
+        -1.1100560426712036
+      ],
+      "ee_grasp_z_mm": -22.05980010330677,
+      "dz_mm": 128.07568721473217
+    },
+    {
+      "ep": 65,
+      "source": "folien_oben_b_saeule/episode_018_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.15091323852539062,
+      "z_est_mm": -150.91323852539062,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.3057574927806854,
+        -1.1328823566436768
+      ],
+      "ee_grasp_z_mm": -23.469790816307068,
+      "dz_mm": 127.44344770908356
+    },
+    {
+      "ep": 66,
+      "source": "folien_oben_b_saeule/episode_019_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.14665517210960388,
+      "z_est_mm": -146.65517210960388,
+      "inliers": 46,
+      "status": "ok",
+      "park_xy": [
+        -0.3489879071712494,
+        -1.132325291633606
+      ],
+      "ee_grasp_z_mm": -26.882076635956764,
+      "dz_mm": 119.77309547364712
+    },
+    {
+      "ep": 67,
+      "source": "folien_oben_b_saeule/episode_020_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1643724888563156,
+      "z_est_mm": -164.3724888563156,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.20040008425712585,
+        -0.9055638909339905
+      ],
+      "ee_grasp_z_mm": -45.56707665324211,
+      "dz_mm": 118.8054122030735
+    },
+    {
+      "ep": 68,
+      "source": "folien_oben_b_saeule/episode_021_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.14662306010723114,
+      "z_est_mm": -146.62306010723114,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.24237455427646637,
+        -0.9815815687179565
+      ],
+      "ee_grasp_z_mm": -18.04397813975811,
+      "dz_mm": 128.57908196747303
+    },
+    {
+      "ep": 69,
+      "source": "folien_oben_b_saeule/episode_022_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.156969353556633,
+      "z_est_mm": -156.969353556633,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.2463076263666153,
+        -0.9924229383468628
+      ],
+      "ee_grasp_z_mm": -22.98438735306263,
+      "dz_mm": 133.98496620357037
+    },
+    {
+      "ep": 70,
+      "source": "folien_oben_b_saeule/episode_024_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.11830952763557434,
+      "z_est_mm": -118.30952763557434,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.2799379825592041,
+        -0.8952149748802185
+      ],
+      "ee_grasp_z_mm": -4.827413242310286,
+      "dz_mm": 113.48211439326406
+    },
+    {
+      "ep": 71,
+      "source": "folien_oben_b_saeule/episode_025_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.11941545456647873,
+      "z_est_mm": -119.41545456647873,
+      "inliers": 59,
+      "status": "ok",
+      "park_xy": [
+        -0.2808697819709778,
+        -0.8540716767311096
+      ],
+      "ee_grasp_z_mm": -6.803086493164301,
+      "dz_mm": 112.61236807331443
+    },
+    {
+      "ep": 72,
+      "source": "folien_oben_b_saeule/episode_026_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.13416244089603424,
+      "z_est_mm": -134.16244089603424,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.26729708909988403,
+        -0.8611622452735901
+      ],
+      "ee_grasp_z_mm": 2.1810682956129313,
+      "dz_mm": 136.34350919164717
+    },
+    {
+      "ep": 73,
+      "source": "folien_oben_b_saeule/episode_027_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11153357475996017,
+      "z_est_mm": -111.53357475996017,
+      "inliers": 59,
+      "status": "ok",
+      "park_xy": [
+        -0.2566872239112854,
+        -0.8838986754417419
+      ],
+      "ee_grasp_z_mm": 9.20472014695406,
+      "dz_mm": 120.73829490691423
+    },
+    {
+      "ep": 74,
+      "source": "folien_oben_b_saeule/episode_028_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10649307817220688,
+      "z_est_mm": -106.49307817220688,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.21591684222221375,
+        -0.8867632746696472
+      ],
+      "ee_grasp_z_mm": -1.5338286757469177,
+      "dz_mm": 104.95924949645996
+    },
+    {
+      "ep": 75,
+      "source": "folien_oben_b_saeule/episode_029_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10369933396577835,
+      "z_est_mm": -103.69933396577835,
+      "inliers": 77,
+      "status": "ok",
+      "park_xy": [
+        -0.23552238941192627,
+        -0.8862794637680054
+      ],
+      "ee_grasp_z_mm": 29.136627912521362,
+      "dz_mm": 132.8359618782997
+    },
+    {
+      "ep": 76,
+      "source": "folien_oben_b_saeule/episode_030_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11391899734735489,
+      "z_est_mm": -113.91899734735489,
+      "inliers": 59,
+      "status": "ok",
+      "park_xy": [
+        -0.18422892689704895,
+        -0.9392526149749756
+      ],
+      "ee_grasp_z_mm": -10.380536317825317,
+      "dz_mm": 103.53846102952957
+    },
+    {
+      "ep": 77,
+      "source": "folien_oben_b_saeule/episode_031_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.09483108669519424,
+      "z_est_mm": -94.83108669519424,
+      "inliers": 63,
+      "status": "ok",
+      "park_xy": [
+        -0.3767056167125702,
+        -0.988685667514801
+      ],
+      "ee_grasp_z_mm": 12.97769695520401,
+      "dz_mm": 107.80878365039825
+    },
+    {
+      "ep": 78,
+      "source": "folien_oben_b_saeule/episode_032_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10114827752113342,
+      "z_est_mm": -101.14827752113342,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.4100736081600189,
+        -0.9674872159957886
+      ],
+      "ee_grasp_z_mm": 5.879322532564402,
+      "dz_mm": 107.02760005369782
+    },
+    {
+      "ep": 79,
+      "source": "folien_oben_b_saeule/episode_033_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.08931516110897064,
+      "z_est_mm": -89.31516110897064,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.4429763853549957,
+        -0.9875189661979675
+      ],
+      "ee_grasp_z_mm": -12.441434897482395,
+      "dz_mm": 76.87372621148825
+    },
+    {
+      "ep": 80,
+      "source": "folien_oben_b_saeule/episode_034_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.09348086267709732,
+      "z_est_mm": -93.48086267709732,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.4619559943675995,
+        -1.0047094821929932
+      ],
+      "ee_grasp_z_mm": -12.067323550581932,
+      "dz_mm": 81.41353912651539
+    },
+    {
+      "ep": 81,
+      "source": "folien_oben_b_saeule/episode_035_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.11908125132322311,
+      "z_est_mm": -119.08125132322311,
+      "inliers": 32,
+      "status": "ok",
+      "park_xy": [
+        -0.4387674331665039,
+        -0.9446086287498474
+      ],
+      "ee_grasp_z_mm": 1.5051716472953558,
+      "dz_mm": 120.58642297051847
+    },
+    {
+      "ep": 82,
+      "source": "folien_oben_b_saeule/episode_036_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.1448369026184082,
+      "z_est_mm": -144.8369026184082,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.43532848358154297,
+        -0.9795746803283691
+      ],
+      "ee_grasp_z_mm": -18.086738884449005,
+      "dz_mm": 126.7501637339592
+    },
+    {
+      "ep": 83,
+      "source": "folien_oben_b_saeule/episode_037_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12690868973731995,
+      "z_est_mm": -126.90868973731995,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.44061732292175293,
+        -0.9767842292785645
+      ],
+      "ee_grasp_z_mm": 0.22138185158837587,
+      "dz_mm": 127.13007158890832
+    },
+    {
+      "ep": 84,
+      "source": "folien_oben_b_saeule/episode_038_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.16506166756153107,
+      "z_est_mm": -165.06166756153107,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.4387078285217285,
+        -0.9870874881744385
+      ],
+      "ee_grasp_z_mm": -39.41052034497261,
+      "dz_mm": 125.65114721655846
+    },
+    {
+      "ep": 85,
+      "source": "folien_oben_b_saeule/episode_039_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.15670551359653473,
+      "z_est_mm": -156.70551359653473,
+      "inliers": 46,
+      "status": "ok",
+      "park_xy": [
+        -0.4591004550457001,
+        -1.025467872619629
+      ],
+      "ee_grasp_z_mm": -38.90146687626839,
+      "dz_mm": 117.80404672026634
+    },
+    {
+      "ep": 86,
+      "source": "folien_oben_b_saeule/episode_040_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.15547260642051697,
+      "z_est_mm": -155.47260642051697,
+      "inliers": 46,
+      "status": "ok",
+      "park_xy": [
+        -0.4856454133987427,
+        -1.0306140184402466
+      ],
+      "ee_grasp_z_mm": -37.433791905641556,
+      "dz_mm": 118.03881451487541
+    },
+    {
+      "ep": 87,
+      "source": "folien_oben_b_saeule/episode_041_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.17291855812072754,
+      "z_est_mm": -172.91855812072754,
+      "inliers": 32,
+      "status": "ok",
+      "park_xy": [
+        -0.4418005049228668,
+        -0.8958969116210938
+      ],
+      "ee_grasp_z_mm": -18.550178036093712,
+      "dz_mm": 154.36838008463383
+    },
+    {
+      "ep": 88,
+      "source": "folien_oben_b_saeule/episode_042_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.15439122915267944,
+      "z_est_mm": -154.39122915267944,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.5254172086715698,
+        -0.9631370902061462
+      ],
+      "ee_grasp_z_mm": -28.483137488365173,
+      "dz_mm": 125.90809166431427
+    },
+    {
+      "ep": 89,
+      "source": "folien_oben_b_saeule/episode_043_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L3",
+      "z_est_m": -0.1533336043357849,
+      "z_est_mm": -153.3336043357849,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.5523855686187744,
+        -0.9635711908340454
+      ],
+      "ee_grasp_z_mm": -31.804461032152176,
+      "dz_mm": 121.52914330363274
+    },
+    {
+      "ep": 90,
+      "source": "folien_oben_b_saeule/episode_044_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12435898184776306,
+      "z_est_mm": -124.35898184776306,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.5630615949630737,
+        -0.9537964463233948
+      ],
+      "ee_grasp_z_mm": 8.102747611701488,
+      "dz_mm": 132.46172945946455
+    },
+    {
+      "ep": 91,
+      "source": "folien_oben_b_saeule/episode_047_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12205144762992859,
+      "z_est_mm": -122.05144762992859,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.5354709029197693,
+        -0.9231107234954834
+      ],
+      "ee_grasp_z_mm": 1.519875368103385,
+      "dz_mm": 123.57132299803197
+    },
+    {
+      "ep": 92,
+      "source": "folien_oben_b_saeule/episode_048_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L2",
+      "z_est_m": -0.12438295036554337,
+      "z_est_mm": -124.38295036554337,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.5466204881668091,
+        -0.9343992471694946
+      ],
+      "ee_grasp_z_mm": 4.7141085378825665,
+      "dz_mm": 129.09705890342593
+    },
+    {
+      "ep": 93,
+      "source": "folien_oben_b_saeule/episode_050_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.12217950075864792,
+      "z_est_mm": -122.17950075864792,
+      "inliers": 37,
+      "status": "ok",
+      "park_xy": [
+        -0.5862879753112793,
+        -0.8803707361221313
+      ],
+      "ee_grasp_z_mm": 18.235834315419197,
+      "dz_mm": 140.41533507406712
+    },
+    {
+      "ep": 94,
+      "source": "folien_oben_b_saeule/episode_051_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.10206159949302673,
+      "z_est_mm": -102.06159949302673,
+      "inliers": 40,
+      "status": "ok",
+      "park_xy": [
+        -0.5145143866539001,
+        -0.9026129841804504
+      ],
+      "ee_grasp_z_mm": -2.458270639181137,
+      "dz_mm": 99.6033288538456
+    },
+    {
+      "ep": 95,
+      "source": "folien_oben_b_saeule/episode_052_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1125786080956459,
+      "z_est_mm": -112.5786080956459,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.555069088935852,
+        -0.8945057392120361
+      ],
+      "ee_grasp_z_mm": 17.983805388212204,
+      "dz_mm": 130.5624134838581
+    },
+    {
+      "ep": 96,
+      "source": "folien_oben_b_saeule/episode_053_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.1083468347787857,
+      "z_est_mm": -108.3468347787857,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.42507144808769226,
+        -0.8840047121047974
+      ],
+      "ee_grasp_z_mm": 34.01392325758934,
+      "dz_mm": 142.36075803637505
+    },
+    {
+      "ep": 97,
+      "source": "folien_oben_b_saeule/episode_054_success",
+      "prefix": "folien_oben_b_saeule",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.11018602550029755,
+      "z_est_mm": -110.18602550029755,
+      "inliers": 66,
+      "status": "ok",
+      "park_xy": [
+        -0.4656098783016205,
+        -0.9157905578613281
+      ],
+      "ee_grasp_z_mm": 29.088102281093597,
+      "dz_mm": 139.27412778139114
+    },
+    {
+      "ep": 98,
+      "source": "folien_oben_heckleuchte/episode_000_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.0006249912548810244,
+      "z_est_mm": 0.6249912548810244,
+      "inliers": 80,
+      "status": "ok",
+      "park_xy": [
+        -0.5202074646949768,
+        -0.8766292333602905
+      ],
+      "ee_grasp_z_mm": 163.02497684955597,
+      "dz_mm": 162.39998559467494
+    },
+    {
+      "ep": 99,
+      "source": "folien_oben_heckleuchte/episode_001_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": -0.00047049944987520576,
+      "z_est_mm": -0.47049944987520576,
+      "inliers": 85,
+      "status": "ok",
+      "park_xy": [
+        -0.5811192989349365,
+        -0.9216815233230591
+      ],
+      "ee_grasp_z_mm": 134.23380255699158,
+      "dz_mm": 134.70430200686678
+    },
+    {
+      "ep": 100,
+      "source": "folien_oben_heckleuchte/episode_002_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.018695544451475143,
+      "z_est_mm": 18.695544451475143,
+      "inliers": 77,
+      "status": "ok",
+      "park_xy": [
+        -0.6055611968040466,
+        -0.9476407170295715
+      ],
+      "ee_grasp_z_mm": 135.2001428604126,
+      "dz_mm": 116.50459840893745
+    },
+    {
+      "ep": 101,
+      "source": "folien_oben_heckleuchte/episode_003_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.015990154817700386,
+      "z_est_mm": 15.990154817700386,
+      "inliers": 85,
+      "status": "ok",
+      "park_xy": [
+        -0.5532432794570923,
+        -0.9083359837532043
+      ],
+      "ee_grasp_z_mm": 122.14013934135437,
+      "dz_mm": 106.14998452365398
+    },
+    {
+      "ep": 102,
+      "source": "folien_oben_heckleuchte/episode_004_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.0004805934731848538,
+      "z_est_mm": 0.4805934731848538,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.5963331460952759,
+        -0.9378543496131897
+      ],
+      "ee_grasp_z_mm": 129.71049547195435,
+      "dz_mm": 129.2299019987695
+    },
+    {
+      "ep": 103,
+      "source": "folien_oben_heckleuchte/episode_005_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.016008809208869934,
+      "z_est_mm": 16.008809208869934,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.6260764002799988,
+        -0.9539437294006348
+      ],
+      "ee_grasp_z_mm": 135.32809913158417,
+      "dz_mm": 119.31928992271423
+    },
+    {
+      "ep": 104,
+      "source": "folien_oben_heckleuchte/episode_006_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.015520313754677773,
+      "z_est_mm": 15.520313754677773,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.6122691631317139,
+        -0.9598901867866516
+      ],
+      "ee_grasp_z_mm": 135.88520884513855,
+      "dz_mm": 120.36489509046078
+    },
+    {
+      "ep": 105,
+      "source": "folien_oben_heckleuchte/episode_007_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.01917809061706066,
+      "z_est_mm": 19.17809061706066,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.5705799460411072,
+        -0.9520320892333984
+      ],
+      "ee_grasp_z_mm": 137.82639801502228,
+      "dz_mm": 118.64830739796162
+    },
+    {
+      "ep": 106,
+      "source": "folien_oben_heckleuchte/episode_008_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.026309384033083916,
+      "z_est_mm": 26.309384033083916,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.2012065052986145,
+        -1.043563961982727
+      ],
+      "ee_grasp_z_mm": 143.47872138023376,
+      "dz_mm": 117.16933734714985
+    },
+    {
+      "ep": 107,
+      "source": "folien_oben_heckleuchte/episode_009_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.0126087237149477,
+      "z_est_mm": 12.6087237149477,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.24303877353668213,
+        -1.0869163274765015
+      ],
+      "ee_grasp_z_mm": 121.10310047864914,
+      "dz_mm": 108.49437676370144
+    },
+    {
+      "ep": 108,
+      "source": "folien_oben_heckleuchte/episode_013_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.008156275376677513,
+      "z_est_mm": 8.156275376677513,
+      "inliers": 81,
+      "status": "ok",
+      "park_xy": [
+        -0.183755561709404,
+        -0.9333450198173523
+      ],
+      "ee_grasp_z_mm": 114.4726499915123,
+      "dz_mm": 106.31637461483479
+    },
+    {
+      "ep": 109,
+      "source": "folien_oben_heckleuchte/episode_014_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.015152007341384888,
+      "z_est_mm": 15.152007341384888,
+      "inliers": 54,
+      "status": "ok",
+      "park_xy": [
+        -0.21086494624614716,
+        -0.9695857167243958
+      ],
+      "ee_grasp_z_mm": 130.6827962398529,
+      "dz_mm": 115.53078889846802
+    },
+    {
+      "ep": 110,
+      "source": "folien_oben_heckleuchte/episode_016_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.008278537541627884,
+      "z_est_mm": 8.278537541627884,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.1935962289571762,
+        -0.9433679580688477
+      ],
+      "ee_grasp_z_mm": 136.88591122627258,
+      "dz_mm": 128.6073736846447
+    },
+    {
+      "ep": 111,
+      "source": "folien_oben_heckleuchte/episode_017_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.00936407595872879,
+      "z_est_mm": 9.36407595872879,
+      "inliers": 56,
+      "status": "ok",
+      "park_xy": [
+        -0.39811068773269653,
+        -1.0180541276931763
+      ],
+      "ee_grasp_z_mm": 137.68944144248962,
+      "dz_mm": 128.32536548376083
+    },
+    {
+      "ep": 112,
+      "source": "folien_oben_heckleuchte/episode_018_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.01350306160748005,
+      "z_est_mm": 13.50306160748005,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.4130041003227234,
+        -1.0275927782058716
+      ],
+      "ee_grasp_z_mm": 143.45382153987885,
+      "dz_mm": 129.9507599323988
+    },
+    {
+      "ep": 113,
+      "source": "folien_oben_heckleuchte/episode_019_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.02467408776283264,
+      "z_est_mm": 24.67408776283264,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.40609145164489746,
+        -1.0610402822494507
+      ],
+      "ee_grasp_z_mm": 136.26793026924133,
+      "dz_mm": 111.59384250640869
+    },
+    {
+      "ep": 114,
+      "source": "folien_oben_heckleuchte/episode_021_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.015370838344097137,
+      "z_est_mm": 15.370838344097137,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.34628355503082275,
+        -1.0708742141723633
+      ],
+      "ee_grasp_z_mm": 143.4372514486313,
+      "dz_mm": 128.06641310453415
+    },
+    {
+      "ep": 115,
+      "source": "folien_oben_heckleuchte/episode_023_success",
+      "prefix": "folien_oben_heckleuchte",
+      "layer": "oben",
+      "folienlage": "L1",
+      "z_est_m": 0.026048224419355392,
+      "z_est_mm": 26.048224419355392,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.3953869044780731,
+        -1.064857006072998
+      ],
+      "ee_grasp_z_mm": 124.90694224834442,
+      "dz_mm": 98.85871782898903
+    },
+    {
+      "ep": 116,
+      "source": "folien_mitte_a_saeule/episode_000_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2569088339805603,
+      "z_est_mm": -256.9088339805603,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.33926716446876526,
+        -1.0860960483551025
+      ],
+      "ee_grasp_z_mm": -124.8004287481308,
+      "dz_mm": 132.1084052324295
+    },
+    {
+      "ep": 117,
+      "source": "folien_mitte_a_saeule/episode_001_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2819649279117584,
+      "z_est_mm": -281.9649279117584,
+      "inliers": 24,
+      "status": "ok",
+      "park_xy": [
+        -0.39812979102134705,
+        -1.0870534181594849
+      ],
+      "ee_grasp_z_mm": -114.85560238361359,
+      "dz_mm": 167.10932552814484
+    },
+    {
+      "ep": 118,
+      "source": "folien_mitte_a_saeule/episode_002_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.27382564544677734,
+      "z_est_mm": -273.82564544677734,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.4273805022239685,
+        -1.1014245748519897
+      ],
+      "ee_grasp_z_mm": -126.67347490787506,
+      "dz_mm": 147.15217053890228
+    },
+    {
+      "ep": 119,
+      "source": "folien_mitte_a_saeule/episode_003_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2569466233253479,
+      "z_est_mm": -256.9466233253479,
+      "inliers": 57,
+      "status": "ok",
+      "park_xy": [
+        -0.3791883587837219,
+        -1.040055513381958
+      ],
+      "ee_grasp_z_mm": -146.85742557048798,
+      "dz_mm": 110.08919775485992
+    },
+    {
+      "ep": 120,
+      "source": "folien_mitte_a_saeule/episode_004_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2520066797733307,
+      "z_est_mm": -252.0066797733307,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.4295985996723175,
+        -1.040937066078186
+      ],
+      "ee_grasp_z_mm": -147.35960960388184,
+      "dz_mm": 104.64707016944885
+    },
+    {
+      "ep": 121,
+      "source": "folien_mitte_a_saeule/episode_005_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2557315528392792,
+      "z_est_mm": -255.73155283927917,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.42030301690101624,
+        -1.0246220827102661
+      ],
+      "ee_grasp_z_mm": -131.27736747264862,
+      "dz_mm": 124.45418536663055
+    },
+    {
+      "ep": 122,
+      "source": "folien_mitte_a_saeule/episode_006_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3243550658226013,
+      "z_est_mm": -324.3550658226013,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.4192346930503845,
+        -1.0849015712738037
+      ],
+      "ee_grasp_z_mm": -176.77752673625946,
+      "dz_mm": 147.57753908634186
+    },
+    {
+      "ep": 123,
+      "source": "folien_mitte_a_saeule/episode_007_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.30589228868484497,
+      "z_est_mm": -305.89228868484497,
+      "inliers": 21,
+      "status": "ok",
+      "park_xy": [
+        -0.37406063079833984,
+        -1.0806232690811157
+      ],
+      "ee_grasp_z_mm": -167.53722727298737,
+      "dz_mm": 138.3550614118576
+    },
+    {
+      "ep": 124,
+      "source": "folien_mitte_a_saeule/episode_008_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.2905363440513611,
+      "z_est_mm": -290.5363440513611,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.40443482995033264,
+        -1.0945466756820679
+      ],
+      "ee_grasp_z_mm": -187.92782723903656,
+      "dz_mm": 102.60851681232452
+    },
+    {
+      "ep": 125,
+      "source": "folien_mitte_a_saeule/episode_009_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.2899118661880493,
+      "z_est_mm": -289.9118661880493,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.5029802322387695,
+        -0.9844679832458496
+      ],
+      "ee_grasp_z_mm": -177.2126853466034,
+      "dz_mm": 112.69918084144592
+    },
+    {
+      "ep": 126,
+      "source": "folien_mitte_a_saeule/episode_010_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3028082847595215,
+      "z_est_mm": -302.8082847595215,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.4835963547229767,
+        -0.9937447905540466
+      ],
+      "ee_grasp_z_mm": -145.91626822948456,
+      "dz_mm": 156.89201653003693
+    },
+    {
+      "ep": 127,
+      "source": "folien_mitte_a_saeule/episode_011_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.285336971282959,
+      "z_est_mm": -285.336971282959,
+      "inliers": 60,
+      "status": "ok",
+      "park_xy": [
+        -0.5202600359916687,
+        -0.976414680480957
+      ],
+      "ee_grasp_z_mm": -161.07995808124542,
+      "dz_mm": 124.25701320171356
+    },
+    {
+      "ep": 128,
+      "source": "folien_mitte_a_saeule/episode_012_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2906959056854248,
+      "z_est_mm": -290.6959056854248,
+      "inliers": 65,
+      "status": "ok",
+      "park_xy": [
+        -0.4628770053386688,
+        -1.0075547695159912
+      ],
+      "ee_grasp_z_mm": -114.65691030025482,
+      "dz_mm": 176.03899538516998
+    },
+    {
+      "ep": 129,
+      "source": "folien_mitte_a_saeule/episode_013_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.28180012106895447,
+      "z_est_mm": -281.80012106895447,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.4744870662689209,
+        -0.961808443069458
+      ],
+      "ee_grasp_z_mm": -115.0374710559845,
+      "dz_mm": 166.76265001296997
+    },
+    {
+      "ep": 130,
+      "source": "folien_mitte_a_saeule/episode_014_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2869833707809448,
+      "z_est_mm": -286.9833707809448,
+      "inliers": 65,
+      "status": "ok",
+      "park_xy": [
+        -0.48553183674812317,
+        -0.9572514295578003
+      ],
+      "ee_grasp_z_mm": -117.3739805817604,
+      "dz_mm": 169.60939019918442
+    },
+    {
+      "ep": 131,
+      "source": "folien_mitte_a_saeule/episode_015_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.24849246442317963,
+      "z_est_mm": -248.49246442317963,
+      "inliers": 74,
+      "status": "ok",
+      "park_xy": [
+        -0.5227447152137756,
+        -0.9890167117118835
+      ],
+      "ee_grasp_z_mm": -115.00972509384155,
+      "dz_mm": 133.48273932933807
+    },
+    {
+      "ep": 132,
+      "source": "folien_mitte_a_saeule/episode_016_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2523643374443054,
+      "z_est_mm": -252.36433744430542,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.5735732316970825,
+        -0.9806250333786011
+      ],
+      "ee_grasp_z_mm": -114.8829534649849,
+      "dz_mm": 137.48138397932053
+    },
+    {
+      "ep": 133,
+      "source": "folien_mitte_a_saeule/episode_017_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2574133276939392,
+      "z_est_mm": -257.4133276939392,
+      "inliers": 64,
+      "status": "ok",
+      "park_xy": [
+        -0.5479982495307922,
+        -0.9283314943313599
+      ],
+      "ee_grasp_z_mm": -103.0426099896431,
+      "dz_mm": 154.3707177042961
+    },
+    {
+      "ep": 134,
+      "source": "folien_mitte_a_saeule/episode_018_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2677094638347626,
+      "z_est_mm": -267.7094638347626,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.46242591738700867,
+        -1.0911833047866821
+      ],
+      "ee_grasp_z_mm": -108.47672820091248,
+      "dz_mm": 159.2327356338501
+    },
+    {
+      "ep": 135,
+      "source": "folien_mitte_a_saeule/episode_019_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.24953524768352509,
+      "z_est_mm": -249.53524768352509,
+      "inliers": 61,
+      "status": "ok",
+      "park_xy": [
+        -0.531906008720398,
+        -1.041670560836792
+      ],
+      "ee_grasp_z_mm": -94.60907429456711,
+      "dz_mm": 154.92617338895798
+    },
+    {
+      "ep": 136,
+      "source": "folien_mitte_a_saeule/episode_020_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.24051815271377563,
+      "z_est_mm": -240.51815271377563,
+      "inliers": 61,
+      "status": "ok",
+      "park_xy": [
+        -0.5660815238952637,
+        -1.034632921218872
+      ],
+      "ee_grasp_z_mm": -119.77050453424454,
+      "dz_mm": 120.7476481795311
+    },
+    {
+      "ep": 137,
+      "source": "folien_mitte_a_saeule/episode_021_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.28790441155433655,
+      "z_est_mm": -287.90441155433655,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.43150848150253296,
+        -1.0435878038406372
+      ],
+      "ee_grasp_z_mm": -125.99217891693115,
+      "dz_mm": 161.9122326374054
+    },
+    {
+      "ep": 138,
+      "source": "folien_mitte_a_saeule/episode_022_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2630610167980194,
+      "z_est_mm": -263.0610167980194,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.5270316004753113,
+        -1.0509856939315796
+      ],
+      "ee_grasp_z_mm": -107.34875500202179,
+      "dz_mm": 155.71226179599762
+    },
+    {
+      "ep": 139,
+      "source": "folien_mitte_a_saeule/episode_024_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.298456609249115,
+      "z_est_mm": -298.456609249115,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.5615461468696594,
+        -1.0580096244812012
+      ],
+      "ee_grasp_z_mm": -173.15125465393066,
+      "dz_mm": 125.30535459518433
+    },
+    {
+      "ep": 140,
+      "source": "folien_mitte_a_saeule/episode_025_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.30037063360214233,
+      "z_est_mm": -300.37063360214233,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.5486323237419128,
+        -1.0503305196762085
+      ],
+      "ee_grasp_z_mm": -164.78107869625092,
+      "dz_mm": 135.58955490589142
+    },
+    {
+      "ep": 141,
+      "source": "folien_mitte_a_saeule/episode_026_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.2929001748561859,
+      "z_est_mm": -292.9001748561859,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.5942171812057495,
+        -0.9676837921142578
+      ],
+      "ee_grasp_z_mm": -158.40531885623932,
+      "dz_mm": 134.4948559999466
+    },
+    {
+      "ep": 142,
+      "source": "folien_mitte_a_saeule/episode_030_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2861788272857666,
+      "z_est_mm": -286.1788272857666,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.16447007656097412,
+        -1.1399757862091064
+      ],
+      "ee_grasp_z_mm": -98.66084158420563,
+      "dz_mm": 187.51798570156097
+    },
+    {
+      "ep": 143,
+      "source": "folien_mitte_a_saeule/episode_031_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2621632218360901,
+      "z_est_mm": -262.1632218360901,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.18782666325569153,
+        -1.1187578439712524
+      ],
+      "ee_grasp_z_mm": -100.75988620519638,
+      "dz_mm": 161.4033356308937
+    },
+    {
+      "ep": 144,
+      "source": "folien_mitte_a_saeule/episode_032_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.2514503002166748,
+      "z_est_mm": -251.4503002166748,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.23269696533679962,
+        -1.0788167715072632
+      ],
+      "ee_grasp_z_mm": -123.33879619836807,
+      "dz_mm": 128.11150401830673
+    },
+    {
+      "ep": 145,
+      "source": "folien_mitte_a_saeule/episode_033_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.26399484276771545,
+      "z_est_mm": -263.99484276771545,
+      "inliers": 44,
+      "status": "ok",
+      "park_xy": [
+        -0.17561325430870056,
+        -0.9034627676010132
+      ],
+      "ee_grasp_z_mm": -122.34677374362946,
+      "dz_mm": 141.648069024086
+    },
+    {
+      "ep": 146,
+      "source": "folien_mitte_a_saeule/episode_034_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.24431093037128448,
+      "z_est_mm": -244.31093037128448,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.27148038148880005,
+        -0.9713181853294373
+      ],
+      "ee_grasp_z_mm": -119.87331509590149,
+      "dz_mm": 124.437615275383
+    },
+    {
+      "ep": 147,
+      "source": "folien_mitte_a_saeule/episode_035_success",
+      "prefix": "folien_mitte_a_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.25452661514282227,
+      "z_est_mm": -254.52661514282227,
+      "inliers": 35,
+      "status": "ok",
+      "park_xy": [
+        -0.30293697118759155,
+        -0.9375426769256592
+      ],
+      "ee_grasp_z_mm": -133.29969346523285,
+      "dz_mm": 121.22692167758942
+    },
+    {
+      "ep": 148,
+      "source": "folien_mitte_b_saeule/episode_003_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3267293870449066,
+      "z_est_mm": -326.7293870449066,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.25459542870521545,
+        -0.9670100808143616
+      ],
+      "ee_grasp_z_mm": -201.38464868068695,
+      "dz_mm": 125.34473836421967
+    },
+    {
+      "ep": 149,
+      "source": "folien_mitte_b_saeule/episode_004_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.32083719968795776,
+      "z_est_mm": -320.83719968795776,
+      "inliers": 20,
+      "status": "ok",
+      "park_xy": [
+        -0.2666441798210144,
+        -0.9609048366546631
+      ],
+      "ee_grasp_z_mm": -209.76242423057556,
+      "dz_mm": 111.0747754573822
+    },
+    {
+      "ep": 150,
+      "source": "folien_mitte_b_saeule/episode_005_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3097301721572876,
+      "z_est_mm": -309.7301721572876,
+      "inliers": 24,
+      "status": "ok",
+      "park_xy": [
+        -0.26018163561820984,
+        -0.9647896885871887
+      ],
+      "ee_grasp_z_mm": -194.26339864730835,
+      "dz_mm": 115.46677350997925
+    },
+    {
+      "ep": 151,
+      "source": "folien_mitte_b_saeule/episode_006_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.36328062415122986,
+      "z_est_mm": -363.28062415122986,
+      "inliers": 13,
+      "status": "ok",
+      "park_xy": [
+        -0.2504948377609253,
+        -0.9723126888275146
+      ],
+      "ee_grasp_z_mm": -218.08552742004395,
+      "dz_mm": 145.1950967311859
+    },
+    {
+      "ep": 152,
+      "source": "folien_mitte_b_saeule/episode_007_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.33033764362335205,
+      "z_est_mm": -330.33764362335205,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.25712624192237854,
+        -0.9704459309577942
+      ],
+      "ee_grasp_z_mm": -201.44468545913696,
+      "dz_mm": 128.8929581642151
+    },
+    {
+      "ep": 153,
+      "source": "folien_mitte_b_saeule/episode_009_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.30939117074012756,
+      "z_est_mm": -309.39117074012756,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.2675279378890991,
+        -0.9191195964813232
+      ],
+      "ee_grasp_z_mm": -188.52975964546204,
+      "dz_mm": 120.86141109466553
+    },
+    {
+      "ep": 154,
+      "source": "folien_mitte_b_saeule/episode_010_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3116391599178314,
+      "z_est_mm": -311.6391599178314,
+      "inliers": 25,
+      "status": "ok",
+      "park_xy": [
+        -0.25623348355293274,
+        -0.9088106155395508
+      ],
+      "ee_grasp_z_mm": -179.02739346027374,
+      "dz_mm": 132.61176645755768
+    },
+    {
+      "ep": 155,
+      "source": "folien_mitte_b_saeule/episode_011_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3015193045139313,
+      "z_est_mm": -301.5193045139313,
+      "inliers": 28,
+      "status": "ok",
+      "park_xy": [
+        -0.3927651643753052,
+        -1.0017662048339844
+      ],
+      "ee_grasp_z_mm": -197.60920107364655,
+      "dz_mm": 103.91010344028473
+    },
+    {
+      "ep": 156,
+      "source": "folien_mitte_b_saeule/episode_012_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.30817359685897827,
+      "z_est_mm": -308.17359685897827,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.43931522965431213,
+        -1.0266249179840088
+      ],
+      "ee_grasp_z_mm": -173.71083796024323,
+      "dz_mm": 134.46275889873505
+    },
+    {
+      "ep": 157,
+      "source": "folien_mitte_b_saeule/episode_013_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.29149967432022095,
+      "z_est_mm": -291.49967432022095,
+      "inliers": 58,
+      "status": "ok",
+      "park_xy": [
+        -0.46843448281288147,
+        -1.0261292457580566
+      ],
+      "ee_grasp_z_mm": -143.79888772964478,
+      "dz_mm": 147.70078659057617
+    },
+    {
+      "ep": 158,
+      "source": "folien_mitte_b_saeule/episode_014_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3312193751335144,
+      "z_est_mm": -331.2193751335144,
+      "inliers": 21,
+      "status": "ok",
+      "park_xy": [
+        -0.3181998133659363,
+        -1.0266947746276855
+      ],
+      "ee_grasp_z_mm": -195.96707820892334,
+      "dz_mm": 135.25229692459106
+    },
+    {
+      "ep": 159,
+      "source": "folien_mitte_b_saeule/episode_015_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.2955560088157654,
+      "z_est_mm": -295.5560088157654,
+      "inliers": 19,
+      "status": "ok",
+      "park_xy": [
+        -0.386141836643219,
+        -1.0441014766693115
+      ],
+      "ee_grasp_z_mm": -177.8910905122757,
+      "dz_mm": 117.66491830348969
+    },
+    {
+      "ep": 160,
+      "source": "folien_mitte_b_saeule/episode_016_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3245193660259247,
+      "z_est_mm": -324.5193660259247,
+      "inliers": 21,
+      "status": "ok",
+      "park_xy": [
+        -0.3724718391895294,
+        -1.0054668188095093
+      ],
+      "ee_grasp_z_mm": -185.88437139987946,
+      "dz_mm": 138.63499462604523
+    },
+    {
+      "ep": 161,
+      "source": "folien_mitte_b_saeule/episode_018_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3610711693763733,
+      "z_est_mm": -361.0711693763733,
+      "inliers": 20,
+      "status": "ok",
+      "park_xy": [
+        -0.4293598234653473,
+        -1.0039077997207642
+      ],
+      "ee_grasp_z_mm": -214.10273015499115,
+      "dz_mm": 146.96843922138214
+    },
+    {
+      "ep": 162,
+      "source": "folien_mitte_b_saeule/episode_019_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.36858895421028137,
+      "z_est_mm": -368.5889542102814,
+      "inliers": 13,
+      "status": "ok",
+      "park_xy": [
+        -0.40005984902381897,
+        -1.05713951587677
+      ],
+      "ee_grasp_z_mm": -206.26160502433777,
+      "dz_mm": 162.3273491859436
+    },
+    {
+      "ep": 163,
+      "source": "folien_mitte_b_saeule/episode_020_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3386724889278412,
+      "z_est_mm": -338.6724889278412,
+      "inliers": 19,
+      "status": "ok",
+      "park_xy": [
+        -0.3688116669654846,
+        -1.0487385988235474
+      ],
+      "ee_grasp_z_mm": -220.49188613891602,
+      "dz_mm": 118.18060278892517
+    },
+    {
+      "ep": 164,
+      "source": "folien_mitte_b_saeule/episode_021_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.324535071849823,
+      "z_est_mm": -324.535071849823,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.5706877708435059,
+        -0.977994978427887
+      ],
+      "ee_grasp_z_mm": -201.54955983161926,
+      "dz_mm": 122.98551201820374
+    },
+    {
+      "ep": 165,
+      "source": "folien_mitte_b_saeule/episode_022_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.33622950315475464,
+      "z_est_mm": -336.22950315475464,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.606844961643219,
+        -0.9928523898124695
+      ],
+      "ee_grasp_z_mm": -230.5683195590973,
+      "dz_mm": 105.66118359565735
+    },
+    {
+      "ep": 166,
+      "source": "folien_mitte_b_saeule/episode_023_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.35121339559555054,
+      "z_est_mm": -351.21339559555054,
+      "inliers": 48,
+      "status": "ok",
+      "park_xy": [
+        -0.6173760294914246,
+        -0.9498257637023926
+      ],
+      "ee_grasp_z_mm": -220.86301445960999,
+      "dz_mm": 130.35038113594055
+    },
+    {
+      "ep": 167,
+      "source": "folien_mitte_b_saeule/episode_024_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3464598059654236,
+      "z_est_mm": -346.4598059654236,
+      "inliers": 46,
+      "status": "ok",
+      "park_xy": [
+        -0.626318633556366,
+        -0.9312830567359924
+      ],
+      "ee_grasp_z_mm": -193.46949458122253,
+      "dz_mm": 152.99031138420105
+    },
+    {
+      "ep": 168,
+      "source": "folien_mitte_b_saeule/episode_025_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3294362723827362,
+      "z_est_mm": -329.4362723827362,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.5726334452629089,
+        -0.9139416217803955
+      ],
+      "ee_grasp_z_mm": -174.5901256799698,
+      "dz_mm": 154.84614670276642
+    },
+    {
+      "ep": 169,
+      "source": "folien_mitte_b_saeule/episode_026_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.30497801303863525,
+      "z_est_mm": -304.97801303863525,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.5617525577545166,
+        -0.9013606905937195
+      ],
+      "ee_grasp_z_mm": -169.27596926689148,
+      "dz_mm": 135.70204377174377
+    },
+    {
+      "ep": 170,
+      "source": "folien_mitte_b_saeule/episode_027_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.33195745944976807,
+      "z_est_mm": -331.95745944976807,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.5238392353057861,
+        -0.9173857569694519
+      ],
+      "ee_grasp_z_mm": -183.02999436855316,
+      "dz_mm": 148.9274650812149
+    },
+    {
+      "ep": 171,
+      "source": "folien_mitte_b_saeule/episode_028_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.32415348291397095,
+      "z_est_mm": -324.15348291397095,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.5615743398666382,
+        -0.9326386451721191
+      ],
+      "ee_grasp_z_mm": -165.71730375289917,
+      "dz_mm": 158.43617916107178
+    },
+    {
+      "ep": 172,
+      "source": "folien_mitte_b_saeule/episode_029_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3218282461166382,
+      "z_est_mm": -321.8282461166382,
+      "inliers": 56,
+      "status": "ok",
+      "park_xy": [
+        -0.5502945184707642,
+        -0.9185949563980103
+      ],
+      "ee_grasp_z_mm": -160.18064320087433,
+      "dz_mm": 161.64760291576385
+    },
+    {
+      "ep": 173,
+      "source": "folien_mitte_b_saeule/episode_030_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3084794580936432,
+      "z_est_mm": -308.4794580936432,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.5355112552642822,
+        -0.998535692691803
+      ],
+      "ee_grasp_z_mm": -128.11769545078278,
+      "dz_mm": 180.3617626428604
+    },
+    {
+      "ep": 174,
+      "source": "folien_mitte_b_saeule/episode_031_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3138049244880676,
+      "z_est_mm": -313.8049244880676,
+      "inliers": 70,
+      "status": "ok",
+      "park_xy": [
+        -0.5969564914703369,
+        -1.0278093814849854
+      ],
+      "ee_grasp_z_mm": 50.91613531112671,
+      "dz_mm": 364.72105979919434
+    },
+    {
+      "ep": 175,
+      "source": "folien_mitte_b_saeule/episode_032_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.33823102712631226,
+      "z_est_mm": -338.23102712631226,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.4372864365577698,
+        -1.0161011219024658
+      ],
+      "ee_grasp_z_mm": -177.08642780780792,
+      "dz_mm": 161.14459931850433
+    },
+    {
+      "ep": 176,
+      "source": "folien_mitte_b_saeule/episode_033_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.3306484818458557,
+      "z_est_mm": -330.6484818458557,
+      "inliers": 24,
+      "status": "ok",
+      "park_xy": [
+        -0.17454010248184204,
+        -1.1042412519454956
+      ],
+      "ee_grasp_z_mm": -196.53353095054626,
+      "dz_mm": 134.11495089530945
+    },
+    {
+      "ep": 177,
+      "source": "folien_mitte_b_saeule/episode_034_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.28878581523895264,
+      "z_est_mm": -288.78581523895264,
+      "inliers": 17,
+      "status": "ok",
+      "park_xy": [
+        -0.18011321127414703,
+        -1.1030946969985962
+      ],
+      "ee_grasp_z_mm": -169.94401812553406,
+      "dz_mm": 118.84179711341858
+    },
+    {
+      "ep": 178,
+      "source": "folien_mitte_b_saeule/episode_035_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.27062249183654785,
+      "z_est_mm": -270.62249183654785,
+      "inliers": 18,
+      "status": "ok",
+      "park_xy": [
+        -0.24023644626140594,
+        -1.0842740535736084
+      ],
+      "ee_grasp_z_mm": -164.19388353824615,
+      "dz_mm": 106.4286082983017
+    },
+    {
+      "ep": 179,
+      "source": "folien_mitte_b_saeule/episode_036_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3369603455066681,
+      "z_est_mm": -336.9603455066681,
+      "inliers": 17,
+      "status": "ok",
+      "park_xy": [
+        -0.24169808626174927,
+        -1.092897653579712
+      ],
+      "ee_grasp_z_mm": -150.00338852405548,
+      "dz_mm": 186.9569569826126
+    },
+    {
+      "ep": 180,
+      "source": "folien_mitte_b_saeule/episode_037_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3425348401069641,
+      "z_est_mm": -342.5348401069641,
+      "inliers": 13,
+      "status": "ok",
+      "park_xy": [
+        -0.2802775204181671,
+        -1.1131514310836792
+      ],
+      "ee_grasp_z_mm": -211.05261147022247,
+      "dz_mm": 131.48222863674164
+    },
+    {
+      "ep": 181,
+      "source": "folien_mitte_b_saeule/episode_038_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L2",
+      "z_est_m": -0.3380465805530548,
+      "z_est_mm": -338.0465805530548,
+      "inliers": 9,
+      "status": "ok",
+      "park_xy": [
+        -0.2890368103981018,
+        -1.0906497240066528
+      ],
+      "ee_grasp_z_mm": -218.2229906320572,
+      "dz_mm": 119.82358992099762
+    },
+    {
+      "ep": 182,
+      "source": "folien_mitte_b_saeule/episode_039_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3824999999999999,
+      "z_est_mm": -382.4999999999999,
+      "inliers": 4,
+      "status": "low_inliers",
+      "park_xy": [
+        -0.28508660197257996,
+        -1.0557644367218018
+      ],
+      "ee_grasp_z_mm": -221.05520963668823,
+      "dz_mm": 161.44479036331165
+    },
+    {
+      "ep": 183,
+      "source": "folien_mitte_b_saeule/episode_040_success",
+      "prefix": "folien_mitte_b_saeule",
+      "layer": "mitte",
+      "folienlage": "L3",
+      "z_est_m": -0.3767082691192627,
+      "z_est_mm": -376.7082691192627,
+      "inliers": 8,
+      "status": "ok",
+      "park_xy": [
+        -0.2939412593841553,
+        -1.0889196395874023
+      ],
+      "ee_grasp_z_mm": -201.138436794281,
+      "dz_mm": 175.5698323249817
+    },
+    {
+      "ep": 184,
+      "source": "folien_mitte_heckleuchte/episode_000_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.17316073179244995,
+      "z_est_mm": -173.16073179244995,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.27030545473098755,
+        -1.1051133871078491
+      ],
+      "ee_grasp_z_mm": -31.942032277584076,
+      "dz_mm": 141.21869951486588
+    },
+    {
+      "ep": 185,
+      "source": "folien_mitte_heckleuchte/episode_001_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.16710838675498962,
+      "z_est_mm": -167.10838675498962,
+      "inliers": 14,
+      "status": "ok",
+      "park_xy": [
+        -0.25636306405067444,
+        -1.0807744264602661
+      ],
+      "ee_grasp_z_mm": -24.433406069874763,
+      "dz_mm": 142.67498068511486
+    },
+    {
+      "ep": 186,
+      "source": "folien_mitte_heckleuchte/episode_002_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.17206263542175293,
+      "z_est_mm": -172.06263542175293,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.29847997426986694,
+        -1.120692491531372
+      ],
+      "ee_grasp_z_mm": -55.30953034758568,
+      "dz_mm": 116.75310507416725
+    },
+    {
+      "ep": 187,
+      "source": "folien_mitte_heckleuchte/episode_003_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.20626336336135864,
+      "z_est_mm": -206.26336336135864,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.21130628883838654,
+        -0.9113419055938721
+      ],
+      "ee_grasp_z_mm": -61.91376596689224,
+      "dz_mm": 144.3495973944664
+    },
+    {
+      "ep": 188,
+      "source": "folien_mitte_heckleuchte/episode_004_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.17195019125938416,
+      "z_est_mm": -171.95019125938416,
+      "inliers": 40,
+      "status": "ok",
+      "park_xy": [
+        -0.24296964704990387,
+        -0.928344190120697
+      ],
+      "ee_grasp_z_mm": -63.20904195308685,
+      "dz_mm": 108.7411493062973
+    },
+    {
+      "ep": 189,
+      "source": "folien_mitte_heckleuchte/episode_007_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.18329505622386932,
+      "z_est_mm": -183.29505622386932,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.4469456970691681,
+        -0.979519248008728
+      ],
+      "ee_grasp_z_mm": -41.99850559234619,
+      "dz_mm": 141.29655063152313
+    },
+    {
+      "ep": 190,
+      "source": "folien_mitte_heckleuchte/episode_008_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.18431566655635834,
+      "z_est_mm": -184.31566655635834,
+      "inliers": 44,
+      "status": "ok",
+      "park_xy": [
+        -0.47756725549697876,
+        -1.0431832075119019
+      ],
+      "ee_grasp_z_mm": -53.02584171295166,
+      "dz_mm": 131.28982484340668
+    },
+    {
+      "ep": 191,
+      "source": "folien_mitte_heckleuchte/episode_009_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.17916586995124817,
+      "z_est_mm": -179.16586995124817,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.5098217129707336,
+        -1.057119369506836
+      ],
+      "ee_grasp_z_mm": -61.76464632153511,
+      "dz_mm": 117.40122362971306
+    },
+    {
+      "ep": 192,
+      "source": "folien_mitte_heckleuchte/episode_010_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.1710430383682251,
+      "z_est_mm": -171.0430383682251,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.532207727432251,
+        -0.8891489505767822
+      ],
+      "ee_grasp_z_mm": -48.44095930457115,
+      "dz_mm": 122.60207906365395
+    },
+    {
+      "ep": 193,
+      "source": "folien_mitte_heckleuchte/episode_011_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.17263475060462952,
+      "z_est_mm": -172.63475060462952,
+      "inliers": 71,
+      "status": "ok",
+      "park_xy": [
+        -0.5760878920555115,
+        -0.934307873249054
+      ],
+      "ee_grasp_z_mm": -40.80997779965401,
+      "dz_mm": 131.8247728049755
+    },
+    {
+      "ep": 194,
+      "source": "folien_mitte_heckleuchte/episode_012_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.1610032171010971,
+      "z_est_mm": -161.0032171010971,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.60993492603302,
+        -0.9351999759674072
+      ],
+      "ee_grasp_z_mm": -40.47412425279617,
+      "dz_mm": 120.52909284830093
+    },
+    {
+      "ep": 195,
+      "source": "folien_mitte_heckleuchte/episode_013_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.193327859044075,
+      "z_est_mm": -193.327859044075,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.5842317938804626,
+        -1.029245138168335
+      ],
+      "ee_grasp_z_mm": -9.483733214437962,
+      "dz_mm": 183.84412582963705
+    },
+    {
+      "ep": 196,
+      "source": "folien_mitte_heckleuchte/episode_014_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.18782570958137512,
+      "z_est_mm": -187.82570958137512,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.6003341674804688,
+        -0.9177545309066772
+      ],
+      "ee_grasp_z_mm": -55.86693435907364,
+      "dz_mm": 131.95877522230148
+    },
+    {
+      "ep": 197,
+      "source": "folien_mitte_heckleuchte/episode_015_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.15573307871818542,
+      "z_est_mm": -155.73307871818542,
+      "inliers": 46,
+      "status": "ok",
+      "park_xy": [
+        -0.565805196762085,
+        -1.0317333936691284
+      ],
+      "ee_grasp_z_mm": -4.323415458202362,
+      "dz_mm": 151.40966325998306
+    },
+    {
+      "ep": 198,
+      "source": "folien_mitte_heckleuchte/episode_016_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.18531888723373413,
+      "z_est_mm": -185.31888723373413,
+      "inliers": 58,
+      "status": "ok",
+      "park_xy": [
+        -0.6264492273330688,
+        -1.0610796213150024
+      ],
+      "ee_grasp_z_mm": -62.58200854063034,
+      "dz_mm": 122.73687869310379
+    },
+    {
+      "ep": 199,
+      "source": "folien_mitte_heckleuchte/episode_017_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.16129547357559204,
+      "z_est_mm": -161.29547357559204,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.06863045692443848,
+        -1.0965933799743652
+      ],
+      "ee_grasp_z_mm": -1.0462780483067036,
+      "dz_mm": 160.24919552728534
+    },
+    {
+      "ep": 200,
+      "source": "folien_mitte_heckleuchte/episode_018_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.1562439650297165,
+      "z_est_mm": -156.2439650297165,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.18276803195476532,
+        -1.119163155555725
+      ],
+      "ee_grasp_z_mm": -12.570257298648357,
+      "dz_mm": 143.67370773106813
+    },
+    {
+      "ep": 201,
+      "source": "folien_mitte_heckleuchte/episode_019_success",
+      "prefix": "folien_mitte_heckleuchte",
+      "layer": "mitte",
+      "folienlage": "L1",
+      "z_est_m": -0.15713244676589966,
+      "z_est_mm": -157.13244676589966,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.22072367370128632,
+        -1.1056822538375854
+      ],
+      "ee_grasp_z_mm": -41.61521419882774,
+      "dz_mm": 115.51723256707191
+    },
+    {
+      "ep": 202,
+      "source": "folien_unten_a_sauele/episode_000_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.43453729152679443,
+      "z_est_mm": -434.53729152679443,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.21887515485286713,
+        -1.1052367687225342
+      ],
+      "ee_grasp_z_mm": -318.7601566314697,
+      "dz_mm": 115.7771348953247
+    },
+    {
+      "ep": 203,
+      "source": "folien_unten_a_sauele/episode_001_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.45533496141433716,
+      "z_est_mm": -455.33496141433716,
+      "inliers": 19,
+      "status": "ok",
+      "park_xy": [
+        -0.2564413547515869,
+        -1.0446655750274658
+      ],
+      "ee_grasp_z_mm": -284.4263017177582,
+      "dz_mm": 170.90865969657898
+    },
+    {
+      "ep": 204,
+      "source": "folien_unten_a_sauele/episode_002_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.42337924242019653,
+      "z_est_mm": -423.37924242019653,
+      "inliers": 15,
+      "status": "ok",
+      "park_xy": [
+        -0.24778050184249878,
+        -1.1301454305648804
+      ],
+      "ee_grasp_z_mm": -297.33699560165405,
+      "dz_mm": 126.04224681854248
+    },
+    {
+      "ep": 205,
+      "source": "folien_unten_a_sauele/episode_003_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.41751402616500854,
+      "z_est_mm": -417.51402616500854,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.2680857479572296,
+        -1.1373600959777832
+      ],
+      "ee_grasp_z_mm": -229.0848046541214,
+      "dz_mm": 188.42922151088715
+    },
+    {
+      "ep": 206,
+      "source": "folien_unten_a_sauele/episode_004_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.40227875113487244,
+      "z_est_mm": -402.27875113487244,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.3537122905254364,
+        -1.0687488317489624
+      ],
+      "ee_grasp_z_mm": -220.47719359397888,
+      "dz_mm": 181.80155754089355
+    },
+    {
+      "ep": 207,
+      "source": "folien_unten_a_sauele/episode_005_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4126370847225189,
+      "z_est_mm": -412.6370847225189,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.34415528178215027,
+        -1.061437964439392
+      ],
+      "ee_grasp_z_mm": -238.11626434326172,
+      "dz_mm": 174.5208203792572
+    },
+    {
+      "ep": 208,
+      "source": "folien_unten_a_sauele/episode_006_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4083074927330017,
+      "z_est_mm": -408.3074927330017,
+      "inliers": 43,
+      "status": "ok",
+      "park_xy": [
+        -0.35226431488990784,
+        -1.0540592670440674
+      ],
+      "ee_grasp_z_mm": -265.5700147151947,
+      "dz_mm": 142.737478017807
+    },
+    {
+      "ep": 209,
+      "source": "folien_unten_a_sauele/episode_007_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3758401572704315,
+      "z_est_mm": -375.8401572704315,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.3936890661716461,
+        -1.0901579856872559
+      ],
+      "ee_grasp_z_mm": -239.70648646354675,
+      "dz_mm": 136.13367080688477
+    },
+    {
+      "ep": 210,
+      "source": "folien_unten_a_sauele/episode_008_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3712681531906128,
+      "z_est_mm": -371.2681531906128,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.4397171139717102,
+        -1.0763317346572876
+      ],
+      "ee_grasp_z_mm": -229.51149940490723,
+      "dz_mm": 141.75665378570557
+    },
+    {
+      "ep": 211,
+      "source": "folien_unten_a_sauele/episode_009_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3833109140396118,
+      "z_est_mm": -383.3109140396118,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.4670664370059967,
+        -1.0845879316329956
+      ],
+      "ee_grasp_z_mm": -245.35256624221802,
+      "dz_mm": 137.9583477973938
+    },
+    {
+      "ep": 212,
+      "source": "folien_unten_a_sauele/episode_010_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3449900150299072,
+      "z_est_mm": -344.9900150299072,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.46345752477645874,
+        -1.0763944387435913
+      ],
+      "ee_grasp_z_mm": -230.0647646188736,
+      "dz_mm": 114.92525041103363
+    },
+    {
+      "ep": 213,
+      "source": "folien_unten_a_sauele/episode_011_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.37755265831947327,
+      "z_est_mm": -377.55265831947327,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.4468984603881836,
+        -0.9210555553436279
+      ],
+      "ee_grasp_z_mm": -255.24520874023438,
+      "dz_mm": 122.30744957923889
+    },
+    {
+      "ep": 214,
+      "source": "folien_unten_a_sauele/episode_012_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3797338902950287,
+      "z_est_mm": -379.7338902950287,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.5051247477531433,
+        -0.9452602863311768
+      ],
+      "ee_grasp_z_mm": -253.7367045879364,
+      "dz_mm": 125.99718570709229
+    },
+    {
+      "ep": 215,
+      "source": "folien_unten_a_sauele/episode_014_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3673017621040344,
+      "z_est_mm": -367.3017621040344,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.5315439105033875,
+        -0.9175142049789429
+      ],
+      "ee_grasp_z_mm": -240.2898669242859,
+      "dz_mm": 127.01189517974854
+    },
+    {
+      "ep": 216,
+      "source": "folien_unten_a_sauele/episode_015_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4013292193412781,
+      "z_est_mm": -401.3292193412781,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.5682329535484314,
+        -0.960970938205719
+      ],
+      "ee_grasp_z_mm": -226.85056924819946,
+      "dz_mm": 174.4786500930786
+    },
+    {
+      "ep": 217,
+      "source": "folien_unten_a_sauele/episode_016_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.38431233167648315,
+      "z_est_mm": -384.31233167648315,
+      "inliers": 61,
+      "status": "ok",
+      "park_xy": [
+        -0.5533652305603027,
+        -0.9623630046844482
+      ],
+      "ee_grasp_z_mm": -259.83723998069763,
+      "dz_mm": 124.47509169578552
+    },
+    {
+      "ep": 218,
+      "source": "folien_unten_a_sauele/episode_017_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3948649764060974,
+      "z_est_mm": -394.8649764060974,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.5403634309768677,
+        -0.9295689463615417
+      ],
+      "ee_grasp_z_mm": -248.0039745569229,
+      "dz_mm": 146.8610018491745
+    },
+    {
+      "ep": 219,
+      "source": "folien_unten_a_sauele/episode_018_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3502197265625,
+      "z_est_mm": -350.2197265625,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.6131612062454224,
+        -0.904897153377533
+      ],
+      "ee_grasp_z_mm": -239.77436125278473,
+      "dz_mm": 110.44536530971527
+    },
+    {
+      "ep": 220,
+      "source": "folien_unten_a_sauele/episode_019_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4455205798149109,
+      "z_est_mm": -445.5205798149109,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.5452713966369629,
+        -0.9079036116600037
+      ],
+      "ee_grasp_z_mm": -293.48039627075195,
+      "dz_mm": 152.04018354415894
+    },
+    {
+      "ep": 221,
+      "source": "folien_unten_a_sauele/episode_020_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4605417847633362,
+      "z_est_mm": -460.5417847633362,
+      "inliers": 25,
+      "status": "ok",
+      "park_xy": [
+        -0.32766520977020264,
+        -0.986987292766571
+      ],
+      "ee_grasp_z_mm": -305.9278130531311,
+      "dz_mm": 154.61397171020508
+    },
+    {
+      "ep": 222,
+      "source": "folien_unten_a_sauele/episode_021_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4295403063297272,
+      "z_est_mm": -429.5403063297272,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.4051792621612549,
+        -0.9935622811317444
+      ],
+      "ee_grasp_z_mm": -291.04453325271606,
+      "dz_mm": 138.4957730770111
+    },
+    {
+      "ep": 223,
+      "source": "folien_unten_a_sauele/episode_022_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.44182831048965454,
+      "z_est_mm": -441.82831048965454,
+      "inliers": 44,
+      "status": "ok",
+      "park_xy": [
+        -0.37200114130973816,
+        -1.1275029182434082
+      ],
+      "ee_grasp_z_mm": -320.852667093277,
+      "dz_mm": 120.97564339637756
+    },
+    {
+      "ep": 224,
+      "source": "folien_unten_a_sauele/episode_023_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4263441562652588,
+      "z_est_mm": -426.3441562652588,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.40878167748451233,
+        -1.0429123640060425
+      ],
+      "ee_grasp_z_mm": -309.444397687912,
+      "dz_mm": 116.8997585773468
+    },
+    {
+      "ep": 225,
+      "source": "folien_unten_a_sauele/episode_025_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4180411100387573,
+      "z_est_mm": -418.0411100387573,
+      "inliers": 13,
+      "status": "ok",
+      "park_xy": [
+        -0.281172513961792,
+        -1.148178219795227
+      ],
+      "ee_grasp_z_mm": -316.611111164093,
+      "dz_mm": 101.4299988746643
+    },
+    {
+      "ep": 226,
+      "source": "folien_unten_a_sauele/episode_026_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.38615068793296814,
+      "z_est_mm": -386.15068793296814,
+      "inliers": 35,
+      "status": "ok",
+      "park_xy": [
+        -0.36948511004447937,
+        -1.1155163049697876
+      ],
+      "ee_grasp_z_mm": -267.23048090934753,
+      "dz_mm": 118.9202070236206
+    },
+    {
+      "ep": 227,
+      "source": "folien_unten_a_sauele/episode_027_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.37490808963775635,
+      "z_est_mm": -374.90808963775635,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.39035964012145996,
+        -1.1170893907546997
+      ],
+      "ee_grasp_z_mm": -250.27108192443848,
+      "dz_mm": 124.63700771331787
+    },
+    {
+      "ep": 228,
+      "source": "folien_unten_a_sauele/episode_028_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.38137516379356384,
+      "z_est_mm": -381.37516379356384,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.3203829824924469,
+        -1.1198978424072266
+      ],
+      "ee_grasp_z_mm": -273.60212802886963,
+      "dz_mm": 107.77303576469421
+    },
+    {
+      "ep": 229,
+      "source": "folien_unten_a_sauele/episode_030_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3986956477165222,
+      "z_est_mm": -398.6956477165222,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.34897729754447937,
+        -1.1133729219436646
+      ],
+      "ee_grasp_z_mm": -266.3249969482422,
+      "dz_mm": 132.37065076828003
+    },
+    {
+      "ep": 230,
+      "source": "folien_unten_a_sauele/episode_031_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.36789458990097046,
+      "z_est_mm": -367.89458990097046,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.3676721155643463,
+        -1.130789041519165
+      ],
+      "ee_grasp_z_mm": -252.52017378807068,
+      "dz_mm": 115.37441611289978
+    },
+    {
+      "ep": 231,
+      "source": "folien_unten_a_sauele/episode_032_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3602992296218872,
+      "z_est_mm": -360.2992296218872,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.31042298674583435,
+        -1.124673843383789
+      ],
+      "ee_grasp_z_mm": -245.49224972724915,
+      "dz_mm": 114.80697989463806
+    },
+    {
+      "ep": 232,
+      "source": "folien_unten_a_sauele/episode_033_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.37035563588142395,
+      "z_est_mm": -370.35563588142395,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.4161938428878784,
+        -1.0955729484558105
+      ],
+      "ee_grasp_z_mm": -242.96483397483826,
+      "dz_mm": 127.3908019065857
+    },
+    {
+      "ep": 233,
+      "source": "folien_unten_a_sauele/episode_034_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.36597102880477905,
+      "z_est_mm": -365.97102880477905,
+      "inliers": 39,
+      "status": "ok",
+      "park_xy": [
+        -0.1276787668466568,
+        -1.1278361082077026
+      ],
+      "ee_grasp_z_mm": -248.91386926174164,
+      "dz_mm": 117.05715954303741
+    },
+    {
+      "ep": 234,
+      "source": "folien_unten_a_sauele/episode_035_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.36681267619132996,
+      "z_est_mm": -366.81267619132996,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.15734922885894775,
+        -1.1307975053787231
+      ],
+      "ee_grasp_z_mm": -229.6970933675766,
+      "dz_mm": 137.11558282375336
+    },
+    {
+      "ep": 235,
+      "source": "folien_unten_a_sauele/episode_036_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3813202679157257,
+      "z_est_mm": -381.3202679157257,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.2229357361793518,
+        -1.1592761278152466
+      ],
+      "ee_grasp_z_mm": -245.64115703105927,
+      "dz_mm": 135.67911088466644
+    },
+    {
+      "ep": 236,
+      "source": "folien_unten_a_sauele/episode_037_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4136034846305847,
+      "z_est_mm": -413.6034846305847,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.20664678514003754,
+        -1.10508394241333
+      ],
+      "ee_grasp_z_mm": -263.02483677864075,
+      "dz_mm": 150.57864785194397
+    },
+    {
+      "ep": 237,
+      "source": "folien_unten_a_sauele/episode_038_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4109443128108978,
+      "z_est_mm": -410.9443128108978,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.2404250055551529,
+        -1.0790680646896362
+      ],
+      "ee_grasp_z_mm": -239.86171185970306,
+      "dz_mm": 171.08260095119476
+    },
+    {
+      "ep": 238,
+      "source": "folien_unten_a_sauele/episode_039_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.39931347966194153,
+      "z_est_mm": -399.3134796619415,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.23049668967723846,
+        -1.0524743795394897
+      ],
+      "ee_grasp_z_mm": -250.3604292869568,
+      "dz_mm": 148.95305037498474
+    },
+    {
+      "ep": 239,
+      "source": "folien_unten_a_sauele/episode_040_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4505116939544678,
+      "z_est_mm": -450.5116939544678,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.08804787695407867,
+        -1.1260069608688354
+      ],
+      "ee_grasp_z_mm": -290.1415228843689,
+      "dz_mm": 160.37017107009888
+    },
+    {
+      "ep": 240,
+      "source": "folien_unten_a_sauele/episode_041_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.41091078519821167,
+      "z_est_mm": -410.91078519821167,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.05540147051215172,
+        -1.131569504737854
+      ],
+      "ee_grasp_z_mm": -297.1714735031128,
+      "dz_mm": 113.73931169509888
+    },
+    {
+      "ep": 241,
+      "source": "folien_unten_a_sauele/episode_042_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4202266335487366,
+      "z_est_mm": -420.2266335487366,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.03955443575978279,
+        -1.1735327243804932
+      ],
+      "ee_grasp_z_mm": -302.7154207229614,
+      "dz_mm": 117.51121282577515
+    },
+    {
+      "ep": 242,
+      "source": "folien_unten_a_sauele/episode_043_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4176289439201355,
+      "z_est_mm": -417.6289439201355,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.1263742446899414,
+        -0.9843321442604065
+      ],
+      "ee_grasp_z_mm": -313.90342116355896,
+      "dz_mm": 103.72552275657654
+    },
+    {
+      "ep": 243,
+      "source": "folien_unten_a_sauele/episode_044_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4204896092414856,
+      "z_est_mm": -420.4896092414856,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.2300705909729004,
+        -1.0735266208648682
+      ],
+      "ee_grasp_z_mm": -300.3602921962738,
+      "dz_mm": 120.12931704521179
+    },
+    {
+      "ep": 244,
+      "source": "folien_unten_a_sauele/episode_045_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4141448438167572,
+      "z_est_mm": -414.1448438167572,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.2149716466665268,
+        -0.996228814125061
+      ],
+      "ee_grasp_z_mm": -304.8076629638672,
+      "dz_mm": 109.33718085289001
+    },
+    {
+      "ep": 245,
+      "source": "folien_unten_a_sauele/episode_046_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4054245948791504,
+      "z_est_mm": -405.4245948791504,
+      "inliers": 37,
+      "status": "ok",
+      "park_xy": [
+        -0.1975664347410202,
+        -0.9033976793289185
+      ],
+      "ee_grasp_z_mm": -269.2352533340454,
+      "dz_mm": 136.18934154510498
+    },
+    {
+      "ep": 246,
+      "source": "folien_unten_a_sauele/episode_047_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3840649724006653,
+      "z_est_mm": -384.0649724006653,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.16789573431015015,
+        -0.9264376163482666
+      ],
+      "ee_grasp_z_mm": -289.35837745666504,
+      "dz_mm": 94.70659494400024
+    },
+    {
+      "ep": 247,
+      "source": "folien_unten_a_sauele/episode_048_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3826908469200134,
+      "z_est_mm": -382.6908469200134,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.14485661685466766,
+        -0.9890323877334595
+      ],
+      "ee_grasp_z_mm": -275.20790696144104,
+      "dz_mm": 107.48293995857239
+    },
+    {
+      "ep": 248,
+      "source": "folien_unten_a_sauele/episode_049_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3443332314491272,
+      "z_est_mm": -344.3332314491272,
+      "inliers": 18,
+      "status": "ok",
+      "park_xy": [
+        -0.23497414588928223,
+        -0.922668993473053
+      ],
+      "ee_grasp_z_mm": -233.99679362773895,
+      "dz_mm": 110.33643782138824
+    },
+    {
+      "ep": 249,
+      "source": "folien_unten_a_sauele/episode_050_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3572545647621155,
+      "z_est_mm": -357.2545647621155,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.1996135115623474,
+        -0.9390737414360046
+      ],
+      "ee_grasp_z_mm": -215.82697331905365,
+      "dz_mm": 141.42759144306183
+    },
+    {
+      "ep": 250,
+      "source": "folien_unten_a_sauele/episode_051_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3518770933151245,
+      "z_est_mm": -351.8770933151245,
+      "inliers": 31,
+      "status": "ok",
+      "park_xy": [
+        -0.24749982357025146,
+        -0.9153903722763062
+      ],
+      "ee_grasp_z_mm": -237.2056245803833,
+      "dz_mm": 114.67146873474121
+    },
+    {
+      "ep": 251,
+      "source": "folien_unten_a_sauele/episode_052_success",
+      "prefix": "folien_unten_a_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3953951597213745,
+      "z_est_mm": -395.3951597213745,
+      "inliers": 18,
+      "status": "ok",
+      "park_xy": [
+        -0.3065944314002991,
+        -0.9301221370697021
+      ],
+      "ee_grasp_z_mm": -242.21384525299072,
+      "dz_mm": 153.1813144683838
+    },
+    {
+      "ep": 252,
+      "source": "folien_unten_b_sauele/episode_000_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4286329448223114,
+      "z_est_mm": -428.6329448223114,
+      "inliers": 19,
+      "status": "ok",
+      "park_xy": [
+        -0.2628649175167084,
+        -0.9464625716209412
+      ],
+      "ee_grasp_z_mm": -258.5578262805939,
+      "dz_mm": 170.07511854171753
+    },
+    {
+      "ep": 253,
+      "source": "folien_unten_b_sauele/episode_001_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4211363196372986,
+      "z_est_mm": -421.1363196372986,
+      "inliers": 15,
+      "status": "ok",
+      "park_xy": [
+        -0.22198443114757538,
+        -0.948257327079773
+      ],
+      "ee_grasp_z_mm": -281.15716576576233,
+      "dz_mm": 139.97915387153625
+    },
+    {
+      "ep": 254,
+      "source": "folien_unten_b_sauele/episode_002_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3984552025794983,
+      "z_est_mm": -398.4552025794983,
+      "inliers": 13,
+      "status": "ok",
+      "park_xy": [
+        -0.20419716835021973,
+        -0.9655559062957764
+      ],
+      "ee_grasp_z_mm": -242.2858327627182,
+      "dz_mm": 156.1693698167801
+    },
+    {
+      "ep": 255,
+      "source": "folien_unten_b_sauele/episode_003_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3831332325935364,
+      "z_est_mm": -383.1332325935364,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.22845624387264252,
+        -0.9298993945121765
+      ],
+      "ee_grasp_z_mm": -264.94300365448,
+      "dz_mm": 118.1902289390564
+    },
+    {
+      "ep": 256,
+      "source": "folien_unten_b_sauele/episode_004_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.38678616285324097,
+      "z_est_mm": -386.78616285324097,
+      "inliers": 28,
+      "status": "ok",
+      "park_xy": [
+        -0.24044503271579742,
+        -0.9635443091392517
+      ],
+      "ee_grasp_z_mm": -247.13055789470673,
+      "dz_mm": 139.65560495853424
+    },
+    {
+      "ep": 257,
+      "source": "folien_unten_b_sauele/episode_005_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.39243119955062866,
+      "z_est_mm": -392.43119955062866,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.22336609661579132,
+        -0.9173281192779541
+      ],
+      "ee_grasp_z_mm": -246.39515578746796,
+      "dz_mm": 146.0360437631607
+    },
+    {
+      "ep": 258,
+      "source": "folien_unten_b_sauele/episode_006_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.38184019923210144,
+      "z_est_mm": -381.84019923210144,
+      "inliers": 32,
+      "status": "ok",
+      "park_xy": [
+        -0.16982582211494446,
+        -0.9539172053337097
+      ],
+      "ee_grasp_z_mm": -255.47313690185547,
+      "dz_mm": 126.36706233024597
+    },
+    {
+      "ep": 259,
+      "source": "folien_unten_b_sauele/episode_007_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.39762750267982483,
+      "z_est_mm": -397.62750267982483,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.38341015577316284,
+        -0.9690381288528442
+      ],
+      "ee_grasp_z_mm": -254.24152612686157,
+      "dz_mm": 143.38597655296326
+    },
+    {
+      "ep": 260,
+      "source": "folien_unten_b_sauele/episode_009_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.4051109254360199,
+      "z_est_mm": -405.1109254360199,
+      "inliers": 19,
+      "status": "ok",
+      "park_xy": [
+        -0.38148853182792664,
+        -1.0553311109542847
+      ],
+      "ee_grasp_z_mm": -252.1038055419922,
+      "dz_mm": 153.0071198940277
+    },
+    {
+      "ep": 261,
+      "source": "folien_unten_b_sauele/episode_012_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.39867857098579407,
+      "z_est_mm": -398.67857098579407,
+      "inliers": 42,
+      "status": "ok",
+      "park_xy": [
+        -0.43381524085998535,
+        -1.0996372699737549
+      ],
+      "ee_grasp_z_mm": -272.3318636417389,
+      "dz_mm": 126.34670734405518
+    },
+    {
+      "ep": 262,
+      "source": "folien_unten_b_sauele/episode_013_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4042951166629791,
+      "z_est_mm": -404.2951166629791,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.4239506721496582,
+        -1.0589599609375
+      ],
+      "ee_grasp_z_mm": -261.9084119796753,
+      "dz_mm": 142.38670468330383
+    },
+    {
+      "ep": 263,
+      "source": "folien_unten_b_sauele/episode_014_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3972170054912567,
+      "z_est_mm": -397.2170054912567,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.44849109649658203,
+        -1.077962875366211
+      ],
+      "ee_grasp_z_mm": -292.19338297843933,
+      "dz_mm": 105.02362251281738
+    },
+    {
+      "ep": 264,
+      "source": "folien_unten_b_sauele/episode_015_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4337814152240753,
+      "z_est_mm": -433.7814152240753,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.2730972170829773,
+        -1.0928735733032227
+      ],
+      "ee_grasp_z_mm": -294.1429615020752,
+      "dz_mm": 139.63845372200012
+    },
+    {
+      "ep": 265,
+      "source": "folien_unten_b_sauele/episode_017_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.410255491733551,
+      "z_est_mm": -410.255491733551,
+      "inliers": 26,
+      "status": "ok",
+      "park_xy": [
+        -0.24248021841049194,
+        -1.163415551185608
+      ],
+      "ee_grasp_z_mm": -294.1867411136627,
+      "dz_mm": 116.0687506198883
+    },
+    {
+      "ep": 266,
+      "source": "folien_unten_b_sauele/episode_018_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.422771155834198,
+      "z_est_mm": -422.771155834198,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.5071852207183838,
+        -0.9958679676055908
+      ],
+      "ee_grasp_z_mm": -293.517142534256,
+      "dz_mm": 129.25401329994202
+    },
+    {
+      "ep": 267,
+      "source": "folien_unten_b_sauele/episode_019_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.40728867053985596,
+      "z_est_mm": -407.28867053985596,
+      "inliers": 58,
+      "status": "ok",
+      "park_xy": [
+        -0.5579227209091187,
+        -0.9600315690040588
+      ],
+      "ee_grasp_z_mm": -303.2209873199463,
+      "dz_mm": 104.06768321990967
+    },
+    {
+      "ep": 268,
+      "source": "folien_unten_b_sauele/episode_020_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.40424779057502747,
+      "z_est_mm": -404.24779057502747,
+      "inliers": 51,
+      "status": "ok",
+      "park_xy": [
+        -0.5962619185447693,
+        -0.9288129806518555
+      ],
+      "ee_grasp_z_mm": -294.19320821762085,
+      "dz_mm": 110.05458235740662
+    },
+    {
+      "ep": 269,
+      "source": "folien_unten_b_sauele/episode_021_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4002065658569336,
+      "z_est_mm": -400.2065658569336,
+      "inliers": 36,
+      "status": "ok",
+      "park_xy": [
+        -0.5016257762908936,
+        -0.9617060422897339
+      ],
+      "ee_grasp_z_mm": -253.44529747962952,
+      "dz_mm": 146.76126837730408
+    },
+    {
+      "ep": 270,
+      "source": "folien_unten_b_sauele/episode_023_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.4069547951221466,
+      "z_est_mm": -406.9547951221466,
+      "inliers": 43,
+      "status": "ok",
+      "park_xy": [
+        -0.5378410816192627,
+        -0.9161228537559509
+      ],
+      "ee_grasp_z_mm": -252.70166993141174,
+      "dz_mm": 154.25312519073486
+    },
+    {
+      "ep": 271,
+      "source": "folien_unten_b_sauele/episode_024_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.38804665207862854,
+      "z_est_mm": -388.04665207862854,
+      "inliers": 45,
+      "status": "ok",
+      "park_xy": [
+        -0.5268629789352417,
+        -0.9638477563858032
+      ],
+      "ee_grasp_z_mm": -225.32860934734344,
+      "dz_mm": 162.7180427312851
+    },
+    {
+      "ep": 272,
+      "source": "folien_unten_b_sauele/episode_026_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3891732096672058,
+      "z_est_mm": -389.1732096672058,
+      "inliers": 43,
+      "status": "ok",
+      "park_xy": [
+        -0.5841181874275208,
+        -0.9952703714370728
+      ],
+      "ee_grasp_z_mm": -250.00789761543274,
+      "dz_mm": 139.16531205177307
+    },
+    {
+      "ep": 273,
+      "source": "folien_unten_b_sauele/episode_027_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3885693848133087,
+      "z_est_mm": -388.5693848133087,
+      "inliers": 34,
+      "status": "ok",
+      "park_xy": [
+        -0.5094925165176392,
+        -0.9584865570068359
+      ],
+      "ee_grasp_z_mm": -223.8788604736328,
+      "dz_mm": 164.6905243396759
+    },
+    {
+      "ep": 274,
+      "source": "folien_unten_b_sauele/episode_028_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.38054728507995605,
+      "z_est_mm": -380.54728507995605,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.5504176020622253,
+        -0.9710688591003418
+      ],
+      "ee_grasp_z_mm": -217.52239763736725,
+      "dz_mm": 163.0248874425888
+    },
+    {
+      "ep": 275,
+      "source": "folien_unten_b_sauele/episode_031_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.38051638007164,
+      "z_est_mm": -380.51638007164,
+      "inliers": 20,
+      "status": "ok",
+      "park_xy": [
+        -0.5439183712005615,
+        -1.003084421157837
+      ],
+      "ee_grasp_z_mm": -236.6538941860199,
+      "dz_mm": 143.86248588562012
+    },
+    {
+      "ep": 276,
+      "source": "folien_unten_b_sauele/episode_032_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.39865952730178833,
+      "z_est_mm": -398.65952730178833,
+      "inliers": 28,
+      "status": "ok",
+      "park_xy": [
+        -0.4229418635368347,
+        -1.1115987300872803
+      ],
+      "ee_grasp_z_mm": -250.12236833572388,
+      "dz_mm": 148.53715896606445
+    },
+    {
+      "ep": 277,
+      "source": "folien_unten_b_sauele/episode_033_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.39933040738105774,
+      "z_est_mm": -399.33040738105774,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.42123910784721375,
+        -1.0854771137237549
+      ],
+      "ee_grasp_z_mm": -258.2150399684906,
+      "dz_mm": 141.11536741256714
+    },
+    {
+      "ep": 278,
+      "source": "folien_unten_b_sauele/episode_034_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3912237286567688,
+      "z_est_mm": -391.2237286567688,
+      "inliers": 28,
+      "status": "ok",
+      "park_xy": [
+        -0.48191529512405396,
+        -1.0402568578720093
+      ],
+      "ee_grasp_z_mm": -231.0067117214203,
+      "dz_mm": 160.2170169353485
+    },
+    {
+      "ep": 279,
+      "source": "folien_unten_b_sauele/episode_036_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.41013744473457336,
+      "z_est_mm": -410.13744473457336,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.4420556426048279,
+        -1.0744751691818237
+      ],
+      "ee_grasp_z_mm": -250.48384070396423,
+      "dz_mm": 159.65360403060913
+    },
+    {
+      "ep": 280,
+      "source": "folien_unten_b_sauele/episode_037_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.410209596157074,
+      "z_est_mm": -410.209596157074,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.4416494071483612,
+        -1.108504295349121
+      ],
+      "ee_grasp_z_mm": -314.0018582344055,
+      "dz_mm": 96.20773792266846
+    },
+    {
+      "ep": 281,
+      "source": "folien_unten_b_sauele/episode_038_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.4187186360359192,
+      "z_est_mm": -418.7186360359192,
+      "inliers": 40,
+      "status": "ok",
+      "park_xy": [
+        -0.42204660177230835,
+        -1.134505271911621
+      ],
+      "ee_grasp_z_mm": -299.11690950393677,
+      "dz_mm": 119.60172653198242
+    },
+    {
+      "ep": 282,
+      "source": "folien_unten_b_sauele/episode_039_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.42084071040153503,
+      "z_est_mm": -420.84071040153503,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.14118808507919312,
+        -1.106999397277832
+      ],
+      "ee_grasp_z_mm": -297.5678741931915,
+      "dz_mm": 123.2728362083435
+    },
+    {
+      "ep": 283,
+      "source": "folien_unten_b_sauele/episode_040_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L3",
+      "z_est_m": -0.42243680357933044,
+      "z_est_mm": -422.43680357933044,
+      "inliers": 30,
+      "status": "ok",
+      "park_xy": [
+        -0.11744814366102219,
+        -1.0932331085205078
+      ],
+      "ee_grasp_z_mm": -308.62587690353394,
+      "dz_mm": 113.81092667579651
+    },
+    {
+      "ep": 284,
+      "source": "folien_unten_b_sauele/episode_042_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3995727300643921,
+      "z_est_mm": -399.5727300643921,
+      "inliers": 35,
+      "status": "ok",
+      "park_xy": [
+        -0.17349225282669067,
+        -1.143263578414917
+      ],
+      "ee_grasp_z_mm": -290.22741317749023,
+      "dz_mm": 109.34531688690186
+    },
+    {
+      "ep": 285,
+      "source": "folien_unten_b_sauele/episode_043_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L2",
+      "z_est_m": -0.3956982493400574,
+      "z_est_mm": -395.6982493400574,
+      "inliers": 27,
+      "status": "ok",
+      "park_xy": [
+        -0.17068514227867126,
+        -1.1131410598754883
+      ],
+      "ee_grasp_z_mm": -286.4871919155121,
+      "dz_mm": 109.21105742454529
+    },
+    {
+      "ep": 286,
+      "source": "folien_unten_b_sauele/episode_045_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.3635936677455902,
+      "z_est_mm": -363.5936677455902,
+      "inliers": 29,
+      "status": "ok",
+      "park_xy": [
+        -0.07614932209253311,
+        -1.0926119089126587
+      ],
+      "ee_grasp_z_mm": -239.03152346611023,
+      "dz_mm": 124.56214427947998
+    },
+    {
+      "ep": 287,
+      "source": "folien_unten_b_sauele/episode_046_success",
+      "prefix": "folien_unten_b_sauele",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.37328270077705383,
+      "z_est_mm": -373.28270077705383,
+      "inliers": 43,
+      "status": "ok",
+      "park_xy": [
+        -0.13527977466583252,
+        -1.1193362474441528
+      ],
+      "ee_grasp_z_mm": -249.85262751579285,
+      "dz_mm": 123.43007326126099
+    },
+    {
+      "ep": 288,
+      "source": "folien_unten_heckleuchte/episode_001_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.24201643466949463,
+      "z_est_mm": -242.01643466949463,
+      "inliers": 32,
+      "status": "ok",
+      "park_xy": [
+        -0.22092488408088684,
+        -1.0497281551361084
+      ],
+      "ee_grasp_z_mm": -119.26641315221786,
+      "dz_mm": 122.75002151727676
+    },
+    {
+      "ep": 289,
+      "source": "folien_unten_heckleuchte/episode_002_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2491876780986786,
+      "z_est_mm": -249.1876780986786,
+      "inliers": 23,
+      "status": "ok",
+      "park_xy": [
+        -0.2220422625541687,
+        -1.0865275859832764
+      ],
+      "ee_grasp_z_mm": -106.93348199129105,
+      "dz_mm": 142.25419610738754
+    },
+    {
+      "ep": 290,
+      "source": "folien_unten_heckleuchte/episode_004_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2673635482788086,
+      "z_est_mm": -267.3635482788086,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.23754025995731354,
+        -1.0439804792404175
+      ],
+      "ee_grasp_z_mm": -130.67814707756042,
+      "dz_mm": 136.68540120124817
+    },
+    {
+      "ep": 291,
+      "source": "folien_unten_heckleuchte/episode_005_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.21969765424728394,
+      "z_est_mm": -219.69765424728394,
+      "inliers": 52,
+      "status": "ok",
+      "park_xy": [
+        -0.18955175578594208,
+        -0.8682631850242615
+      ],
+      "ee_grasp_z_mm": -123.89079481363297,
+      "dz_mm": 95.80685943365097
+    },
+    {
+      "ep": 292,
+      "source": "folien_unten_heckleuchte/episode_007_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.24079443514347076,
+      "z_est_mm": -240.79443514347076,
+      "inliers": 62,
+      "status": "ok",
+      "park_xy": [
+        -0.18349549174308777,
+        -0.9193764925003052
+      ],
+      "ee_grasp_z_mm": -140.5288279056549,
+      "dz_mm": 100.26560723781586
+    },
+    {
+      "ep": 293,
+      "source": "folien_unten_heckleuchte/episode_008_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2472207099199295,
+      "z_est_mm": -247.2207099199295,
+      "inliers": 40,
+      "status": "ok",
+      "park_xy": [
+        -0.2013280838727951,
+        -0.8898273706436157
+      ],
+      "ee_grasp_z_mm": -131.36522471904755,
+      "dz_mm": 115.85548520088196
+    },
+    {
+      "ep": 294,
+      "source": "folien_unten_heckleuchte/episode_009_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2789478003978729,
+      "z_est_mm": -278.9478003978729,
+      "inliers": 33,
+      "status": "ok",
+      "park_xy": [
+        -0.3879000246524811,
+        -0.9729924201965332
+      ],
+      "ee_grasp_z_mm": -119.41038072109222,
+      "dz_mm": 159.5374196767807
+    },
+    {
+      "ep": 295,
+      "source": "folien_unten_heckleuchte/episode_010_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2602901756763458,
+      "z_est_mm": -260.2901756763458,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.4186088740825653,
+        -0.9730786085128784
+      ],
+      "ee_grasp_z_mm": -118.94632130861282,
+      "dz_mm": 141.343854367733
+    },
+    {
+      "ep": 296,
+      "source": "folien_unten_heckleuchte/episode_011_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.24526017904281616,
+      "z_est_mm": -245.26017904281616,
+      "inliers": 38,
+      "status": "ok",
+      "park_xy": [
+        -0.42884594202041626,
+        -0.9977036714553833
+      ],
+      "ee_grasp_z_mm": -133.63508880138397,
+      "dz_mm": 111.62509024143219
+    },
+    {
+      "ep": 297,
+      "source": "folien_unten_heckleuchte/episode_012_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.254079133272171,
+      "z_est_mm": -254.07913327217102,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.39033597707748413,
+        -1.000654935836792
+      ],
+      "ee_grasp_z_mm": -135.5539858341217,
+      "dz_mm": 118.52514743804932
+    },
+    {
+      "ep": 298,
+      "source": "folien_unten_heckleuchte/episode_013_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2536201477050781,
+      "z_est_mm": -253.62014770507812,
+      "inliers": 47,
+      "status": "ok",
+      "park_xy": [
+        -0.5138826370239258,
+        -0.9572322368621826
+      ],
+      "ee_grasp_z_mm": -100.76835006475449,
+      "dz_mm": 152.85179764032364
+    },
+    {
+      "ep": 299,
+      "source": "folien_unten_heckleuchte/episode_014_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2343410849571228,
+      "z_est_mm": -234.3410849571228,
+      "inliers": 50,
+      "status": "ok",
+      "park_xy": [
+        -0.5654195547103882,
+        -0.9127443432807922
+      ],
+      "ee_grasp_z_mm": -111.34222149848938,
+      "dz_mm": 122.99886345863342
+    },
+    {
+      "ep": 300,
+      "source": "folien_unten_heckleuchte/episode_015_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.26233214139938354,
+      "z_est_mm": -262.33214139938354,
+      "inliers": 56,
+      "status": "ok",
+      "park_xy": [
+        -0.5256003141403198,
+        -0.9431907534599304
+      ],
+      "ee_grasp_z_mm": -112.19433695077896,
+      "dz_mm": 150.13780444860458
+    },
+    {
+      "ep": 301,
+      "source": "folien_unten_heckleuchte/episode_016_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2592986822128296,
+      "z_est_mm": -259.2986822128296,
+      "inliers": 55,
+      "status": "ok",
+      "park_xy": [
+        -0.505119800567627,
+        -0.9217254519462585
+      ],
+      "ee_grasp_z_mm": -89.23863619565964,
+      "dz_mm": 170.06004601716995
+    },
+    {
+      "ep": 302,
+      "source": "folien_unten_heckleuchte/episode_018_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2675565183162689,
+      "z_est_mm": -267.5565183162689,
+      "inliers": 60,
+      "status": "ok",
+      "park_xy": [
+        -0.5085633397102356,
+        -1.0798259973526
+      ],
+      "ee_grasp_z_mm": -107.17819631099701,
+      "dz_mm": 160.3783220052719
+    },
+    {
+      "ep": 303,
+      "source": "folien_unten_heckleuchte/episode_019_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2554418742656708,
+      "z_est_mm": -255.44187426567078,
+      "inliers": 53,
+      "status": "ok",
+      "park_xy": [
+        -0.5431609153747559,
+        -1.0392390489578247
+      ],
+      "ee_grasp_z_mm": -115.96956849098206,
+      "dz_mm": 139.47230577468872
+    },
+    {
+      "ep": 304,
+      "source": "folien_unten_heckleuchte/episode_021_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.26436981558799744,
+      "z_est_mm": -264.36981558799744,
+      "inliers": 49,
+      "status": "ok",
+      "park_xy": [
+        -0.5616366863250732,
+        -1.0071337223052979
+      ],
+      "ee_grasp_z_mm": -129.15167212486267,
+      "dz_mm": 135.21814346313477
+    },
+    {
+      "ep": 305,
+      "source": "folien_unten_heckleuchte/episode_022_success",
+      "prefix": "folien_unten_heckleuchte",
+      "layer": "unten",
+      "folienlage": "L1",
+      "z_est_m": -0.2613947093486786,
+      "z_est_mm": -261.3947093486786,
+      "inliers": 41,
+      "status": "ok",
+      "park_xy": [
+        -0.5361186861991882,
+        -1.0406215190887451
+      ],
+      "ee_grasp_z_mm": -137.87142932415009,
+      "dz_mm": 123.5232800245285
+    }
+  ]
+}

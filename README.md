@@ -1,4 +1,4 @@
-# il-flexible-object-grasping
+# Imitation learning for flexible object grasping
 
 Imitation learning on a UR10e workcell with interchangeable
 multi-finger hands (Tesollo DG5F, Inspire), SenseGlove-based teleoperation and
@@ -17,6 +17,7 @@ workflow, from bringing up hardware to training and deploying a policy.
 6. [Training](#6-training)
 7. [Deployment](#7-deployment)
 8. [Rollout logging and analysis](#8-rollout-logging-and-analysis)
+9. [Documentation and Experiments](#9-documentation-and-experiments)
 
 ---
 
@@ -84,7 +85,7 @@ uv run start.py r1 --num-gloves 1
 uv run start.py tesollo --delto-ip 192.168.56.102 --hand right --glove-id 70
 ```
 
-See [`src/senseglove_distribution/README.md`](src/senseglove_distribution/README.md)
+See [`src/senseglove/distribution/README.md`](src/senseglove/distribution/README.md)
 for the lab-specific setup and the reasoning behind each argument.
 
 ---
@@ -212,9 +213,9 @@ signal, so during data collection it is armed automatically.
 ### SenseGlove + Tesollo
 
 ```bash
-cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py r1 --tag cyclone-latest --num-gloves 1
-cd ~/dev/il-visual-tactile/src/senseglove_distribution && uv run start.py tesollo --tag cyclone-latest --hand right --glove-id 70 --delto-ip 192.168.56.102
-bash senseglove_guard/run_watchdog.sh
+cd ~/dev/il-visual-tactile/src/senseglove/distribution && uv run start.py r1 --tag cyclone-latest --num-gloves 1
+cd ~/dev/il-visual-tactile/src/senseglove/distribution && uv run start.py tesollo --tag cyclone-latest --hand right --glove-id 70 --delto-ip 192.168.56.102
+bash src/senseglove/guard/run_watchdog.sh
 ```
 
 ---
@@ -269,21 +270,6 @@ python data/dataset_builder/cli.py --config box_opening_baseline.yaml
 python data/dataset_builder/cli.py --config foil_lifting.yaml
 ```
 
-### Relabelling episodes
-
-Indices refer to LeRobot indices: zero-based, counting successful episodes only.
-
-```bash
-# Mark as failed (renames success -> failed)
-python relabel_episodes.py 1 30 55 59 66
-
-# Delete outright
-python relabel_episodes.py 1 30 55 59 66 --action delete
-
-# Operate on a different episode directory
-python relabel_episodes.py 1 30 55 59 66 --data-dir /path/to/episodes
-```
-
 ### Inspecting data
 
 ```bash
@@ -296,7 +282,6 @@ lerobot-dataset-viz --repo-id Marco2929/box_opening_baseline --episode-index 0 \
   --root /root/.cache/huggingface/lerobot/Marco2929/box_opening_baseline --mode local
 
 # Interactive progress label viewer (with camera feeds and grasp signals)
-export DISPLAY=:1
 python data/record_utils/label_viewer.py --review
 python data/record_utils/label_viewer.py --only folien_unten_b_sauele/episode_041_success
 ```
@@ -309,17 +294,17 @@ python data/record_utils/label_viewer.py --only folien_unten_b_sauele/episode_04
 
 ### Multi-GPU Training Queue & Night-Window Dispatcher (Standard)
 
-All multi-run training campaigns are managed by the always-on Multi-GPU Queue (`scripts/gpu_queue.py` + `scripts/gpu_queue.yaml`), which runs permanently as a `systemd --user` background service (`gpu-queue.service`):
+All multi-run training campaigns are managed by the always-on Multi-GPU Queue (`ops/gpu_queue/gpu_queue.py` + `ops/gpu_queue/gpu_queue.yaml`), which runs permanently as a `systemd --user` background service (`gpu-queue.service`):
 
 - **Local GPU (`local_pc`):** Dispatches inside the `ros2_dev` Docker container **24/7 (`schedule: "always"`)** whenever free VRAM and GPU utilization thresholds are met.
-- **Remote colleague GPUs (e.g. `monty`):** Dispatches over SSH **only during the night window (`schedule: "18:00-05:00"`) and on weekends**, after verifying via `nvidia-smi` that no one else is using the GPU. Automatically syncs code and missing `.zarr` datasets before training and pulls finished checkpoints back to `data/outputs/` via `rsync`.
+- **Remote colleague GPUs (e.g. `monty`):** Dispatches over SSH **only during the night window (`schedule: "18:00-05:00"`) and on weekends**, after verifying via `nvidia-smi` that no one else is using the GPU. Automatically syncs code and missing `.zarr` datasets before training and pulls finished checkpoints back to `data/training/models/` via `rsync`.
 
 ```bash
 # Live status of all GPUs, time windows, and queued/running jobs
-python3 scripts/gpu_queue.py status
+python3 ops/gpu_queue/gpu_queue.py status   # or python3 scripts/gpu_queue.py status
 
 # Enqueue a new training run (picked up automatically within 30s)
-python3 scripts/gpu_queue.py add \
+python3 ops/gpu_queue/gpu_queue.py add \
   --id 0031_my_experiment \
   --alg ablation/abl_rel_wrist_height_delta_to4 \
   --task ablation/abl_rel_wrist_height_delta_to4 \
@@ -327,14 +312,14 @@ python3 scripts/gpu_queue.py add \
   --extra-args "policy.state_history=true"
 
 # Reset a job (or 'all') back to pending
-python3 scripts/gpu_queue.py reset 0031_my_experiment
+python3 ops/gpu_queue/gpu_queue.py reset 0031_my_experiment
 
 # Manage the always-on background service
 systemctl --user status gpu-queue.service
 systemctl --user restart gpu-queue.service
 ```
 
-To add another remote GPU machine, copy the `monty` worker block in [`scripts/gpu_queue.yaml`](scripts/gpu_queue.yaml) and set `target: <ssh-host>`.
+To add another remote GPU machine, copy the `monty` worker block in [`ops/gpu_queue/gpu_queue.yaml`](ops/gpu_queue/gpu_queue.yaml) and set `target: <ssh-host>`.
 
 ### Single manual ManiFlow policy run
 
@@ -398,13 +383,6 @@ Generates `best_progress_head.pt` and `val_predictions.png` in `--save_dir`.
 
 #### 4. Configure policy & deploy
 
-Set the checkpoint in `maniflow_multimodal_policy.yaml`:
-
-```yaml
-policy:
-  progress_checkpoint: "checkpoints/progress_head/best_progress_head.pt"
-```
-
 Deploy with progress monitoring / threshold:
 
 ```bash
@@ -429,7 +407,7 @@ Four terminals, in this order:
 | 2 | ZED camera | `ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i` |
 | 3 | Control node | `ros2 run il_main cartesian_inference_control` |
 | 4 | Policy inference | `python third_party/ManiFlow_Policy/ManiFlow/deploy.py` |
-| 5 | Temperature watchdog | `bash senseglove_guard/run_watchdog.sh --table` |
+| 5 | Temperature watchdog | `bash src/senseglove/guard/run_watchdog.sh --table` |
 
 The control node starts inactive: the policy runs inference continuously, but no
 motion is executed until the policy gate is opened.
@@ -465,10 +443,10 @@ Start the logger **before** opening the policy gate: `ros2 topic pub --once`
 is volatile, so a subscriber that joins afterwards never sees the message.
 
 ```bash
-python data/rollout_logs/log_rollout.py \
+python data/rollouts/tools/log_rollout.py \
   --ckpt  "epoch=0040-val_action_mse=0.022836" \
   --label "foil_lifting_relative_e40" \
-  --run-dir /ros2_ws/data/outputs/foil_lifting_relative-maniflow_multimodal_policy-0112_seed0 \
+  --run-dir /ros2_ws/data/training/outputs/foil_lifting_relative-maniflow_multimodal_policy-0112_seed0 \
   --inference-steps 10 \
   --notes "Palette Nominalhoehe"
 ```
@@ -480,8 +458,15 @@ Each gate open/close pair writes one `rollout_NNN/` directory. `Ctrl-C` closes
 a rollout that is still open.
 
 ```bash
-ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: true}"    # start
-ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: false}"   # stop
+# Start rollout: navigates arm to start pose (P1..P5) and opens policy gate
+./data/rollouts/tools/rollout_gate.sh start P1
+
+# Stop rollout: deactivates policy and holds pose (or press [ENTER] in gate terminal)
+./data/rollouts/tools/rollout_gate.sh stop
+
+# Direct gate toggle (manual fallback):
+# ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: true}"
+# ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: false}"
 ```
 
 ### Labeling success and behaviour
@@ -489,7 +474,7 @@ ros2 topic pub --once /policy_gate std_msgs/msg/Bool "{data: false}"   # stop
 To label success and qualitative behaviour, a separate script extracts the info from the policy run:
 
 ```bash
-python3 data/rollout_logs/annotate_rollouts.py --ckpt "foil_lifting_relative_e40"
+python3 data/rollouts/tools/annotate_rollouts.py --ckpt "foil_lifting_relative_e40"
 ```
 
 ### Analysing rollouts
@@ -498,21 +483,21 @@ Note the interpreter: the logger needs `rclpy` (system `python`), the viewer
 needs `plotly`/`rerun` (venv only).
 
 ```bash
-python rollout_viz.py table              # per-rollout numbers + aggregates
-python rollout_viz.py dash               # -> reports/<ckpt>.html, opens via file://
-python rollout_viz.py filters 10         # what the executor's filters cost
-python rollout_viz.py rerun 10 --save reports/r010.rrd
+python data/rollouts/tools/rollout_viz.py table              # per-rollout numbers + aggregates
+python data/rollouts/tools/rollout_viz.py dash               # -> analysis/reports/<ckpt>.html, opens via file://
+python data/rollouts/tools/rollout_viz.py filters 10         # what the executor's filters cost
+python data/rollouts/tools/rollout_viz.py rerun 10 --save analysis/reports/r010.rrd
 ```
 
 `dash` compares all rollouts (scatter / single rollout / sortable table),
 `rerun` is for understanding one: 3D path, point cloud and all time series on
 one timeline. Rerun runs headless here, so write an `.rrd` and open it on the
-host with `rerun data/rollout_logs/reports/r010.rrd`.
+host with `rerun data/rollouts/analysis/reports/r010.rrd`.
 
 Rollouts can be named `rollout_010`, `010` or `10`; without a name the last
 one is used. Add `--video` to overlay the wrist camera (off by default - the
 bags are ~1 GB each; `--max-frames`, default 200, spreads frames over the
-run). Generated files land in `reports/` and are gitignored.
+run). Generated files land in `analysis/reports/` and are gitignored.
 
 `rerun` also plots the **pinch width** (thumb tip to index tip, mm) via URDF
 forward kinematics, because the closure metric sums joint angles and a sum is
@@ -522,12 +507,12 @@ dir or source checkout); override with `--urdf` / `$DG5F_URDF`, or skip the
 kinematics with `--no-pinch`.
 
 ```bash
-rerun - < data/rollout_logs/reports/r010.rrd
+rerun - < data/rollouts/analysis/reports/r010.rrd
 ```
 
-or raise the limit once:
+---
 
-```bash
-echo 'fs.inotify.max_user_instances=1024' | sudo tee /etc/sysctl.d/99-inotify.conf
-sudo sysctl --system
-```
+## 9. Documentation and Experiments
+
+- **Experiment Overview & Roadmap:** [`docs/experiments.md`](docs/experiments.md) (covers Baseline, Multi-Modal Ablations, Progress Heads, Pre-Training, Hardware-Rollouts).
+- **Real-Robot Rollout Matrix & Evaluation Protocol:** [`docs/rollouts.md`](docs/rollouts.md) (hardware rollout tracking, protocol, metrics, and criteria).

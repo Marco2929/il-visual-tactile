@@ -44,17 +44,17 @@ services:
     volumes: 
       - ../src/il_main:/ros2_ws/src/il_main:rw
       - ../src/cam_calibrate:/ros2_ws/src/cam_calibrate:rw
-      - ../src/senseglove_ros/senseglove/senseglove_description/urdf:/ros2_ws/src/il_main/third_party/senseglove/senseglove_description/urdf:rw
+      - ../src/senseglove/senseglove_ros/senseglove/senseglove_description/urdf:/ros2_ws/src/il_main/third_party/senseglove/senseglove_description/urdf:rw
 
       - ../src/hands/rh56dfx_descrption:/ros2_ws/src/hands/rh56dfx_descrption:rw
       - ../src/hands/Sarcomere_Dynamics_Resources:/ros2_ws/src/hands/artus_hand:rw
       - ../src/hands/inspire_hand_Linkage:/ros2_ws/src/hands/inspire_hand_strong_hand:rw
       - ../src/hands/delto_m_ros2:/ros2_ws/src/hands/tesollo_hand:rw
-      - ../src/rembrandt_ros/r1_msgs:/r1_ws/src/r1_msgs:rw
+      - ../src/senseglove/rembrandt_ros/r1_msgs:/r1_ws/src/r1_msgs:rw
       
       - ../third_party:/ros2_ws/third_party:rw
       - ../data:/ros2_ws/data:rw
-      - /mnt/data/data:/ros2_ws/data/episodes/external:rw
+      - /mnt/data/data:/ros2_ws/data/recording/episodes/external:rw
       - ${HOME}/.ssh:/root/.ssh:ro
 
       - ../src/moveit_ur_hand_config:/ros2_ws/src/moveit_ur_hand_config:rw
@@ -88,7 +88,7 @@ services:
     container_name: senseglove
     network_mode: host
     volumes:
-      - ../src/senseglove_ros:/root/workspace/src/senseglove_ros:rw
+      - ../src/senseglove/senseglove_ros:/root/workspace/src/senseglove_ros:rw
       - ./entrypoint.sh:/entrypoint.sh:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev:/dev
@@ -117,8 +117,8 @@ services:
     container_name: senseglove_r1
     network_mode: host
     volumes:
-      - ../src/rembrandt-api:/r1_ws/src/rembrandt-api:rw
-      - ../src/rembrandt_ros:/r1_ws/src/rembrandt_ros:rw
+      - ../src/senseglove/rembrandt-api:/r1_ws/src/rembrandt-api:rw
+      - ../src/senseglove/rembrandt_ros:/r1_ws/src/rembrandt_ros:rw
       - ./r1_entrypoint.sh:/r1_entrypoint.sh:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev:/dev
@@ -187,7 +187,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./cyclonedds.xml:/tmp/cyclonedds.xml:ro
       - ../data:/root/ros2_ws/data:rw
-      - /mnt/data/data:/root/ros2_ws/data/episodes/external:rw
+      - /mnt/data/data:/root/ros2_ws/data/recording/episodes/external:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:rw
       - /dev:/dev
     command: >

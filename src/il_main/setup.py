@@ -40,6 +40,7 @@ install_requires=['setuptools', 'scipy', 'numpy', 'dex-retargeting'],
             # and the arm then moves only on its TF seed, with the policy never
             # actually in the loop.
             'cartesian_inference_control = il_main.control_ur_tesollo_cartesian:main',
+            'rollout_gate = il_main.rollout_gate:main',
         ],
     },
 )

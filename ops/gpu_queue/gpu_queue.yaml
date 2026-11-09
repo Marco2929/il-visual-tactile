@@ -1,0 +1,72 @@
+settings:
+  poll_interval_sec: 30
+  log_dir: /home/mm/dev/il-visual-tactile/data/training/logs/queue
+  local_code_dir: /home/mm/dev/il-visual-tactile/third_party/ManiFlow_Policy/ManiFlow
+  local_zarr_dir: /home/mm/dev/il-visual-tactile/data/datasets/zarr_datasets
+  local_outputs_dir: /home/mm/dev/il-visual-tactile/data/training/models
+workers:
+  local_pc:
+    display_name: Monty5 (Local)
+    enabled: true
+    type: docker
+    connection: local
+    target: ros2_dev
+    gpu_id: 0
+    schedule: always
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 50
+    code_dir: /ros2_ws/third_party/ManiFlow_Policy
+    venv_activate: /ros2_ws/venv/bin/activate
+    zarr_dir: /ros2_ws/data/datasets/zarr_datasets
+    output_dir: /ros2_ws/data/training/models
+  cell_pc:
+    display_name: Kitty3 (Bosch)
+    enabled: true
+    type: ssh
+    connection: ethernet
+    target: cell-pc
+    gpu_id: 0
+    schedule: always
+    weekend_always: true
+    min_free_vram_mb: 12000
+    max_gpu_util_pct: 25
+    code_dir: /home/adm-cell/maniflow_worker/ManiFlow_Policy
+    venv_activate: /home/adm-cell/venvs/lerobot/bin/activate
+    zarr_dir: /home/adm-cell/maniflow_worker/data/zarr_datasets
+    output_dir: /home/adm-cell/maniflow_worker/data/outputs
+    cleanup_remote_after_sync: true
+  monty3:
+    display_name: Monty3 (Gopal)
+    enabled: true
+    type: ssh
+    connection: ethernet
+    target: monty3
+    gpu_id: 0
+    schedule: 18:00-05:00
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 15
+    code_dir: /data/training_ws/ManiFlow_Policy
+    venv_activate: /data/venvs/lerobot/bin/activate
+    zarr_dir: /data/training_ws/data/zarr_datasets
+    output_dir: /data/training_ws/data/outputs
+    cleanup_remote_after_sync: true
+  monty:
+    display_name: Monty2 (Chitsi)
+    enabled: true
+    type: ssh
+    connection: wifi
+    target: monty-server
+    gpu_id: 0
+    schedule: 18:00-05:00
+    weekend_always: true
+    min_free_vram_mb: 10000
+    max_gpu_util_pct: 60
+    code_dir: /home/monty2/training_ws/ManiFlow_Policy
+    venv_activate: /home/monty2/training_ws/venv/bin/activate
+    zarr_dir: /home/monty2/training_ws/data/zarr_datasets
+    output_dir: /home/monty2/training_ws/data/outputs
+    cleanup_remote_after_sync: true
+disconnected_workers: {}
+jobs: []
