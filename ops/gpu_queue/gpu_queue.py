@@ -1301,18 +1301,34 @@ def cmd_reset(args: argparse.Namespace) -> None:
 def cmd_add(args: argparse.Namespace) -> None:
     cfg_path = Path(args.config)
     cfg = load_config(cfg_path)
-    new_job = {
-        "id": args.id,
-        "alg": args.alg,
-        "task": args.task,
-        "dataset": args.dataset,
-        "extra_args": args.extra_args,
-        "seed": args.seed,
-        "status": "pending",
-    }
+    job_type = getattr(args, "type", "policy")
+    if job_type == "progress_head":
+        new_job = {
+            "id": args.id,
+            "type": "progress_head",
+            "split_json": getattr(args, "split_json", "progress_split_70_30.json"),
+            "epochs": getattr(args, "epochs", 30),
+            "batch_size": getattr(args, "batch_size", 128),
+            "lr": getattr(args, "lr", 1e-3),
+            "extra_args": args.extra_args,
+            "seed": args.seed if args.seed != 0 else 42,
+            "status": "pending",
+        }
+    else:
+        if not args.alg or not args.task:
+            raise ValueError("--alg and --task are required for policy training jobs")
+        new_job = {
+            "id": args.id,
+            "alg": args.alg,
+            "task": args.task,
+            "dataset": args.dataset,
+            "extra_args": args.extra_args,
+            "seed": args.seed,
+            "status": "pending",
+        }
     cfg.setdefault("jobs", []).append(new_job)
     save_config(cfg, cfg_path)
-    print(f"Added job {args.id!r} to queue.")
+    print(f"Added job {args.id!r} ({job_type}) to queue.")
 
 
 def cmd_claim_next(args: argparse.Namespace) -> None:
@@ -1373,10 +1389,15 @@ def main() -> None:
 
     p_add = sub.add_parser("add", help="Add a new training job to the queue")
     p_add.add_argument("--id", required=True, help="Unique run ID (e.g. 0031_...)")
-    p_add.add_argument("--alg", required=True, help="Hydra config name (e.g. ablation/abl_rel_wrist_height_delta_to4)")
-    p_add.add_argument("--task", required=True, help="Hydra task name")
+    p_add.add_argument("--type", default="policy", choices=["policy", "progress_head"], help="Job type ('policy' or 'progress_head')")
+    p_add.add_argument("--alg", default=None, help="Hydra config name (e.g. ablation/abl_rel_wrist_height_delta_to4)")
+    p_add.add_argument("--task", default=None, help="Hydra task name")
     p_add.add_argument("--dataset", default="foil_lifting_box_recorded_action.zarr", help="Zarr dataset filename")
-    p_add.add_argument("--extra-args", default="", help="Extra Hydra overrides")
+    p_add.add_argument("--split-json", default="progress_split_70_30.json", help="Manifest JSON for progress_head")
+    p_add.add_argument("--epochs", type=int, default=30, help="Epochs for progress_head")
+    p_add.add_argument("--batch-size", type=int, default=128, help="Batch size for progress_head")
+    p_add.add_argument("--lr", type=float, default=1e-3, help="Learning rate for progress_head")
+    p_add.add_argument("--extra-args", default="", help="Extra Hydra overrides or script args")
     p_add.add_argument("--seed", type=int, default=0, help="Random seed")
 
     p_claim = sub.add_parser("claim-next", help="Claim next pending job for a pull-worker")

@@ -22,7 +22,7 @@ workers:
     output_dir: /ros2_ws/data/training/models
   cell_pc:
     display_name: Kitty3 (Bosch)
-    enabled: true
+    enabled: false
     type: ssh
     connection: ethernet
     target: cell-pc
@@ -38,7 +38,7 @@ workers:
     cleanup_remote_after_sync: true
   monty3:
     display_name: Monty3 (Gopal)
-    enabled: true
+    enabled: false
     type: ssh
     connection: ethernet
     target: monty3
@@ -54,7 +54,7 @@ workers:
     cleanup_remote_after_sync: true
   monty:
     display_name: Monty2 (Chitsi)
-    enabled: true
+    enabled: false
     type: ssh
     connection: wifi
     target: monty-server
@@ -68,5 +68,57 @@ workers:
     zarr_dir: /home/monty2/training_ws/data/zarr_datasets
     output_dir: /home/monty2/training_ws/data/outputs
     cleanup_remote_after_sync: true
-disconnected_workers: {}
-jobs: []
+disconnected_workers:
+  monty:
+    worker: monty
+    job_id: prg_0006_reg_only
+    disconnected_at: '2026-11-10 18:53:44'
+    exit_code: 255
+    reason: ssh_disconnect (exit 255)
+jobs:
+- id: prg_0004_multitask
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --progress_loss_weight 1.0 --state_loss_weight 0.5 --wandb_project ManiFlow
+    --wandb_name prg_0004_multitask_baseline
+  seed: 42
+  status: completed
+  worker: local_pc
+  started_at: '2026-11-10 18:20:27'
+  log_file: /home/mm/dev/il-visual-tactile/data/training/logs/queue/20261110_182027_prg_0004_multitask_local_pc.log
+  finished_at: '2026-11-10 19:01:25'
+- id: prg_0005_cls_only
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --progress_loss_weight 0.0 --state_loss_weight 0.5 --wandb_project ManiFlow
+    --wandb_name prg_0005_cls_only
+  seed: 42
+  status: completed
+  log_file: /home/mm/dev/il-visual-tactile/data/training/logs/queue/20261110_184609_prg_0005_cls_only_cell_pc.log
+  started_at: '2026-11-10 18:46:11'
+  failover_from: cell_pc
+  failover_at: '2026-11-10 18:46:08'
+  worker: cell_pc
+  finished_at: '2026-11-10 19:19:26'
+- id: prg_0006_reg_only
+  type: progress_head
+  split_json: progress_split_70_30.json
+  epochs: 30
+  batch_size: 128
+  lr: 0.001
+  extra_args: --progress_loss_weight 1.0 --state_loss_weight 0.0 --wandb_project ManiFlow
+    --wandb_name prg_0006_reg_only
+  seed: 42
+  status: completed
+  started_at: '2026-11-10 19:01:25'
+  log_file: /home/mm/dev/il-visual-tactile/data/training/logs/queue/20261110_190125_prg_0006_reg_only_local_pc.log
+  failover_from: monty
+  failover_at: '2026-11-10 18:53:44'
+  worker: local_pc
+  finished_at: '2026-11-10 19:40:56'

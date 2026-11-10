@@ -22,7 +22,7 @@ workers:
     output_dir: /ros2_ws/data/outputs
   cell_pc:
     display_name: Kitty3 (Bosch)
-    enabled: true
+    enabled: false
     type: ssh
     connection: ethernet
     target: cell-pc
@@ -38,7 +38,7 @@ workers:
     cleanup_remote_after_sync: true
   monty3:
     display_name: Monty3 (Gopal)
-    enabled: true
+    enabled: false
     type: ssh
     connection: ethernet
     target: monty3

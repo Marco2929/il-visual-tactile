@@ -83,6 +83,7 @@ from processing.progress import (  # noqa: E402
     build_progress_curve,
     build_pchip_progress_curve,
     build_phase_labels,
+    build_progress_from_phases,
     extract_grasp_signal,
     smooth,
     CONSERVATIVE,
@@ -134,6 +135,30 @@ REVIEW_EPISODES = [
     "folien_oben_a_saeule/episode_017_success",
     "folien_mitte_b_saeule/episode_027_success",
     "folien_mitte_a_saeule/episode_040_success",
+]
+
+PROBLEM_ROLLOUT_PATTERNS = [
+    "Not_systematic_tests_findings_stated/rollout_000",
+    "Not_systematic_tests_findings_stated/rollout_001",
+    "Not_systematic_tests_findings_stated/rollout_002",
+    "Not_systematic_tests_findings_stated/rollout_003",
+    "Not_systematic_tests_findings_stated/rollout_004",
+    "Not_systematic_tests_findings_stated/rollout_005",
+    "Not_systematic_tests_findings_stated/rollout_006",
+    "Not_systematic_tests_findings_stated/rollout_010",
+    "Not_systematic_tests_findings_stated/rollout_011",
+    "Not_systematic_tests_findings_stated/rollout_013",
+    "Not_systematic_tests_findings_stated/rollout_014",
+    "Smoothness rollouts/rollout_030",
+    "Smoothness rollouts/rollout_031",
+    "Smoothness rollouts/rollout_034",
+    "Smoothness rollouts/rollout_035",
+    "Smoothness rollouts/rollout_040",
+    "Smoothness rollouts/rollout_042",
+    "Smoothness rollouts/rollout_048",
+    "Smoothness rollouts/rollout_051",
+    "relative_e40/rollout_008",
+    "relative_e40/rollout_017",
 ]
 
 
@@ -192,8 +217,13 @@ def find_episodes(root, prefixes):
 
 
 def load_frame(ep, cam, i):
-    path = ep / cam / ("frame_%04d.png" % i)
-    return mpimg.imread(path) if path.exists() else None
+    if getattr(ep, "is_zarr", False):
+        return None
+    try:
+        path = ep / cam / ("frame_%04d.png" % i)
+        return mpimg.imread(path) if path.exists() else None
+    except Exception:
+        return None
 
 
 def labels_to_segments(labels: np.ndarray, times_s: np.ndarray):
@@ -230,15 +260,25 @@ def labels_to_segments(labels: np.ndarray, times_s: np.ndarray):
 def segments_to_labels(segs, num_frames: int, times_s: np.ndarray) -> np.ndarray:
     """Expand phase segments back into a per-frame (num_frames,) int64 array."""
     labels = np.full(num_frames, STATE_APPROACH, dtype=np.int64)
+    if not segs:
+        return labels
+    last_end = segs[-1].get("end_frame", -1)
+    frame_aligned = (last_end == num_frames)
+    times_arr = np.asarray(times_s, dtype=np.float64) if times_s is not None else None
     for s in segs:
         st = int(s["state"])
-        if "start_frame" in s and "end_frame" in s:
+        if frame_aligned and "start_frame" in s and "end_frame" in s:
             a = max(0, min(num_frames, int(s["start_frame"])))
             b = max(a, min(num_frames, int(s["end_frame"])))
             labels[a:b] = st
-        elif "start_s" in s and "end_s" in s:
-            mask = (times_s >= float(s["start_s"]) - 1e-3) & (times_s <= float(s["end_s"]) + 1e-3)
+        elif times_arr is not None and len(times_arr) == num_frames and "start_s" in s and "end_s" in s:
+            mask = (times_arr >= float(s["start_s"]) - 1e-3) & (times_arr <= float(s["end_s"]) + 1e-3)
             labels[mask] = st
+        elif "start_frame" in s and "end_frame" in s and last_end > 0:
+            scale = float(num_frames) / float(last_end)
+            a = max(0, min(num_frames, int(round(int(s["start_frame"]) * scale))))
+            b = max(a, min(num_frames, int(round(int(s["end_frame"]) * scale))))
+            labels[a:b] = st
     return labels
 
 
@@ -256,7 +296,61 @@ class ZarrEpisode:
         class FakePath:
             def exists(self):
                 return False
+            def __truediv__(self, other):
+                return self
         return FakePath()
+
+
+def find_zarr_crosscheck_episodes(z_name="foil_lifting_box_progress.zarr", n_samples=10):
+    """Find retry episodes and representative clean samples from the large Zarr dataset."""
+    import zarr
+    cand_paths = [
+        _DATA_DIR / "datasets" / "zarr_datasets" / z_name,
+        pathlib.Path("/ros2_ws/data/datasets/zarr_datasets") / z_name,
+    ]
+    z_path = None
+    for c in cand_paths:
+        if c.exists():
+            z_path = c
+            break
+    if not z_path:
+        return [], []
+
+    z_root = zarr.open(str(z_path), mode="a")
+    z_grp = z_root["data"] if "data" in z_root else z_root
+    ends = z_root["meta/episode_ends"][:] if "meta/episode_ends" in z_root else z_grp["meta/episode_ends"][:]
+    sources = z_root["meta/episode_sources"][:] if "meta/episode_sources" in z_root else [f"ep_{i:03d}" for i in range(len(ends))]
+    states = z_root["grasp_state"][:] if "grasp_state" in z_root else None
+    progress = z_root["progress"][:] if "progress" in z_root else None
+
+    retry_eps = []
+    clean_candidates = []
+    start = 0
+    for i, end in enumerate(ends):
+        src = str(sources[i])
+        ep_obj = ZarrEpisode(z_root, z_grp, i, ends)
+        if states is not None:
+            ep_st = states[start:end]
+            ep_pr = progress[start:end] if progress is not None else None
+            has_miss = (ep_st == STATE_MISS_OR_LOST).any()
+            pinches = np.count_nonzero((ep_st[:-1] != STATE_PINCH_CONTACT) & (ep_st[1:] == STATE_PINCH_CONTACT))
+            if len(ep_st) and ep_st[0] == STATE_PINCH_CONTACT:
+                pinches += 1
+            pr_dips = np.count_nonzero(np.diff(ep_pr) < -0.05) if ep_pr is not None else 0
+            if has_miss or pinches > 1 or pr_dips > 0:
+                retry_eps.append((f"[2_Zarr_Retries] ep_{i:03d}: {src}", ep_obj))
+            elif not has_miss and pinches == 1 and ep_pr is not None and ep_pr[-1] >= 0.95:
+                clean_candidates.append((i, src, ep_obj))
+        start = end
+
+    sample_eps = []
+    if clean_candidates:
+        idxs = np.linspace(0, len(clean_candidates) - 1, min(n_samples, len(clean_candidates)), dtype=int)
+        for idx in idxs:
+            ep_idx, src, ep_obj = clean_candidates[idx]
+            sample_eps.append((f"[3_Zarr_Samples] ep_{ep_idx:03d}: {src}", ep_obj))
+
+    return retry_eps, sample_eps
 
 
 class Viewer:
@@ -377,7 +471,7 @@ class Viewer:
                     ee_z = z_data["tf_pose"][:, 2]
                     self.z = np.interp(times, tf_t, ee_z)
                 else:
-                    self.z = raw[:, 2]
+                    self.z = smooth(-(raw[:, 1].astype(np.float64) + raw[:, 2].astype(np.float64)), 5)
                 self.times_s = times
             else:
                 raw = z_data["js_pos"]
@@ -385,7 +479,7 @@ class Viewer:
                 if "tf_pose" in z_data and len(z_data["tf_pose"]) == self.n:
                     self.z = z_data["tf_pose"][:, 2]
                 else:
-                    self.z = raw[:, 2]
+                    self.z = smooth(-(raw[:, 1].astype(np.float64) + raw[:, 2].astype(np.float64)), 5)
                 self.times_s = z_data["js_t"] if "js_t" in z_data else (np.arange(self.n) / 30.0)
         else:
             self.is_success = True
@@ -402,23 +496,47 @@ class Viewer:
         self.g = smooth(sig, 5)
         self.seg = segment_grasp_attempts(sig, z=self.z)
 
+        self.lift_peak = None
+        self.segment_peaks = {}
+        outcome_end = -1
         if self.is_rollout and outcome:
+            self.lift_peak = outcome.get("lift_peak", None)
+            raw_sp = outcome.get("segment_peaks", {})
+            if isinstance(raw_sp, dict):
+                self.segment_peaks = {int(k): float(v) for k, v in raw_sp.items()}
+            if outcome.get("phases"):
+                outcome_end = outcome["phases"][-1].get("end_frame", -1)
+
+        if self.is_rollout and outcome and outcome_end == self.n:
             if outcome.get("attempts"):
-                self.seg["attempts"] = [tuple(a) for a in outcome["attempts"]]
-                self.seg["has_grasp"] = True
-                self.seg["n_attempts"] = len(self.seg["attempts"])
-            if outcome.get("t_first") is not None and outcome["t_first"] >= 0:
+                cl_att = []
+                for a, b in outcome["attempts"]:
+                    if int(a) < self.n:
+                        cl_att.append((max(0, int(a)), min(int(b), self.n - 1)))
+                if cl_att:
+                    self.seg["attempts"] = cl_att
+                    self.seg["has_grasp"] = True
+                    self.seg["n_attempts"] = len(cl_att)
+            if outcome.get("t_first") is not None and 0 <= outcome["t_first"] < self.n:
                 self.seg["t_first"] = int(outcome["t_first"])
-            if outcome.get("t_lock") is not None and outcome["t_lock"] >= 0:
+            if outcome.get("t_lock") is not None and 0 <= outcome["t_lock"] < self.n:
                 self.seg["t_lock"] = int(outcome["t_lock"])
-            if outcome.get("t_last") is not None and outcome["t_last"] >= 0:
+            if outcome.get("t_last") is not None and 0 <= outcome["t_last"] < self.n:
                 self.seg["t_last"] = int(outcome["t_last"])
 
+        self.phase_labels = np.zeros(self.n, dtype=np.int64)
         self.has_manual_phases = False
-        self._compute_curves()
         if self.is_rollout and outcome and outcome.get("phases"):
-            self.phase_labels = segments_to_labels(outcome["phases"], self.n, self.times_s)
-            self.has_manual_phases = bool(outcome.get("phases_manual", False))
+            is_man = bool(outcome.get("phases_manual", False))
+            if is_man or outcome_end == self.n:
+                self.phase_labels = segments_to_labels(outcome["phases"], self.n, self.times_s)
+                self.has_manual_phases = is_man
+
+        try:
+            self._compute_curves(force_phases=not self.has_manual_phases)
+        except Exception as e:
+            print(f"[Warning] Error computing curves for {self.key}: {e}")
+            self.curves = {self.params.name: np.zeros(self.n, dtype=np.float32)}
 
         self._update_events()
         self.i = 0
@@ -435,6 +553,8 @@ class Viewer:
         self.events = sorted(x for x in ev if 0 <= x < self.n)
 
     def _get_group(self, key):
+        if key.startswith("["):
+            return key.split("]")[0] + "]"
         parts = key.split("/")
         if len(parts) > 2:
             return f"{parts[0]}/{parts[1]}"
@@ -444,42 +564,53 @@ class Viewer:
 
     def _compute_curves(self, force_phases=False):
         self.curves = {}
-        if self.seg.get("has_grasp", False) and self.seg.get("attempts"):
-            y = build_progress_curve(
-                num_frames=self.n,
-                attempts=self.seg["attempts"],
-                t_first=self.seg["t_first"],
-                t_last=self.seg["t_last"],
-                t_lock=self.seg["t_lock"],
-                z=self.z,
-                params=self.params,
+        if getattr(self, "has_manual_phases", False):
+            # Derive continuous regression progress directly from manual classification phases
+            y = build_progress_from_phases(
+                self.phase_labels,
                 is_success=self.is_success,
+                params=self.params,
+                lift_peak=getattr(self, "lift_peak", None),
+                segment_peaks=getattr(self, "segment_peaks", None),
             )
             self.curves[self.params.name] = y
-
-            # Optional 4-point PCHIP spline for comparison
-            if getattr(self, "show_pchip", False):
-                y_pchip = build_pchip_progress_curve(
+        else:
+            if self.seg.get("has_grasp", False) and self.seg.get("attempts"):
+                y = build_progress_curve(
                     num_frames=self.n,
+                    attempts=self.seg["attempts"],
                     t_first=self.seg["t_first"],
+                    t_last=self.seg["t_last"],
+                    t_lock=self.seg["t_lock"],
+                    z=self.z,
+                    params=self.params,
+                    is_success=self.is_success,
+                )
+                self.curves[self.params.name] = y
+            else:
+                self.curves[self.params.name] = np.zeros(self.n, dtype=np.float32)
+
+            if force_phases or not getattr(self, "has_manual_phases", False):
+                self.phase_labels = build_phase_labels(
+                    num_frames=self.n,
+                    attempts=self.seg.get("attempts", []),
+                    t_lock=self.seg.get("t_lock"),
+                    sig=self.g,
                     z=self.z,
                     is_success=self.is_success,
                 )
-                self.curves["initial_pchip"] = y_pchip
-            elif "initial_pchip" in self.curves:
-                del self.curves["initial_pchip"]
-        else:
-            self.curves[self.params.name] = np.zeros(self.n, dtype=np.float32)
 
-        if force_phases or not getattr(self, "has_manual_phases", False):
-            self.phase_labels = build_phase_labels(
+        # Optional 4-point PCHIP spline for comparison
+        if getattr(self, "show_pchip", False):
+            y_pchip = build_pchip_progress_curve(
                 num_frames=self.n,
-                attempts=self.seg.get("attempts", []),
-                t_lock=self.seg.get("t_lock"),
-                sig=self.g,
+                t_first=self.seg.get("t_first", -1),
                 z=self.z,
                 is_success=self.is_success,
             )
+            self.curves["initial_pchip"] = y_pchip
+        elif "initial_pchip" in self.curves:
+            del self.curves["initial_pchip"]
 
     def draw_static(self):
         seg, n = self.seg, self.n
@@ -487,6 +618,13 @@ class Viewer:
         for ax in (self.ax_state, self.ax_y):
             ax.clear()
             ax.grid(alpha=0.25)
+
+        # Ensure phase_labels strictly matches frame count n
+        if len(self.phase_labels) != n:
+            new_p = np.full(n, STATE_APPROACH, dtype=np.int64)
+            copy_len = min(n, len(self.phase_labels))
+            new_p[:copy_len] = self.phase_labels[:copy_len]
+            self.phase_labels = new_p
 
         # 1. Classify Plot: Grasp State Head
         STATE_BG_COLORS = {
@@ -506,10 +644,10 @@ class Viewer:
             self.ax_state.axhspan(s_idx - 0.45, s_idx + 0.45, color=STATE_BG_COLORS[s_idx], alpha=0.35, lw=0)
 
         # Step curve of the discrete state
-        self.ax_state.step(t, self.phase_labels[:n], where="post", color="#1a237e", lw=2.2)
+        self.ax_state.step(t, self.phase_labels, where="post", color="#1a237e", lw=2.2)
 
         # Segment colored spans
-        segs = labels_to_segments(self.phase_labels[:n], self.times_s[:n])
+        segs = labels_to_segments(self.phase_labels, self.times_s[:n])
         for s in segs:
             st = s["state"]
             self.ax_state.axvspan(s["start_frame"], s["end_frame"], color=STATE_BORDER_COLORS[st], alpha=0.18, lw=0)
@@ -522,6 +660,11 @@ class Viewer:
         # 2. Regression Plot: Progress Head
         colors = {"conservative": "#1f77b4", "initial_pchip": "#ff7f0e", "legacy80": "#2ca02c"}
         for name, y in self.curves.items():
+            if len(y) != n:
+                new_y = np.zeros(n, dtype=np.float32)
+                copy_len = min(n, len(y))
+                new_y[:copy_len] = y[:copy_len]
+                y = new_y
             col = colors.get(name, "#1f77b4")
             self.ax_y.plot(t, y, color=col, lw=2.0, label=name)
         self.ax_y.axhline(self.params.theta, color="#888888", ls="--", lw=0.9, label="theta=%.2f" % self.params.theta)
@@ -586,7 +729,7 @@ class Viewer:
         status_hint = getattr(
             self,
             "status_hint",
-            "Keys: [1] Grasp  [2] Lift  [x] DelAttempt  [m] CyclePhase  [Shift+0..3] SetPhase  [r] Retry  [s] Save  [n/p] Ep  [q] Quit",
+            "Keys: [1] Pinch  [2] Lift  [3] Miss/Slip  [0] Approach  [m] Cycle  [x] DelAttempt  [s] Save  [n/p] Ep  [q] Quit",
         )
         self.fig.suptitle(status_hint, fontsize=8.5, color="#555555" if "SAVED" not in status_hint else "#1976d2", y=0.015)
         self.fig.canvas.draw_idle()
@@ -621,211 +764,206 @@ class Viewer:
         elif k == "v":
             self.is_success = not self.is_success
             self.verdict = "pass" if self.is_success else "fail"
-            self.status_hint = f"Verdict toggled to: {self.verdict.upper()} (press [s] to save)"
-            self._compute_curves()
-            self.draw_static()
-            self.draw_frame()
-        elif k == "1":
-            # Set Pinch Contact Start at cursor frame i
-            curr_attempts = list(self.seg.get("attempts", []))
-            prior_attempts = [
-                (max(0, min(int(a), self.n - 1)), max(0, min(int(b), self.n - 1)))
-                for a, b in curr_attempts if b < self.i - 5
-            ]
-            t_lock_cur = self.seg.get("t_lock", -1)
-            if t_lock_cur <= self.i or t_lock_cur >= self.n:
-                t_lock_cur = min(self.i + 20, self.n - 1)
-            self.seg["t_lock"] = t_lock_cur
-
-            new_attempt = (self.i, min(t_lock_cur + 10, self.n - 1))
-            self.seg["attempts"] = prior_attempts + [new_attempt]
-            self.seg["has_grasp"] = True
-            self.seg["n_attempts"] = len(self.seg["attempts"])
-            self.seg["t_first"] = self.seg["attempts"][0][0]
-            self.seg["t_last"] = self.i
-
-            prev_bound = prior_attempts[-1][1] if prior_attempts else 0
-            if prev_bound < self.i:
-                self.phase_labels[prev_bound:self.i] = STATE_APPROACH
-            if self.i < t_lock_cur:
-                self.phase_labels[self.i:t_lock_cur] = STATE_PINCH_CONTACT
-            if self.is_success and t_lock_cur < self.n:
-                self.phase_labels[t_lock_cur:] = STATE_LIFT_SUCCESS
-
+            if not self.is_success:
+                if not self.fail_mode or self.fail_mode in ("none", "unknown"):
+                    self.fail_mode = "slip"
+            else:
+                self.fail_mode = "none"
             self.has_manual_phases = True
-            self.status_hint = f"Set Pinch Start (t_first) = frame {self.i} (press [s] to save)"
-            self._update_events()
+            self.status_hint = f"Verdict: {self.verdict.upper()} (fail_mode={self.fail_mode}). Press [s] to save."
             self._compute_curves(force_phases=False)
             self.draw_static()
             self.draw_frame()
-
-        elif k == "2":
-            # Set Lift Start / Pinch End (t_lock) at cursor frame i
-            self.seg["t_lock"] = self.i
-            curr_attempts = list(self.seg.get("attempts", []))
-            prior_attempts = [
-                (max(0, min(int(a), self.n - 1)), max(0, min(int(b), self.n - 1)))
-                for a, b in curr_attempts if b < self.i - 5
-            ]
-            p_start = self.seg.get("t_last", -1)
-            if p_start < 0 or p_start >= self.i:
-                p_start = max(prior_attempts[-1][1] if prior_attempts else 0, max(0, self.i - 20))
-
-            active_att = (p_start, min(self.i + 10, self.n - 1))
-            self.seg["attempts"] = prior_attempts + [active_att]
-            self.seg["has_grasp"] = True
-            self.seg["n_attempts"] = len(self.seg["attempts"])
-            self.seg["t_first"] = self.seg["attempts"][0][0]
-            self.seg["t_last"] = p_start
-
-            if p_start < self.i:
-                self.phase_labels[p_start:self.i] = STATE_PINCH_CONTACT
-            if self.is_success:
-                self.phase_labels[self.i:] = STATE_LIFT_SUCCESS
-            else:
-                self.phase_labels[self.i:] = STATE_MISS_OR_LOST
-
-            self.has_manual_phases = True
-            self.status_hint = f"Set Lift Start (t_lock) = frame {self.i} (press [s] to save)"
-            self._update_events()
-            self._compute_curves(force_phases=False)
-            self.draw_static()
-            self.draw_frame()
-        elif k in ("x", "backspace", "delete"):
-            # Delete attempt under cursor (ideal for removing false air pinches)
-            curr = list(self.seg.get("attempts", []))
-            match_idx = None
-            for idx, (a, b) in enumerate(curr):
-                if a <= self.i <= b:
-                    match_idx = idx
-                    break
-            if match_idx is None:
-                for idx, (a, b) in enumerate(curr):
-                    if min(abs(self.i - a), abs(self.i - b)) <= 15:
-                        match_idx = idx
-                        break
-            if match_idx is not None:
-                del_att = curr.pop(match_idx)
-                self.seg["attempts"] = curr
-                self.seg["has_grasp"] = bool(curr)
-                self.seg["n_attempts"] = len(curr)
-                if curr:
-                    self.seg["t_first"] = curr[0][0]
-                    self.seg["t_last"] = curr[-1][0]
-                    if self.seg["t_lock"] < self.seg["t_first"]:
-                        self.seg["t_lock"] = min(self.seg["t_last"] + 25, self.n - 1)
-                else:
-                    self.seg["t_first"] = -1
-                    self.seg["t_last"] = -1
-                    self.seg["t_lock"] = -1
-                self.has_manual_phases = False
-                self.status_hint = f"Deleted attempt {del_att}. Recomputed (press [s] to save)."
-                self._update_events()
-                self._compute_curves(force_phases=True)
-                self.draw_static()
-                self.draw_frame()
-            else:
-                self.status_hint = f"No attempt at frame {self.i} to delete."
-                self.draw_frame()
-        elif k == "m":
-            # Cycle state of segment containing frame i: 0 -> 1 -> 3 -> 2 -> 0
-            segs = labels_to_segments(self.phase_labels, self.times_s)
-            for s in segs:
-                if s["start_frame"] <= self.i < s["end_frame"] or (s["start_frame"] == self.i == self.n - 1):
-                    cycle_map = {0: 1, 1: 3, 3: 2, 2: 0}
-                    nxt_st = cycle_map.get(s["state"], 0)
-                    self.phase_labels[s["start_frame"]:s["end_frame"]] = nxt_st
-                    self.has_manual_phases = True
-                    self.status_hint = f"Segment f={s['start_frame']}..{s['end_frame']} set to {nxt_st} ({GRASP_STATE_NAMES[nxt_st]}). Press [s] to save."
-                    break
-            self.draw_static()
-            self.draw_frame()
-        elif raw_k in ("!", "@", "#", "$", ")") or k in ("shift+0", "shift+1", "shift+2", "shift+3"):
-            tgt_map = {
-                ")": 0, "shift+0": 0,
-                "!": 1, "shift+1": 1,
-                "@": 2, "shift+2": 2,
-                "#": 3, "shift+3": 3,
+        elif k in ("0", "1", "2", "3", "4") or raw_k in ("!", "@", '"', "#", "§", "paragraph", "section", "$", ")", "=") or k in ("shift+0", "shift+1", "shift+2", "shift+3", "shift+4"):
+            # Unified non-destructive phase setting:
+            # Never modifies frames BEFORE cursor self.i!
+            # Sets self.i .. segment_end (or whole segment if self.i == start_frame).
+            key_map = {
+                "0": (STATE_APPROACH, None),
+                ")": (STATE_APPROACH, None),
+                "=": (STATE_APPROACH, None),
+                "shift+0": (STATE_APPROACH, None),
+                "1": (STATE_PINCH_CONTACT, None),
+                "!": (STATE_PINCH_CONTACT, None),
+                "shift+1": (STATE_PINCH_CONTACT, None),
+                "2": (STATE_LIFT_SUCCESS, "lift"),
+                "@": (STATE_LIFT_SUCCESS, "lift"),
+                '"': (STATE_LIFT_SUCCESS, "lift"),
+                "shift+2": (STATE_LIFT_SUCCESS, "lift"),
+                "3": (STATE_MISS_OR_LOST, "slip"),
+                "#": (STATE_MISS_OR_LOST, "slip"),
+                "§": (STATE_MISS_OR_LOST, "slip"),
+                "paragraph": (STATE_MISS_OR_LOST, "slip"),
+                "section": (STATE_MISS_OR_LOST, "slip"),
+                "shift+3": (STATE_MISS_OR_LOST, "slip"),
+                "4": (STATE_MISS_OR_LOST, "removed"),
+                "$": (STATE_MISS_OR_LOST, "removed"),
+                "shift+4": (STATE_MISS_OR_LOST, "removed"),
             }
-            tgt_st = tgt_map.get(raw_k, tgt_map.get(k, 0))
+            tgt_st, mode = key_map.get(k, key_map.get(raw_k, (STATE_APPROACH, None)))
             segs = labels_to_segments(self.phase_labels, self.times_s)
+
+            for idx_s, s in enumerate(segs):
+                if s["start_frame"] <= self.i < s["end_frame"] or (s["start_frame"] == self.i == self.n - 1):
+                    end_f = s["end_frame"]
+                    if not hasattr(self, "segment_peaks") or self.segment_peaks is None:
+                        self.segment_peaks = {}
+
+                    # Find which LIFT segment (if any) belongs to this attempt for per-segment peak (3 vs 4)
+                    lift_start_key = None
+                    if s["state"] == STATE_LIFT_SUCCESS:
+                        lift_start_key = s["start_frame"]
+                    elif idx_s > 0 and segs[idx_s - 1]["state"] == STATE_LIFT_SUCCESS:
+                        lift_start_key = segs[idx_s - 1]["start_frame"]
+
+                    # If cursor is ALREADY inside a MISS (3) segment and user presses [3] or [4],
+                    # do NOT alter any classification phase boundaries — only switch the preceding lift's peak!
+                    if s["state"] == STATE_MISS_OR_LOST and tgt_st == STATE_MISS_OR_LOST and lift_start_key is not None:
+                        start_f = s["start_frame"]
+                    else:
+                        if tgt_st == STATE_LIFT_SUCCESS and s["state"] == STATE_PINCH_CONTACT and idx_s + 1 < len(segs):
+                            if segs[idx_s + 1]["state"] == STATE_MISS_OR_LOST:
+                                end_f = segs[idx_s + 1]["end_frame"]
+                        start_f = self.i if self.i > s["start_frame"] else s["start_frame"]
+                        self.phase_labels[start_f:end_f] = tgt_st
+                        if tgt_st == STATE_LIFT_SUCCESS:
+                            lift_start_key = start_f
+
+                    if mode == "slip":
+                        if lift_start_key is not None:
+                            self.segment_peaks[int(lift_start_key)] = 0.55
+                        if end_f >= self.n - 5:
+                            self.is_success = False
+                            self.verdict = "fail"
+                            self.fail_mode = "slip"
+                    elif mode == "removed":
+                        if lift_start_key is not None:
+                            self.segment_peaks[int(lift_start_key)] = 1.0
+                        if end_f >= self.n - 5:
+                            self.is_success = False
+                            self.verdict = "fail"
+                            self.fail_mode = "operator_removed"
+                    elif mode == "lift":
+                        if lift_start_key is not None:
+                            self.segment_peaks[int(lift_start_key)] = 1.0
+                        if end_f >= self.n - 5:
+                            self.is_success = True
+                            self.verdict = "pass"
+                            self.fail_mode = "none"
+
+                    # Keep verdict synced with final phase of episode
+                    if int(self.phase_labels[-1]) == STATE_LIFT_SUCCESS:
+                        self.is_success = True
+                        self.verdict = "pass"
+                        self.fail_mode = "none"
+
+                    self.has_manual_phases = True
+                    extra = ""
+                    if mode == "slip":
+                        extra = f" (Lift @{lift_start_key} peak = 0.55)"
+                    elif mode == "removed":
+                        extra = f" (Lift @{lift_start_key} peak = 1.00 / 100%)"
+                    self.status_hint = (
+                        f"Set f={start_f}..{end_f} -> {tgt_st} ({GRASP_STATE_NAMES[tgt_st]}){extra}. Press [s] to save."
+                    )
+                    break
+
+            self._update_events()
+            self._compute_curves(force_phases=False)
+            self.draw_static()
+            self.draw_frame()
+
+        elif raw_k in ("+", "-") or k in ("+", "-", "plus", "minus"):
+            if not hasattr(self, "segment_peaks") or self.segment_peaks is None:
+                self.segment_peaks = {}
+            segs = labels_to_segments(self.phase_labels, self.times_s)
+            lift_key = None
+            for idx_s, s in enumerate(segs):
+                if s["start_frame"] <= self.i < s["end_frame"] or (s["start_frame"] == self.i == self.n - 1):
+                    if s["state"] == STATE_LIFT_SUCCESS:
+                        lift_key = int(s["start_frame"])
+                    elif idx_s > 0 and segs[idx_s - 1]["state"] == STATE_LIFT_SUCCESS:
+                        lift_key = int(segs[idx_s - 1]["start_frame"])
+                    break
+            step = 0.05 if (raw_k == "+" or k in ("+", "plus")) else -0.05
+            if lift_key is not None:
+                cur_pk = self.segment_peaks.get(lift_key, getattr(self, "lift_peak", None))
+                if cur_pk is None:
+                    cur_pk = 1.0 if self.is_success else 0.55
+                new_pk = round(float(np.clip(cur_pk + step, 0.40, 1.00)), 2)
+                self.segment_peaks[lift_key] = new_pk
+                self.status_hint = f"Adjusted Lift @{lift_key} Peak = {new_pk:.2f}. Press [s] to save."
+            else:
+                cur_pk = getattr(self, "lift_peak", None)
+                if cur_pk is None:
+                    cur_pk = 1.0 if self.is_success else 0.55
+                self.lift_peak = round(float(np.clip(cur_pk + step, 0.40, 1.00)), 2)
+                self.status_hint = f"Adjusted Global Lift Peak = {self.lift_peak:.2f}. Press [s] to save."
+            self.has_manual_phases = True
+            self._compute_curves(force_phases=False)
+            self.draw_static()
+            self.draw_frame()
+
+        elif k == "c":
+            # Clear from cursor frame i to end of episode -> 0: APPROACH (for clean left-to-right relabeling)
+            self.phase_labels[self.i:] = STATE_APPROACH
+            self.has_manual_phases = True
+            self.status_hint = f"Cleared f={self.i}..{self.n} to 0 (APPROACH). Ready to label left-to-right with [1]->[2]->[3/4]->[0]."
+            self._update_events()
+            self._compute_curves(force_phases=False)
+            self.draw_static()
+            self.draw_frame()
+
+        elif k in ("x", "backspace", "delete"):
+            # Delete/reset current segment under cursor to 0: APPROACH without losing other manual edits!
+            segs = labels_to_segments(self.phase_labels, self.times_s)
+            for idx_s, s in enumerate(segs):
+                if s["start_frame"] <= self.i < s["end_frame"] or (s["start_frame"] == self.i == self.n - 1):
+                    sf, ef = s["start_frame"], s["end_frame"]
+                    # If deleting a PINCH segment followed immediately by MISS, clear both (whole failed attempt)
+                    if s["state"] == STATE_PINCH_CONTACT and idx_s + 1 < len(segs) and segs[idx_s + 1]["state"] == STATE_MISS_OR_LOST:
+                        ef = segs[idx_s + 1]["end_frame"]
+                    elif s["state"] == STATE_MISS_OR_LOST and idx_s > 0 and segs[idx_s - 1]["state"] == STATE_PINCH_CONTACT:
+                        sf = segs[idx_s - 1]["start_frame"]
+                    self.phase_labels[sf:ef] = STATE_APPROACH
+                    self.has_manual_phases = True
+                    self.status_hint = f"Deleted segment f={sf}..{ef} -> set to 0 (APPROACH). Press [s] to save."
+                    break
+            self._update_events()
+            self._compute_curves(force_phases=False)
+            self.draw_static()
+            self.draw_frame()
+
+        elif k == "m":
+            # Cycle state of current segment: 0 -> 1 -> 2 -> 3 -> 0
+            segs = labels_to_segments(self.phase_labels, self.times_s)
+            cycle_map = {
+                STATE_APPROACH: STATE_PINCH_CONTACT,
+                STATE_PINCH_CONTACT: STATE_LIFT_SUCCESS,
+                STATE_LIFT_SUCCESS: STATE_MISS_OR_LOST,
+                STATE_MISS_OR_LOST: STATE_APPROACH,
+            }
             for s in segs:
                 if s["start_frame"] <= self.i < s["end_frame"] or (s["start_frame"] == self.i == self.n - 1):
-                    self.phase_labels[s["start_frame"]:s["end_frame"]] = tgt_st
+                    nxt_st = cycle_map.get(s["state"], STATE_APPROACH)
+                    start_f = self.i if self.i > s["start_frame"] else s["start_frame"]
+                    self.phase_labels[start_f:s["end_frame"]] = nxt_st
                     self.has_manual_phases = True
-                    self.status_hint = f"Segment f={s['start_frame']}..{s['end_frame']} set to {tgt_st} ({GRASP_STATE_NAMES[tgt_st]}). Press [s] to save."
+                    self.status_hint = f"f={start_f}..{s['end_frame']} -> {nxt_st} ({GRASP_STATE_NAMES[nxt_st]}). Press [s] to save."
                     break
+            self._update_events()
+            self._compute_curves(force_phases=False)
             self.draw_static()
             self.draw_frame()
-        elif raw_k in ("R", "shift+r"):
+
+        elif raw_k in ("R", "shift+r") or k == "r":
             sig = extract_grasp_signal(joint_states=self.raw_data)
-            self.seg = segment_grasp_attempts(sig)
-            self.status_hint = "Reset grasp attempts to automatic segmentation."
+            self.seg = segment_grasp_attempts(sig, z=self.z)
+            self.has_manual_phases = False
+            self.lift_peak = None
+            self.status_hint = "Reset episode to automatic grasp segmentation."
+            self._compute_curves(force_phases=True)
             self._update_events()
-            self._compute_curves()
-            self.draw_static()
-            self.draw_frame()
-        elif k == "r":
-            # Split current attempt or add a retry attempt at cursor frame i
-            curr_attempts = list(self.seg.get("attempts", []))
-            split_idx = None
-            for idx, (a, b) in enumerate(curr_attempts):
-                if a < self.i < b:
-                    split_idx = idx
-                    break
-
-            if split_idx is not None:
-                a, b = curr_attempts[split_idx]
-                sub_sig = self.g[a:self.i]
-                if len(sub_sig) > 20:
-                    pk_idx = a + int(np.argmax(sub_sig))
-                    if self.i > pk_idx + 10:
-                        val_idx = pk_idx + int(np.argmin(self.g[pk_idx:self.i]))
-                        end1 = max(a + 10, min((pk_idx + val_idx) // 2, self.i - 10))
-                    else:
-                        end1 = max(a + 10, self.i - 10)
-                else:
-                    end1 = max(a + 1, self.i - 1)
-                new_attempts = curr_attempts[:split_idx] + [(a, end1), (self.i, b)] + curr_attempts[split_idx + 1:]
-                self.seg["attempts"] = new_attempts
-                self.seg["t_last"] = self.i
-                thr_lock = self.seg.get("threshold", 0.5)
-                hit_lock = np.flatnonzero(self.g[self.i:b] >= thr_lock)
-                t_lock = self.i + int(hit_lock[0]) if len(hit_lock) else self.i
-                self.seg["t_lock"] = min(t_lock, min(self.i + 25, self.n - 1))
-                self.status_hint = f"Retry added at f={self.i} (total attempts: {len(new_attempts)}). Press [s] to save."
-            else:
-                prior = [(a, min(b, self.i - 5)) for a, b in curr_attempts if a < self.i - 5]
-                new_attempts = prior + [(self.i, self.n - 1)]
-                self.seg["attempts"] = new_attempts
-                self.seg["t_last"] = self.i
-                self.seg["t_lock"] = min(self.i + 25, self.n - 1)
-                self.status_hint = f"Added attempt starting at f={self.i}. Press [s] to save."
-
-            self.seg["has_grasp"] = bool(self.seg["attempts"])
-            self.seg["n_attempts"] = len(self.seg["attempts"])
-            self.seg["t_first"] = self.seg["attempts"][0][0] if self.seg["attempts"] else -1
-            self._update_events()
-            self._compute_curves()
-            self.draw_static()
-            self.draw_frame()
-        elif k == "0":
-            if self.seg.get("has_grasp", False) and self.seg.get("attempts"):
-                self.seg["has_grasp"] = False
-                self.seg["attempts"] = []
-                self.seg["t_first"] = -1
-                self.seg["t_last"] = -1
-                self.seg["t_lock"] = -1
-                self.fail_mode = "grasp_miss"
-                self.is_success = False
-                self.verdict = "fail"
-                self.status_hint = "Marked as NO GRASP / total miss (progress = 0.0). Press [s] to save."
-            else:
-                sig = extract_grasp_signal(joint_states=self.raw_data)
-                self.seg = segment_grasp_attempts(sig)
-                self.status_hint = "Restored automatic grasp detection."
-            self._update_events()
-            self._compute_curves()
             self.draw_static()
             self.draw_frame()
         elif k == "f":
@@ -864,7 +1002,7 @@ class Viewer:
                 delta = 1
             else:
                 delta = -1
-            self.status_hint = "[v]=Pass/Fail  [1]=Grasp  [2]=Lock/Peel  [r]=Retry  [0]=NoGrasp  [f]=FailMode  [s]=Save  [n/p]=Ep  [g]=Group  [q]=Quit"
+            self.status_hint = "[1]=Pinch  [2]=Lift  [3]=Miss/Slip  [0]=Approach  [m]=Cycle  [v]=Pass/Fail  [s]=Save  [n/p]=Ep  [q]=Quit"
             self.ei = (self.ei + delta) % len(self.episodes)
             nxt_key = self.episodes[self.ei][0]
             print(f"\nLoading [{self.ei + 1}/{len(self.episodes)}] {nxt_key}...")
@@ -904,6 +1042,14 @@ class Viewer:
             outcome["verdict"] = self.verdict
             outcome["success"] = bool(self.is_success)
             outcome["failure_mode"] = self.fail_mode
+            if getattr(self, "lift_peak", None) is not None:
+                outcome["lift_peak"] = float(self.lift_peak)
+            elif "lift_peak" in outcome:
+                del outcome["lift_peak"]
+            if getattr(self, "segment_peaks", None):
+                outcome["segment_peaks"] = {str(k): float(v) for k, v in self.segment_peaks.items()}
+            elif "segment_peaks" in outcome:
+                del outcome["segment_peaks"]
             outcome["t_first"] = int(self.seg.get("t_first", -1))
             outcome["t_lock"] = int(self.seg.get("t_lock", -1))
             outcome["t_last"] = int(self.seg.get("t_last", -1))
@@ -987,6 +1133,12 @@ def main():
                     help="collection/episode keys or rollout names")
     ap.add_argument("--review", action="store_true",
                     help="load the 10 reviewed episodes")
+    ap.add_argument("--problems", action="store_true",
+                    help="only load the 21 problem rollouts identified during review")
+    ap.add_argument("--crosscheck", action="store_true",
+                    help="load 21 problem rollouts + 30 Zarr retries + 10 Zarr samples for final crosscheck")
+    ap.add_argument("--retries", action="store_true",
+                    help="load only the 30 retry episodes from the large Zarr dataset")
     ap.add_argument("--max-frames", type=int, default=1500,
                     help="max wrist camera frames to decode per episode (default: 1500; 0 for uncapped)")
     ap.add_argument("--no-video", action="store_true",
@@ -1004,7 +1156,35 @@ def main():
         print("    export DISPLAY=:1", file=sys.stderr)
         sys.exit(1)
 
-    if args.zarr is not None:
+    if args.crosscheck:
+        roots = DEFAULT_ROLLOUT_ROOTS
+        all_rollouts = find_rollouts(roots)
+        episodes = []
+        for pat in PROBLEM_ROLLOUT_PATTERNS:
+            for k, e in all_rollouts:
+                if pat.lower() in k.lower():
+                    episodes.append((f"[1_Problem_Rollouts] {k}", e))
+                    break
+        retries, samples = find_zarr_crosscheck_episodes()
+        episodes.extend(retries)
+        episodes.extend(samples)
+        print(f"[Viewer] Loaded {len(episodes)} episodes for Crosscheck: "
+              f"{len(PROBLEM_ROLLOUT_PATTERNS)} problem rollouts, {len(retries)} Zarr retries, {len(samples)} Zarr samples.")
+    elif args.retries:
+        retries, _ = find_zarr_crosscheck_episodes()
+        episodes = retries
+        print(f"[Viewer] Loaded {len(episodes)} Zarr retry episodes from large dataset.")
+    elif args.problems:
+        roots = DEFAULT_ROLLOUT_ROOTS
+        all_rollouts = find_rollouts(roots)
+        episodes = []
+        for pat in PROBLEM_ROLLOUT_PATTERNS:
+            for k, e in all_rollouts:
+                if pat.lower() in k.lower():
+                    episodes.append((k, e))
+                    break
+        print(f"[Viewer] Loaded {len(episodes)} problem rollouts for targeted review.")
+    elif args.zarr is not None:
         import zarr
         z_path = pathlib.Path(args.zarr)
         if not z_path.exists():

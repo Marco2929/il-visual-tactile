@@ -165,11 +165,16 @@ def segment_grasp_attempts(
                 # to make a fresh retry (e.g. ep_498), vs staying/lifting in the air (e.g. ep_144, ep_328).
                 prev_end = part_attempts[-1][1] if part_attempts else 0
                 z_peak_since_prev = float(np.max(z_arr[prev_end:a + 1])) if a >= prev_end else z_att_start
-                descended_for_retry = (z_peak_since_prev - z_att_min) >= 0.040 and (z_att_min <= z_min + 0.075)
+                z_span = max(float(np.max(z_arr)) - z_min, 0.10)
+                hand_opened_wide = (a - prev_end >= 20) and (float(np.min(sig[prev_end:a])) < open_reset_thr)
+                descended_for_retry = (
+                    ((z_peak_since_prev - z_att_min) >= 0.040 and (z_att_min <= z_min + 0.075 or hand_opened_wide))
+                    or (hand_opened_wide and z_att_min <= z_min + 0.45 * z_span)
+                )
 
                 if descended_for_retry:
                     part_attempts.append((a, b))
-                elif part_attempts and z_att_start > contact_ceil:
+                elif part_attempts and z_att_start > contact_ceil and not hand_opened_wide:
                     # Hand already grasped at the part and is now up in the air
                     # re-tightening/adjusting its grip -> extend the prior grasp!
                     part_attempts[-1] = (part_attempts[-1][0], b)

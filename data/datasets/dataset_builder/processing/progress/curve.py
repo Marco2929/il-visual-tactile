@@ -286,6 +286,23 @@ def build_phase_labels(
     if not attempts:
         return labels
 
+    # Sanitize and clamp attempts strictly to [0, T - 1]
+    clean_attempts = []
+    for raw_a, raw_b in sorted(attempts):
+        a_c = max(0, min(int(raw_a), T - 1))
+        b_c = max(a_c, min(int(raw_b), T - 1))
+        if clean_attempts:
+            prev_a, prev_b = clean_attempts[-1]
+            if a_c <= prev_b:
+                clean_attempts[-1] = (prev_a, max(prev_b, b_c))
+                continue
+        if b_c > a_c:
+            clean_attempts.append((a_c, b_c))
+
+    if not clean_attempts:
+        return labels
+    attempts = clean_attempts
+
     # Helper to find closing onset (~20% closure before threshold crossing)
     onset_thr = None
     if sig is not None and len(sig) == T:
@@ -313,7 +330,19 @@ def build_phase_labels(
         # Pinch phase lasts while fingers are closing/squeezing at the part up to
         # the end of the squeeze plateau (>= 85% of the attempt's peak closure),
         # so multi-pulse pinches (like ep_049) stay in PINCH_CONTACT until release begins.
-        if sig is not None and rt > gt:
+        if rt - gt > 45:
+            # Long closed span (e.g. empty-hand lift in rollout_006 or full intermediate lift):
+            # Pinch contact at the surface only lasts until lift onset (~20-25 frames),
+            # not for hundreds of frames in the air.
+            t_pinch_end = min(rt, gt + 22)
+            if z is not None and len(z) == T:
+                w0 = max(0, min(T - 1, gt - 5))
+                w1 = max(w0 + 1, min(T, gt + 15))
+                z_c = float(np.min(z[w0:w1]))
+                lifted_i = np.flatnonzero(z[gt:rt] >= z_c + lift_delta_z)
+                if len(lifted_i):
+                    t_pinch_end = max(gt + 8, min(rt, gt + int(lifted_i[0])))
+        elif sig is not None and rt > gt:
             seg_sig = sig[gt:rt]
             seg_lo = float(sig[t_onset_i])
             seg_hi = float(np.max(seg_sig))
@@ -343,12 +372,16 @@ def build_phase_labels(
     if is_success:
         # Determine lift onset: when z rises by lift_delta_z above contact height
         if z is not None and len(z) == T:
-            win_start = max(0, glast - 5)
-            win_end = min(T, t_end_lock + 10)
-            z_contact = float(np.min(z[win_start:win_end]))
-            lifted = np.flatnonzero(z[t_end_lock:] >= z_contact + lift_delta_z)
-            if len(lifted):
-                t_lift = t_end_lock + int(lifted[0])
+            win_start = max(0, min(T - 1, glast - 5))
+            win_end = max(win_start + 1, min(T, t_end_lock + 10))
+            z_slice = z[win_start:win_end]
+            if len(z_slice) > 0:
+                z_contact = float(np.min(z_slice))
+                lifted = np.flatnonzero(z[t_end_lock:] >= z_contact + lift_delta_z)
+                if len(lifted):
+                    t_lift = t_end_lock + int(lifted[0])
+                else:
+                    t_lift = min(T - 1, max(t_end_lock + 6, t_onset + 10))
             else:
                 t_lift = min(T - 1, max(t_end_lock + 6, t_onset + 10))
         else:
@@ -366,6 +399,118 @@ def build_phase_labels(
             labels[t_miss:] = STATE_MISS_OR_LOST
 
     return labels
+
+
+def build_progress_from_phases(
+    phase_labels: np.ndarray,
+    is_success: bool = True,
+    params: CurveParams = CONSERVATIVE,
+    lift_peak: Optional[float] = None,
+    segment_peaks: Optional[dict] = None,
+    max_lift_frames: int = 210,
+) -> np.ndarray:
+    """Derive a smooth continuous progress curve in [0, 1] directly from discrete phase labels.
+
+    Synchronizes Regression with Classification:
+      - Phase 0 (APPROACH): ramps 0.0 -> yc (or yr -> yc between retries)
+      - Phase 1 (PINCH_CONTACT): ramps yc -> yg
+      - Phase 2 (LIFT_SUCCESS): ramps yg -> target_val within at most max_lift_frames (no stretching!)
+      - Phase 3 (MISS_OR_LOST): drops cleanly and rapidly to 0.0
+    """
+    T = len(phase_labels)
+    if T <= 0:
+        return np.zeros(0, dtype=np.float32)
+
+    y = np.zeros(T, dtype=np.float32)
+    yc = params.y_contact
+    yg = params.y_grasp
+    yr = params.y_retry
+    gamma = params.gamma
+    seg_peaks = segment_peaks or {}
+
+    # Convert per-frame phase labels to contiguous segments
+    segs = []
+    start = 0
+    cur = int(phase_labels[0])
+    for i in range(1, T):
+        if int(phase_labels[i]) != cur:
+            segs.append((cur, start, i))
+            start = i
+            cur = int(phase_labels[i])
+    segs.append((cur, start, T))
+
+    seen_first_pinch = False
+
+    for st, a, b in segs:
+        dur = b - a
+        if dur <= 0:
+            continue
+
+        prev_val = float(y[a - 1]) if a > 0 else 0.0
+
+        if st == STATE_APPROACH:
+            if not seen_first_pinch:
+                ramp_d = min(dur, 240)
+                t_app = np.linspace(0.0, 1.0, ramp_d)
+                y[a:a + ramp_d] = yc * (t_app ** gamma)
+                if ramp_d < dur:
+                    y[a + ramp_d:b] = yc
+            else:
+                ramp_d = min(dur, 150)
+                p_re = np.linspace(0.0, 1.0, ramp_d)
+                start_val = min(prev_val, yr)
+                y[a:a + ramp_d] = start_val + (yc - start_val) * (p_re ** gamma)
+                if ramp_d < dur:
+                    y[a + ramp_d:b] = yc
+
+        elif st == STATE_PINCH_CONTACT:
+            seen_first_pinch = True
+            ramp_d = min(dur, 60)
+            p_pinch = np.linspace(0.0, 1.0, ramp_d)
+            start_val = max(0.0, prev_val)
+            y[a:a + ramp_d] = start_val + (yg - start_val) * np.sin(0.5 * np.pi * p_pinch)
+            if ramp_d < dur:
+                y[a + ramp_d:b] = yg
+
+        elif st == STATE_LIFT_SUCCESS:
+            seen_first_pinch = True
+            start_val = max(yg, prev_val)
+            # Determine target peak for this specific LIFT segment:
+            # 1) Check segment-specific peak (from pressing [3] or [4] on this attempt)
+            seg_pk = seg_peaks.get(a, seg_peaks.get(str(a), None))
+            if seg_pk is not None:
+                target_val = float(np.clip(seg_pk, start_val, 1.0))
+            elif b >= T - 2 and is_success:
+                # Final successful lift at the end of a passed episode ALWAYS reaches 1.0 (100%)
+                target_val = 1.0
+            elif lift_peak is not None:
+                target_val = float(np.clip(lift_peak, start_val, 1.0))
+            elif not is_success:
+                target_val = max(start_val, 0.55)
+            else:
+                target_val = 1.0
+
+            # Do NOT stretch the ramp across overly long holds at the top:
+            # Scale max ramp frames proportionally to how far target_val is above start_val
+            frac_span = max(0.25, (target_val - start_val) / max(1.0 - yg, 1e-4))
+            max_ramp = max(20, int(round(max_lift_frames * frac_span)))
+            ramp_d = min(dur, max_ramp)
+
+            p_lift = np.linspace(0.0, 1.0, ramp_d)
+            y[a:a + ramp_d] = start_val + (target_val - start_val) * (p_lift ** 0.8)
+            if ramp_d < dur:
+                y[a + ramp_d:b] = target_val
+
+        elif st == STATE_MISS_OR_LOST:
+            drop_len = min(dur, 4)
+            if drop_len > 0 and prev_val > 0.01:
+                p_drop = np.linspace(0.0, 1.0, drop_len)
+                y[a:a + drop_len] = prev_val * ((1.0 - p_drop) ** 2)
+                y[a + drop_len:b] = 0.0
+            else:
+                y[a:b] = 0.0
+
+    return y
 
 
 

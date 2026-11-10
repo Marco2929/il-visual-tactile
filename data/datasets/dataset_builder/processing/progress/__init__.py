@@ -22,6 +22,7 @@ from .curve import (
     build_progress_curve,
     build_pchip_progress_curve,
     build_phase_labels,
+    build_progress_from_phases,
 )
 from .detector import (
     DEFAULT_CLOSED_FRAC,
